@@ -11,6 +11,7 @@ on:
       - '.github/workflows/ontario-google-shortlist.yml'
       - '.github/workflows/ontario-quick-centroids.yml'
       - '.github/workflows/ontario-pt-current-screen.yml'
+      - '.github/workflows/p5n-exact-directory-format.yml'
 permissions:
   actions: read
   contents: write
