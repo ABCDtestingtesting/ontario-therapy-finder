@@ -8,6 +8,7 @@ on:
       - '.github/workflows/ci-run-index.yml'
       - '.github/workflows/collection-feasibility.yml'
       - '.github/workflows/google-access-observation.yml'
+      - '.github/workflows/ontario-google-shortlist.yml'
 permissions:
   actions: read
   contents: write
