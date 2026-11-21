@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/ci-run-index.yml'
       - '.github/workflows/collection-feasibility.yml'
+      - '.github/workflows/google-access-observation.yml'
 permissions:
   actions: read
   contents: write
