@@ -65,7 +65,7 @@ def _snapshot(page,path):
 
 
 def scan_one(context,query,lat,lon,diagnostics,timeout_seconds=90,max_scroll=35,
-             interactive=False,verification_wait_seconds=None,
+             interactive=False,verification_wait_seconds=None,zoom=16,
              progress=lambda msg:None,cancel_requested=lambda:False):
     """Scan one actual query. Returns a *complete* search only on verified end.
 
@@ -74,7 +74,7 @@ def scan_one(context,query,lat,lon,diagnostics,timeout_seconds=90,max_scroll=35,
     """
     diagnostics=Path(diagnostics);diagnostics.mkdir(parents=True,exist_ok=True)
     encoded=quote(query,safe='')
-    url=f'https://www.google.com/maps/search/{encoded}/@{lat:.6f},{lon:.6f},16z?hl=en'
+    url=f'https://www.google.com/maps/search/{encoded}/@{lat:.6f},{lon:.6f},{int(zoom)}z?hl=en'
     page=context.new_page()
     evidence={'query':query,'search_lat':lat,'search_lon':lon,'search_url':url,
               'place_links':[],'completed':False,'completion_reason':None}
