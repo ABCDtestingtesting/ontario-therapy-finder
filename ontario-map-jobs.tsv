@@ -1,4 +1,22 @@
-136978180019	extract	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947581100/job/136978180019
+136978742176	Low population PT shard 0	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947763762/job/136978742176
+136978742346	Low population PT shard 4	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947763762/job/136978742346
+136978742381	Low population PT shard 5	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947763762/job/136978742381
+136978742404	Low population PT shard 2	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947763762/job/136978742404
+136978742412	Low population PT shard 3	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947763762/job/136978742412
+136978742418	Low population PT shard 1	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947763762/job/136978742418
+136978663493	Low population FSA shard 10	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947738317/job/136978663493
+136978663614	Low population FSA shard 9	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947738317/job/136978663614
+136978663616	Low population FSA shard 0	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947738317/job/136978663616
+136978663641	Low population FSA shard 2	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947738317/job/136978663641
+136978663655	Low population FSA shard 4	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947738317/job/136978663655
+136978663669	Low population FSA shard 7	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947738317/job/136978663669
+136978663699	Low population FSA shard 5	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947738317/job/136978663699
+136978663711	Low population FSA shard 11	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947738317/job/136978663711
+136978663723	Low population FSA shard 1	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947738317/job/136978663723
+136978663733	Low population FSA shard 3	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947738317/job/136978663733
+136978663738	Low population FSA shard 8	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947738317/job/136978663738
+136978663739	Low population FSA shard 6	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947738317/job/136978663739
+136978180019	extract	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947581100/job/136978180019
 136978014764	PT shard 8	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947526931/job/136978014764
 136978014967	PT shard 7	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947526931/job/136978014967
 136978014983	PT shard 2	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947526931/job/136978014983
