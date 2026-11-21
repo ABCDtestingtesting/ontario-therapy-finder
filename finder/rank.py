@@ -28,6 +28,26 @@ def merged_locations(fsas):
             all_places[p['id']]=p
     return list(all_places.values())
 
+def pick_distinct_candidates(sites,fsa_centres,min_distance_km=10):
+    """Choose two different FSAs at least 10 km apart, with separate catchments.
+
+    Check both FSA representative centres and the candidate points. Different
+    FSA labels alone do not establish geographic independence.
+    """
+    picks=[]
+    for cand in sites:
+        if cand.get('status')!='screened':continue
+        fsa=cand.get('fsa')
+        if fsa not in fsa_centres:raise InvalidEvidence(f'Missing FSA centre for {fsa}')
+        if any(fsa==p['fsa'] or
+               haversine(fsa_centres[fsa],fsa_centres[p['fsa']])<min_distance_km or
+               haversine((cand['latitude'],cand['longitude']),
+                         (p['latitude'],p['longitude']))<min_distance_km
+               for p in picks):continue
+        picks.append(cand)
+        if len(picks)==2:break
+    return picks
+
 def analyse(fsas,min_sites_each=4,max_sites_each=70):
     if len(set(fsas)) < 2:
         raise InvalidEvidence('At least two distinct postal areas are needed for two recommendations')
@@ -37,13 +57,14 @@ def analyse(fsas,min_sites_each=4,max_sites_each=70):
     all_google=merged_locations(fsas)
     fsas_geometry=census.fsa_geometry();da_pop=census.load_population('da')
     fsa_population=census.load_population('fsa')
-    rows=[];sites=[]
+    rows=[];sites=[];fsa_centres={}
     snapshot=state.read()
     for code in fsas:
         if code not in fsas_geometry:raise InvalidEvidence(f'FSA boundary missing: {code}')
         g=fsas_geometry[code]
         da_geos=census.da_near(code,g)
         point=census.representative(g)
+        fsa_centres[code]=point
         pop=census.catchment(*point,da_geos,da_pop,radius_km=5)
         maps=nearby(all_google,*point)
         if not maps:raise InvalidEvidence(f'{code} has zero mapped clinics in representative 5 km circle; extra source audit required')
@@ -93,15 +114,7 @@ def analyse(fsas,min_sites_each=4,max_sites_each=70):
                           'google_maps_url':f'https://www.google.com/maps/search/?api=1&query={p["lat"]}%2C{p["lon"]}'})
     rows.sort(key=lambda r:(r['combined_competition_indicator'],-r['population_5km_2021_est']))
     sites.sort(key=lambda r:(r['status']!='screened',r['combined_competition_indicator'],-r['housing_photos_within_2km']))
-    # Two selected FSA recommendations should not effectively cover same catchment;
-    # screen overlap with 8km minimum between representative candidate points.
-    picks=[]
-    for cand in sites:
-        if cand['status']!='screened':continue
-        if len({p['fsa'] for p in picks}|{cand['fsa']})!=len(picks)+1:continue
-        if any(haversine((cand['latitude'],cand['longitude']),(p['latitude'],p['longitude']))<8 for p in picks):continue
-        picks.append(cand)
-        if len(picks)==2:break
+    picks=pick_distinct_candidates(sites,fsa_centres)
     if len(picks)!=2:
         raise InvalidEvidence(
             f'Only {len(picks)} geographically distinct residential candidates were verified; '
