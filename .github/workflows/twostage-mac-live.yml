@@ -4,6 +4,7 @@ on:
     paths:
       - '.github/workflows/twostage-mac-live.yml'
       - 'Ontario_Therapy_Finder_Two_Stage_90_Day_Mac.zip'
+      - 'patch_twostage_zip.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -28,12 +29,14 @@ jobs:
           shasum -a 256 Ontario_Therapy_Finder_Two_Stage_90_Day_Mac.zip
           mkdir package
           unzip -q Ontario_Therapy_Finder_Two_Stage_90_Day_Mac.zip -d package
+          python patch_twostage_zip.py
           cd package/Ontario_Therapy_Automated_Competition
           /bin/zsh -n START.command
           test -x START.command
           python -m pip install 'playwright>=1.49,<2'
           python -m playwright install firefox
           python -m unittest discover -v
+          shasum -a 256 staged.py google_auto.py
       - name: Exercise actual Stage 1 Google, Stage 2 PT, publish and final CSV
         timeout-minutes: 23
         run: |
@@ -97,6 +100,21 @@ jobs:
               finally:
                   output.write_text(json.dumps(report,indent=2,default=str))
           PY
+      - name: Build corrected Mac package for user after verification
+        if: success()
+        run: |
+          cd package
+          zip -q -r ../Ontario_Therapy_Finder_Two_Stage_90_Day_Mac_TESTED.zip Ontario_Therapy_Automated_Competition \
+            -x '*__pycache__*' '*.pyc' '*research_data*' '*mac-e2e-report.json'
+          unzip -t ../Ontario_Therapy_Finder_Two_Stage_90_Day_Mac_TESTED.zip | tail -1
+          shasum -a 256 ../Ontario_Therapy_Finder_Two_Stage_90_Day_Mac_TESTED.zip
+      - name: Upload corrected ZIP
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: corrected-two-stage-mac-ZIP
+          retention-days: 7
+          path: Ontario_Therapy_Finder_Two_Stage_90_Day_Mac_TESTED.zip
       - name: Upload source evidence and final report
         if: always()
         uses: actions/upload-artifact@v4
