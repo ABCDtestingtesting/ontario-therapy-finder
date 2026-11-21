@@ -1,0 +1,30 @@
+name: This week's PT counts for remaining Ontario FSAs
+on:
+  push:
+    paths: ['.github/workflows/provincewide-small-pt.yml','research/scan_small_fsa_pt.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pt:
+    name: Low population PT shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5]
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Live verify current smaller-FSA Psychology Today counts
+        run: python -m research.scan_small_fsa_pt --shard ${{ matrix.shard }} --shards 6
+      - name: Preserve dated listing counts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pt-low-pop-${{ matrix.shard }}
+          retention-days: 14
+          path: pt-small-output/shard-*/results.json
