@@ -6,6 +6,7 @@ on:
   push:
     paths:
       - '.github/workflows/ci-run-index.yml'
+      - '.github/workflows/collection-feasibility.yml'
 permissions:
   actions: read
   contents: write
