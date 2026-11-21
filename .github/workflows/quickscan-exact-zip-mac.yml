@@ -1,0 +1,87 @@
+name: Verify exact delivered QuickScan ZIP end to end on macOS
+on:
+  push:
+    paths:
+      - '.github/workflows/quickscan-exact-zip-mac.yml'
+      - 'Ontario_Therapy_Automated_Competition_Mac.zip'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-zip:
+    runs-on: macos-15
+    timeout-minutes: 35
+    env:
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Unpack the actual user ZIP, verify launcher and install Firefox
+        run: |
+          set -euo pipefail
+          shasum -a 256 Ontario_Therapy_Automated_Competition_Mac.zip
+          unzip -q Ontario_Therapy_Automated_Competition_Mac.zip -d check
+          cd check/Ontario_Therapy_Automated_Competition
+          test -x START.command
+          /bin/zsh -n START.command
+          python -m pip install 'playwright>=1.49,<2'
+          python -m playwright install firefox
+          python -m unittest discover -v
+      - name: Run actual Google then PT then local dashboard and CSV
+        timeout-minutes: 24
+        run: |
+          cd check/Ontario_Therapy_Automated_Competition
+          python - <<'PY'
+          import json,os,threading,time,csv,io
+          from pathlib import Path
+          from urllib.request import urlopen
+          from http.server import ThreadingHTTPServer
+          import quickscan,google_auto
+          from playwright.sync_api import sync_playwright
+          out=Path('ci_verification.json')
+          original=google_auto.launch_context
+          def ci_headless(pw,profile,headless=False):
+              return original(pw,profile,headless=True)
+          google_auto.launch_context=ci_headless
+          areas=['P5N','N4W']
+          try:
+              print('BEGIN REAL MAC GOOGLE-TO-PT',areas,flush=True)
+              quickscan.automated_google_scan(areas)
+              rows={code:quickscan.DB['areas'][code] for code in areas}
+              print('REAL_SOURCE_RESULTS',json.dumps({k:{x:v.get(x) for x in ('google_status','google_count','google_coverage','google_error','pt_count','pt_checked_at','pt_error')} for k,v in rows.items()}),flush=True)
+              with ThreadingHTTPServer(('127.0.0.1',0),quickscan.Handler) as server:
+                  t=threading.Thread(target=server.serve_forever,daemon=True);t.start()
+                  try:
+                      addr=f'http://127.0.0.1:{server.server_port}'
+                      with urlopen(addr+'/api/state',timeout=8) as r:state=json.load(r)
+                      with urlopen(addr+'/export.csv',timeout=8) as r:raw=r.read().decode('utf-8-sig')
+                      exported=list(csv.DictReader(io.StringIO(raw)))
+                      assert len(exported)==len(quickscan.DB['areas']),'CSV rows incomplete'
+                      assert len(state['rows'])==len(exported),'dashboard rows incomplete'
+                      print('DASHBOARD_AND_CSV',len(state['rows']),len(exported),flush=True)
+                  finally:server.shutdown();t.join(timeout=8)
+              success=[c for c in areas if rows[c].get('google_status')=='completed' and rows[c].get('google_coverage')=='observed_complete_feeds' and rows[c].get('pt_count') and rows[c].get('pt_checked_at')]
+              status='passed' if len(success)==len(areas) and quickscan.DB['job']['status']=='complete' else 'incomplete'
+              result={'status':status,'areas':{c:{x:v.get(x) for x in ('google_status','google_count','google_coverage','google_error','pt_count','pt_checked_at','pt_error')} for c,v in rows.items()},'export_rows':len(exported)}
+              out.write_text(json.dumps(result,indent=2))
+              print('RESULT',status,flush=True)
+              if status!='passed':raise RuntimeError('End-to-end sources/ranking incomplete; inspect ci_verification.json')
+          except Exception as exc:
+              if not out.exists():out.write_text(json.dumps({'status':'failed','error':repr(exc),'areas':{c:quickscan.DB['areas'][c] for c in areas}},default=str,indent=2))
+              raise
+          PY
+      - name: Preserve evidence including failure details
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exact-zip-mac-e2e-evidence
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            check/Ontario_Therapy_Automated_Competition/ci_verification.json
+            check/Ontario_Therapy_Automated_Competition/research_data/results.json
+            check/Ontario_Therapy_Automated_Competition/research_data/google_evidence/*/*/summary.json
+            check/Ontario_Therapy_Automated_Competition/research_data/google_evidence/*/*/*/search.json
+            check/Ontario_Therapy_Automated_Competition/research_data/google_evidence/*/*/*/failure.json
