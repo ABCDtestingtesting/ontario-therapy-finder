@@ -1,0 +1,97 @@
+name: Real macOS verification (live sources)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'finder/**'
+      - 'tests/**'
+      - 'web/**'
+      - 'ci/**'
+      - '.github/workflows/live-macos-verification.yml'
+      - 'requirements.txt'
+      - 'start.command'
+
+permissions:
+  contents: read
+
+jobs:
+  live-macos-verification:
+    name: ${{ matrix.os }} — real external data checks
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel, macos-26, macos-26-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 155
+    env:
+      PYTHONUNBUFFERED: '1'
+      THERAPY_DATA_HOME: ${{ github.workspace }}/ci_private_data
+      CI: 'true'
+    steps:
+      - name: Check out exact tested revision
+        uses: actions/checkout@v4
+      - name: Configure Python 3.12 for this Mac architecture
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Record real Mac and validate launcher syntax
+        run: |
+          uname -a
+          sw_vers
+          python --version
+          zsh -n start.command
+          ls -la start.command
+          go version || true
+      - name: Install application requirements and actual Playwright Firefox
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m playwright install firefox
+          python -m finder.selfcheck
+      - name: Run existing tests on the actual hosted Mac
+        run: python -m pytest -q
+      - name: Live localhost server and dashboard HTTP
+        if: always()
+        continue-on-error: true
+        run: python ci/run_stage.py app --timeout 120
+      - name: Real Mac start.command, browser installation and dashboard startup
+        if: always()
+        continue-on-error: true
+        run: python ci/run_stage.py mac_launcher --timeout 750
+      - name: Live Statistics Canada downloads and geographic catchment
+        if: always()
+        continue-on-error: true
+        run: python ci/run_stage.py census --timeout 3000
+      - name: Live Google Maps native installation and a small real search
+        if: always()
+        continue-on-error: true
+        run: python ci/run_stage.py maps --timeout 1400
+      - name: Live Psychology Today page-by-page Firefox collection
+        if: always()
+        continue-on-error: true
+        run: python ci/run_stage.py psychology_today --timeout 1600
+      - name: Live Google Street View screenshot sampling
+        if: always()
+        continue-on-error: true
+        run: python ci/run_stage.py housing_capture --timeout 1100
+      - name: Enforce that ALL SIX real Mac stages passed
+        if: always()
+        run: python ci/report.py
+      - name: Save logs, census summaries and diagnostic screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-live-test-${{ matrix.os }}
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            ci_results/
+            ci/app_server.log
+            ci/real_launcher.log
+            logs/
+            ci_private_data/areas/*/pt/verification_*.png
+            ci_private_data/areas/*/pt/unrecognised_*.png
+            ci_private_data/areas/*/housing/*.png
+            ci_private_data/ci_maps_small_grid/stdout.txt
+            ci_private_data/ci_maps_small_grid/stderr.txt

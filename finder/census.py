@@ -1,0 +1,232 @@
+"""Official 2021 Census sources, strict wide-column parser and paginated DA polygons.
+
+Population = the 2021 baseline. A 5-km point estimate assumes uniform population
+within each intersected dissemination area; estimates are labelled accordingly.
+"""
+from __future__ import annotations
+import csv, io, re, math, json, zipfile, time, os, tempfile
+from functools import lru_cache
+from pathlib import Path
+import requests
+from shapely.geometry import shape, Point
+from shapely.ops import transform
+from pyproj import Transformer
+from .common import DATA,SourceUnavailable,InvalidEvidence,write_json,read_json,sha256,valid_fsa
+FSA_URL='https://www150.statcan.gc.ca/n1/tbl/csv/98100019-eng.zip'
+DA_URL='https://www150.statcan.gc.ca/n1/tbl/csv/98100015-eng.zip'
+GIS='https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer'
+FSA_LAYER=GIS+'/14/query'
+DA_LAYER=GIS+'/12/query'
+UA='OntarioTherapyAreaResearch/5.1 census-geography'
+
+@lru_cache(maxsize=1)
+def project():return Transformer.from_crs(4326,3347,always_xy=True).transform
+@lru_cache(maxsize=1)
+def unproject():return Transformer.from_crs(3347,4326,always_xy=True).transform
+
+def http_get(url, params=None, timeout=120, retries=4):
+    errors=[]
+    for i in range(retries):
+        try:
+            r=requests.get(url,params=params,timeout=(15,timeout),headers={'User-Agent':UA})
+            r.raise_for_status()
+            return r.content
+        except requests.RequestException as exc:
+            errors.append(str(exc))
+            if i<retries-1:time.sleep(min(2**i,8))
+    raise SourceUnavailable(f'{url} failed after {retries} attempts: {errors[-1]}')
+
+def fetch_to_file(url,path, progress=None,retries=3):
+    """Stream to temporary file and atomically commit only if download is complete."""
+    path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
+    last=None
+    for attempt in range(retries):
+        tmp=None
+        try:
+            with requests.get(url,timeout=(15,120),stream=True,headers={'User-Agent':UA}) as r:
+                r.raise_for_status()
+                total=int(r.headers.get('Content-Length') or 0)
+                with tempfile.NamedTemporaryFile(dir=path.parent,delete=False) as out:
+                    tmp=Path(out.name);done=0;next_report=0
+                    for chunk in r.iter_content(1024*512):
+                        if not chunk:continue
+                        out.write(chunk);done+=len(chunk)
+                        if progress and done>=next_report:
+                            progress(f'{path.name}: {done/1048576:.1f} MB'+(f' / {total/1048576:.1f} MB' if total else ''))
+                            next_report=done+1024*1024
+                    out.flush();os.fsync(out.fileno())
+            if total and done!=total:raise InvalidEvidence(f'Download truncated: {done}/{total} bytes')
+            if done<1000:raise InvalidEvidence('Download smaller than 1000 bytes')
+            if not zipfile.is_zipfile(tmp):raise InvalidEvidence('Remote download is not a ZIP file')
+            os.replace(tmp,path)
+            return path
+        except (requests.RequestException,OSError,InvalidEvidence) as exc:
+            last=exc
+            if tmp:tmp.unlink(missing_ok=True)
+            if attempt<retries-1:time.sleep(min(2**attempt,10))
+    raise SourceUnavailable(f'{url}: failed download after retries: {last}')
+
+def column_map(columns):
+    fields={}
+    for c in columns:
+        s=' '.join(c.lower().split())
+        if 'population and dwelling counts' not in s:continue
+        if re.search(r'population,\s*2021\b',s) and 'change' not in s and 'percent' not in s:fields['population']=c
+        elif 'private dwellings occupied by usual residents' in s and '2021' in s:fields['occupied']=c
+        elif 'total private dwellings' in s and '2021' in s:fields['dwellings']=c
+    return fields
+
+def as_int(v):
+    s=str(v or '').strip().replace(',','')
+    return int(s) if re.fullmatch(r'\d+',s) else None
+
+def parse_zip(path,kind,min_rows=None):
+    """Real StatCan 2021 census downloads are transposed (characteristics as columns).
+    Reject unexpected schemas, suppressed counts, impossible numbers and sparse downloads.
+    """
+    if kind not in ('fsa','da'):raise ValueError(kind)
+    threshold=min_rows if min_rows is not None else (300 if kind=='fsa' else 10000)
+    results={};csv_found=False;skipped=0
+    with zipfile.ZipFile(path) as z:
+        for name in z.namelist():
+            if not name.lower().endswith('.csv') or 'metadata' in name.lower():continue
+            with z.open(name) as raw:
+                reader=csv.DictReader(io.TextIOWrapper(raw,encoding='utf-8-sig',newline=''))
+                cols=reader.fieldnames or []
+                if 'GEO' not in cols:continue
+                fields=column_map(cols)
+                if 'population' not in fields or 'occupied' not in fields:
+                    raise InvalidEvidence(f'Unexpected StatCan {kind} CSV schema: {cols[:9]}')
+                csv_found=True
+                for row in reader:
+                    if kind=='fsa':
+                        match=re.search(r'\b([KLMNP]\d[A-Z])\b',str(row.get('GEO','')).upper())
+                        uid=match.group(1) if match else None
+                    else:
+                        dguid=str(row.get('DGUID',''))
+                        match=re.search(r'2021S0512(35\d{6})$',dguid)
+                        if not match:match=re.search(r'(?<!\d)(35\d{6})(?!\d)',str(row.get('GEO','')))
+                        uid=match.group(1) if match else None
+                    if not uid:continue
+                    pop=as_int(row.get(fields['population']));occ=as_int(row.get(fields['occupied']))
+                    dw=as_int(row.get(fields['dwellings'])) if 'dwellings' in fields else None
+                    if pop is None or occ is None or (dw is not None and dw<occ):
+                        skipped+=1;continue
+                    if uid in results:
+                        if results[uid]['population']!=pop:raise InvalidEvidence('Conflicting duplicate '+uid)
+                        continue
+                    results[uid]={'population':pop,'occupied':occ,'dwellings':dw}
+    if not csv_found:raise InvalidEvidence(f'No census CSV found in {path}')
+    if len(results)<threshold:raise InvalidEvidence(f'Incomplete census {kind} records: {len(results)} < {threshold}; skipped {skipped}')
+    return results
+
+def load_population(kind,progress=None):
+    target=DATA/f'{kind}_population.json'
+    if target.exists():
+        cached=read_json(target)
+        if len(cached)>=(300 if kind=='fsa' else 10000):return cached
+        target.unlink()
+    archive=DATA/'downloads'/f'{kind}_source.zip'
+    if not archive.exists():fetch_to_file(FSA_URL if kind=='fsa' else DA_URL,archive,progress)
+    if progress:progress(f'Parsing {kind.upper()} 2021 census rows')
+    try:records=parse_zip(archive,kind)
+    except Exception:
+        # Remove corrupt/unexpected archives to force a clean download on resume.
+        archive.rename(archive.with_suffix('.invalid.zip'))
+        raise
+    write_json(target,records)
+    write_json(DATA/f'{kind}_provenance.json',{'url':FSA_URL if kind=='fsa' else DA_URL,
+                          'source_sha256':sha256(archive),'records':len(records),'census_year':2021})
+    return records
+
+def _arc_json(url,params):
+    try:reply=json.loads(http_get(url,params).decode('utf8'))
+    except (ValueError,UnicodeDecodeError) as ex:raise InvalidEvidence(f'Invalid ArcGIS JSON: {ex}')
+    if not isinstance(reply,dict) or 'error' in reply:raise SourceUnavailable(f'ArcGIS query returned {str(reply)[:500]}')
+    return reply
+
+def _envelope_params(bbox):
+    return {'geometry':','.join(f'{x:.7f}' for x in bbox),'geometryType':'esriGeometryEnvelope',
+            'inSR':'4326','spatialRel':'esriSpatialRelIntersects'} if bbox else {}
+
+def load_layer(url,where,field,bbox=None,progress=None):
+    p={'where':where,'returnCountOnly':'true','f':'json',**_envelope_params(bbox)}
+    expected=_arc_json(url,p).get('count')
+    if not isinstance(expected,int) or expected<1:raise InvalidEvidence(f'ArcGIS returned invalid count: {expected}')
+    seen={}; offset=0;limit=150
+    while offset<expected:
+        params={'where':where,'outFields':'*','returnGeometry':'true','outSR':'4326','f':'geojson',
+                'orderByFields':'OBJECTID ASC','resultOffset':offset,
+                'resultRecordCount':min(limit,expected-offset),**_envelope_params(bbox)}
+        page=_arc_json(url,params)
+        if page.get('type')!='FeatureCollection' or not isinstance(page.get('features'),list):
+            raise InvalidEvidence('ArcGIS did not return GeoJSON FeatureCollection')
+        items=page['features']
+        if not items:raise InvalidEvidence(f'ArcGIS returned empty page at {offset}/{expected}')
+        for feat in items:
+            properties=feat.get('properties') or {}
+            key=str(properties.get(field) or '')
+            geometry=feat.get('geometry')
+            if not key or not geometry or key in seen:raise InvalidEvidence(f'Duplicate or missing geometry {key}')
+            g=shape(geometry)
+            if not g.is_valid:g=g.buffer(0)
+            if g.is_empty or g.area<=0:raise InvalidEvidence(f'Invalid geometry for {key}')
+            seen[key]=g.__geo_interface__
+        offset+=len(items)
+        if progress:progress(f'{field} boundaries: {offset}/{expected} verified')
+    if len(seen)!=expected:raise InvalidEvidence(f'{field} count mismatch {len(seen)}/{expected}')
+    return seen
+
+def fsa_geometry(progress=None):
+    target=DATA/'fsa_boundaries.json'
+    if target.exists():
+        data=read_json(target)
+        if len(data)>=300:return data
+        target.unlink()
+    polys=load_layer(FSA_LAYER,"PRUID='35'",'CFSAUID',progress=progress)
+    if len(polys)<300 or any(not valid_fsa(x) for x in polys):raise InvalidEvidence('Ontario FSA boundaries invalid')
+    write_json(target,polys);return polys
+
+def representative(geometry):
+    p=shape(geometry).representative_point();return (round(p.y,6),round(p.x,6))
+
+def da_near(fsa,geom,progress=None,pad_km=6.2):
+    target=DATA/'da_boundaries'/f'{fsa}.json'
+    if target.exists():
+        data=read_json(target)
+        if data:return data
+    g=transform(project(),shape(geom)).buffer(pad_km*1000)
+    lonlat=transform(unproject(),g)
+    found=load_layer(DA_LAYER,"PRUID='35'",'DAUID',bbox=lonlat.bounds,progress=progress)
+    write_json(target,found)
+    return found
+
+def catchment(lat,lon,geometries,population,radius_km=5):
+    target=transform(project(),Point(lon,lat)).buffer(radius_km*1000,quad_segs=32)
+    people=homes=0.0;intersections=0;missing=[]
+    for code,poly in geometries.items():
+        geom=transform(project(),shape(poly))
+        if not geom.is_valid:geom=geom.buffer(0)
+        if geom.area==0 or not geom.intersects(target):continue
+        if code not in population:missing.append(code);continue
+        weight=min(1,geom.intersection(target).area/geom.area)
+        people+=population[code]['population']*weight
+        homes+=population[code]['occupied']*weight
+        intersections+=1
+    if missing:raise InvalidEvidence(f'Missing population data for intersecting DAs {missing[:12]}')
+    if intersections==0 or people<=0:raise InvalidEvidence(f'Missing positive population within {radius_km} km')
+    return {'population_2021_estimate':round(people),'occupied_dwellings_2021_estimate':round(homes),
+            'intersected_da':intersections,'radius_km':radius_km,
+            'assumption':'Population uniform within each 2021 dissemination-area polygon'}
+
+def areas_near_hamilton(radius_km=125,min_population=12000,exclude_within_km=11):
+    from .rank import haversine
+    pop=load_population('fsa');geom=fsa_geometry(); found=[]
+    for code,g in geom.items():
+        if code not in pop or pop[code]['population']<min_population:continue
+        lat,lon=representative(g);distance=haversine((43.2557,-79.8711),(lat,lon))
+        if exclude_within_km<=distance<=radius_km:
+            found.append({'fsa':code,'population_2021':pop[code]['population'],
+                          'occupied_dwellings_2021':pop[code]['occupied'],
+                          'distance_from_hamilton_km':round(distance,1),'lat':lat,'lon':lon})
+    return sorted(found,key=lambda a:(a['distance_from_hamilton_km'],a['fsa']))

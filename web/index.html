@@ -1,0 +1,133 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ontario Therapy Area Finder — Version 5.1</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:#243247;background:#f4f7fb}
+*{box-sizing:border-box} body{margin:0;padding:25px 18px} main{max-width:1160px;margin:auto}h1{font-size:29px;letter-spacing:-.6px;margin:6px 0 9px}h2{font-size:21px;margin:0 0 14px} h3{font-size:17px}p{line-height:1.5}small,.muted{color:#536579}.section{background:white;border:1px solid #d6dfeb;padding:22px;border-radius:12px;margin:18px 0;box-shadow:0 1px 2px rgba(0,0,0,.025)}
+button{font-weight:650;padding:11px 14px;border-radius:6px;background:#135c8d;color:#fff;border:0;cursor:pointer;margin:3px 4px 3px 0}button:hover{background:#0c476c}button:disabled{opacity:.55;cursor:default}.secondary{background:#526174}.danger{background:#8b3838}.inline{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.inline label{display:flex;align-items:center;gap:5px}input,textarea,select{font-size:16px;border:1px solid #bac8d6;padding:9px;border-radius:5px;color:#283444;max-width:100%}input[type=number]{width:100px}input[type=text]{width:280px}input[type=checkbox]{width:auto}textarea{width:min(100%,610px);min-height:65px}.feedback{margin:10px 0;padding:10px 12px;background:#eaf2ff;border-left:4px solid #527eac;min-height:42px;line-height:1.4;white-space:pre-wrap}.feedback.bad{background:#ffeded;border-color:#a83535;color:#9d2929}.feedback.good{background:#edf8ef;border-color:#50845d;color:#174f29}
+pre{white-space:pre-wrap;word-break:break-word;background:#edf2f7;padding:12px;border-radius:5px;max-height:450px;overflow:auto}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border-bottom:1px solid #e5e9ee;text-align:left;padding:9px 6px;vertical-align:top}th{background:#f0f3f8}.scroll{overflow-x:auto}.candidate-list{display:flex;flex-wrap:wrap;gap:5px;max-height:240px;overflow:auto}.candidate-list button{font-size:12px;padding:7px}.photos{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:12px}.photo{border:1px solid #d9e0e9;padding:10px;border-radius:8px;background:#fff}.photo img{max-width:100%;width:100%;height:145px;object-fit:cover;border:1px solid #ddd}.photo select,.photo input{width:100%;margin:4px 0}.photo button{width:100%}a{color:#145e96}#map{height:390px;border:1px solid #ced5df;border-radius:7px}#stages td.status{font-weight:600}.footer{color:#667;font-size:13px;padding:12px 0}.help{background:#f8fafc;padding:8px 12px;border-left:3px solid #a9b9cc}
+</style><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script></head>
+<body><main><h1>Ontario Therapy Area Research</h1>
+<p>Independent free research of local therapy competition, population, Psychology Today, and visible residential housing. Saved raw evidence, restartable scans and completion gates. <span class="muted" id="version">Checking local app…</span></p>
+<section class="section"><h2>1. Prepare official census data</h2><p>Download 2021 population, occupied dwellings, and Ontario postal-area polygons from Statistics Canada. This happens once.</p><button id="censusButton" type="button">Download and validate census data</button><div id="censusFeedback" class="feedback" role="status">Checking status…</div><div id="sources" class="muted"></div></section>
+<section class="section"><h2>2. Choose areas and collect every source</h2>
+<p>The default searches are 11–125 km from Hamilton with a minimum postal-area population of 12,000. You can enter areas directly or load every eligible area. All four sources are required for final results.</p>
+<div class="inline"><label>Postal areas <input id="areas" type="text" value="L7A" placeholder="L7A,N1T,L6Z" aria-label="Three-character postal areas"></label><label>Radius km <input id="radius" type="number" value="125" min="12" max="1500"></label><label>Minimum population <input id="population" type="number" value="12000" min="0"></label><button id="eligibleButton" class="secondary">Show eligible areas</button><button id="allButton" class="secondary">Select all listed</button></div>
+<div id="eligibleFeedback" class="feedback">Choose an area or load the census shortlist.</div><div class="candidate-list" id="eligibleList"></div>
+<p class="help">Each selected area is scanned with the Google Maps grid collector and Psychology Today's directory, measured against 5-km census catchments, and supplied with Street View housing photos. Google and PT need independent final evidence review. Long searches retain completed work; a stopped stage can be resumed.</p>
+<div class="inline"><label><input type="checkbox" id="vision"> Use local Ollama to classify Street View photos (optional; requires an installed vision model)</label></div>
+<button id="runButton">Run / resume all four sources</button><button id="stopButton" class="danger">Stop after current stage</button>
+<div id="runFeedback" class="feedback">Ready. Start with L7A to verify the live sources on this Mac.</div>
+<div class="scroll"><table id="stages"><thead><tr><th>Area</th><th>Population</th><th>Google Maps</th><th>Psychology Today</th><th>Housing photos</th></tr></thead><tbody id="stageBody"></tbody></table></div>
+</section>
+<section class="section"><h2>3. Review sources and housing photographs</h2>
+<p>Actual Google clinic locations, the paginated Psychology Today directory and the housing photographs must be checked before inclusion in the final ranking. Failed searches cannot be approved.</p>
+<div class="inline"><label>Area <input type="text" id="reviewArea" value="L7A" maxlength="3" style="width:90px"></label>
+<label>Source <select id="reviewSource"><option value="google">Google Maps</option><option value="psychology_today">Psychology Today</option><option value="housing">Housing photographs</option></select></label><button id="inspectButton">Inspect evidence</button><button id="mapButton" class="secondary">Map locations</button></div>
+<div id="reviewFeedback" class="feedback">Inspect a collected source to view its evidence.</div>
+<div id="evidenceLinks"></div><div id="photos" class="photos"></div><pre id="evidence"></pre>
+<p><textarea id="note" placeholder="Record what you checked: source pages, locations and housing observations."></textarea></p><button id="approveButton">Approve reviewed source</button>
+<div id="map" style="display:none"></div><div id="mapFallback"></div></section>
+<section class="section"><h2>4. Rank neighbourhoods and export</h2><p>The program scores sampled residential locations within each postal area. It treats local Psychology Today postal listings as an observed directory measure, not proof of in-person availability. It calculates estimated 2021 population and Google-mapped therapy locations within 5 km, and displays Psychology Today competition separately. It also identifies two sufficiently separated candidate areas when available.</p>
+<button id="rankButton">Check completeness and rank</button><div id="rankFeedback" class="feedback">Awaiting complete source verification.</div><div id="results" class="scroll"></div></section>
+<section class="section"><h2>Live activity and errors</h2><div id="health"></div><pre id="logs"></pre></section>
+<p class="footer">No Google Places API key or paid account required. Census population is from 2021. Neither search directory can guarantee an exhaustive record of actual practices; the program never converts a failed search to zero competition.</p>
+</main>
+<script>
+'use strict';
+const el=id=>document.getElementById(id);
+let listed=[],activeJob='',mapRef=null,mapLayers=[];
+async function api(url,options={}){
+ let resp;
+ try{resp=await fetch(url,options)}catch(e){throw Error('Local application cannot be reached. Check the Terminal window. '+e.message)}
+ let body;try{body=await resp.json()}catch{throw Error('Local application returned malformed data, HTTP '+resp.status)}
+ if(!resp.ok || body?.ok===false || body?.error)throw Error(body?.error||('HTTP '+resp.status));
+ return body;
+}
+async function send(url,data){return api(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data||{})});}
+function msg(id,value,kind=''){let n=el(id);n.textContent=value;n.className='feedback '+kind;}
+function codes(){return [...new Set(el('areas').value.toUpperCase().split(',').map(x=>x.trim()).filter(Boolean))]}
+function addArea(code){let a=codes();if(!a.includes(code))a.push(code);el('areas').value=a.join(',');el('reviewArea').value=code;}
+function button(id,cb){el(id).addEventListener('click',async()=>{el(id).disabled=true;try{await cb()}catch(e){let target=({censusButton:'censusFeedback',eligibleButton:'eligibleFeedback',runButton:'runFeedback',stopButton:'runFeedback',rankButton:'rankFeedback'})[id]||'reviewFeedback';msg(target,e.message,'bad')}finally{el(id).disabled=false}})}
+button('censusButton',async()=>{msg('censusFeedback','Submitting census download…');let r=await send('/api/census');msg('censusFeedback',r.message);});
+button('eligibleButton',async()=>{
+ msg('eligibleFeedback','Loading eligible postal areas from official census files…');
+ const radius=Number(el('radius').value),pop=Number(el('population').value);
+ const j=await api('/api/eligible?radius_km='+encodeURIComponent(radius)+'&min_population='+encodeURIComponent(pop));
+ listed=j.areas;msg('eligibleFeedback',j.count+' eligible postal areas loaded. Select individual areas or use Select all listed.','good');
+ let host=el('eligibleList');host.replaceChildren();for(let a of listed){let b=document.createElement('button');b.className='secondary';b.type='button';b.textContent=a.fsa+' · '+a.population_2021.toLocaleString()+' · '+a.distance_from_hamilton_km+' km';b.onclick=()=>addArea(a.fsa);host.append(b);}
+});
+button('allButton',async()=>{if(!listed.length)throw Error('First click Show eligible areas.');el('areas').value=listed.map(x=>x.fsa).join(',');msg('eligibleFeedback',listed.length+' areas selected. Searches may take many hours and will resume as necessary.','good');});
+button('runButton',async()=>{msg('runFeedback','Submitting source searches…');let r=await send('/api/run',{areas:codes().join(','),auto_vision:el('vision').checked});msg('runFeedback',r.message);});
+button('stopButton',async()=>{let r=await send('/api/stop');msg('runFeedback',r.message);});
+button('inspectButton',async()=>{
+ const c=el('reviewArea').value.toUpperCase().trim(),source=el('reviewSource').value;
+ msg('reviewFeedback','Reading saved evidence…');
+ const j=await api('/api/evidence/'+encodeURIComponent(c)+'/'+source);
+ const r=j.record,ev=r.evidence||{};
+ msg('reviewFeedback',c+' / '+source+': '+r.status+(r.error?' — '+r.error:''),r.status==='failed'?'bad':'');
+ const links=el('evidenceLinks');links.replaceChildren();
+ function link(url,name){if(!url||!url.startsWith('https://'))return;const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=name;links.append(a,document.createTextNode(' · '));}
+ if(source==='google'){link('https://www.google.com/maps/search/psychotherapist+near+'+c+'+Ontario','Check Google Maps');link('https://www.google.com/maps/search/counselling+near+'+c+'+Ontario','Second Maps search');}
+ if(source==='psychology_today')link(ev.source_url||'https://www.psychologytoday.com/ca/therapists/'+c.toLowerCase(),'Open Psychology Today directory');
+ const gallery=el('photos');gallery.replaceChildren();
+ if(source==='psychology_today' && ev.unclassified_profiles?.length){
+  for(let person of ev.unclassified_profiles){
+   let card=document.createElement('div');card.className='photo';
+   let a=document.createElement('a');a.href=person.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=person.name+' — original profile';card.append(a);
+   let select=document.createElement('select');for(let cat of ['local_postal_listing','online_only','serves_area']){let o=document.createElement('option');o.value=cat;o.textContent=cat;select.append(o)}
+   let note=document.createElement('input');note.placeholder='Evidence for this classification';
+   let button=document.createElement('button');button.textContent='Save profile classification';button.onclick=async()=>{try{let r=await send('/api/pt-profile-review',{fsa:c,id:person.id,kind:select.value,note:note.value});msg('reviewFeedback',r.message,'good');}catch(e){msg('reviewFeedback',e.message,'bad')}};
+   card.append(select,note,button);gallery.append(card);
+  }
+ }
+ if(source==='housing'){
+  const labels=['detached','semi-detached','townhouse','low-rise apartments','mid-rise apartments','high-rise apartments','mixed housing','undeveloped','unknown'];
+  for(let sample of ev.samples||[]){let card=document.createElement('div');card.className='photo';let h=document.createElement('div');h.textContent='DA '+sample.point.id+' — '+sample.status;card.append(h);
+   if(sample.image){let im=document.createElement('img');im.src='/api/photo/'+encodeURIComponent(c)+'/'+encodeURIComponent(sample.point.id);im.alt='Street-level evidence for '+sample.point.id;card.append(im);}
+   let a=document.createElement('a');a.href=sample.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent='Original Street View';card.append(a);
+   let select=document.createElement('select');for(let label of labels){let o=document.createElement('option');o.value=label;o.textContent=label;select.append(o)}
+   let txt=document.createElement('input');txt.placeholder='What the image actually shows';txt.value=sample.human_review?.note||'';
+   let b=document.createElement('button');b.textContent='Save photo observation';b.onclick=async()=>{try{let r=await send('/api/photo-review',{fsa:c,uid:sample.point.id,category:select.value,note:txt.value});msg('reviewFeedback',r.message,'good')}catch(e){msg('reviewFeedback',e.message,'bad')}};
+   card.append(select,txt,b);gallery.append(card);
+  }
+ }
+ const displayed=JSON.parse(JSON.stringify(ev));if(displayed.samples){displayed.samples=displayed.samples.map(x=>({...x,image:x.image?'Captured image available':null}));}
+ el('evidence').textContent=JSON.stringify({status:r.status,error:r.error,evidence:displayed},null,2).slice(0,25000);
+});
+button('approveButton',async()=>{let r=await send('/api/approve',{fsa:el('reviewArea').value.toUpperCase().trim(),source:el('reviewSource').value,note:el('note').value});msg('reviewFeedback',r.message,'good');});
+button('mapButton',async()=>{
+ let fsa=el('reviewArea').value.toUpperCase().trim();let j=await api('/api/map/'+fsa);const div=el('map'), fallback=el('mapFallback');fallback.replaceChildren();
+ for(let p of j.locations){let a=document.createElement('a');a.href=p.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=p.name+' — '+p.address;let line=document.createElement('div');line.append(a);fallback.append(line)}
+ if(!window.L){msg('reviewFeedback','Map library unavailable; individual Google business links are listed below.','bad');return;}
+ div.style.display='block';
+ if(!mapRef){mapRef=L.map('map');L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(mapRef)}
+ for(let x of mapLayers)x.remove();mapLayers=[];
+ let boundary=L.geoJSON(j.geometry,{style:{color:'#247eb0',fillOpacity:.08}}).addTo(mapRef);mapLayers.push(boundary);
+ for(let p of j.locations){let m=L.marker([p.lat,p.lon]).addTo(mapRef);let a=document.createElement('a');a.href=p.url;a.textContent=p.name;a.target='_blank';m.bindPopup(a);mapLayers.push(m)}
+ let ring=L.circle(j.center,{radius:5000,fill:false,color:'#4a8659'}).addTo(mapRef);mapLayers.push(ring);
+ mapRef.fitBounds(boundary.getBounds());setTimeout(()=>mapRef.invalidateSize(),250);
+});
+button('rankButton',async()=>{
+ msg('rankFeedback','Checking every required source and calculating 5-km candidate catchments…');
+ let j=await send('/api/rank',{areas:codes().join(',')});
+ msg('rankFeedback','Calculation complete. '+j.rows.length+' postal areas ranked and '+j.two.length+' separated locations shortlisted.','good');
+ let host=el('results');host.replaceChildren();
+ for(let item of j.files){let a=document.createElement('a');a.href='/data/'+item;a.textContent='Download '+item.split('/').at(-1);a.style.marginRight='18px';host.append(a)}
+ let t=document.createElement('table');if(j.rows.length){let tr=document.createElement('tr');for(let k of Object.keys(j.rows[0])){let th=document.createElement('th');th.textContent=k;tr.append(th)}t.append(tr);for(let row of j.rows){let r=document.createElement('tr');for(let v of Object.values(row)){let d=document.createElement('td');d.textContent=String(v);r.append(d)}t.append(r)}host.append(t)}
+});
+async function refresh(){try{let j=await api('/api/status');el('version').textContent='Local version '+j.version;let h=j.census;
+ el('sources').textContent='FSA population: '+(h.fsa_population?'ready':'missing')+' | DA population: '+(h.da_population?'ready':'missing')+' | Boundaries: '+(h.fsa_boundaries?'ready':'missing')+' | Maps collector: '+(j.google_engine_installed?'installed':'downloads on first search');
+ let run=j.state.job||{};
+ if(run.status==='running'){let target=run.message.startsWith('Download official')?'censusFeedback':'runFeedback';msg(target,run.message+' — '+(run.progress||''));}
+ else if(run.status==='failed'){let target=run.message.toLowerCase().includes('census')?'censusFeedback':'runFeedback';msg(target,'Last operation failed: '+run.message,'bad');}
+ else if(run.status==='complete'){let target=run.message.startsWith('Download official')?'censusFeedback':'runFeedback';msg(target,run.message,'good');}
+ if(h.ready && run.status!=='running')msg('censusFeedback','All census datasets are available and validated.','good');
+ const body=el('stageBody');body.replaceChildren();for(let [code,record] of Object.entries(j.state.areas||{})){
+  let row=document.createElement('tr');let first=document.createElement('td');first.textContent=code;row.append(first);
+  for(let key of ['population','google','psychology_today','housing']){let cell=document.createElement('td');cell.className='status';cell.textContent=record[key]?.status||'not started';if(record[key]?.status==='failed')cell.style.color='#ac3030';row.append(cell)}body.append(row)
+ }
+ el('logs').textContent=(j.state.events||[]).slice(-40).map(e=>e.at+' '+e.message).join('\n');
+ el('health').textContent='Server connected · '+(j.busy?'Source scan active':'Ready')+' · '+run.status;
+ }catch(e){el('health').textContent='CONNECTION ERROR: '+e.message;msg('runFeedback',e.message,'bad');}}
+refresh();setInterval(refresh,2500);
+</script></body></html>
