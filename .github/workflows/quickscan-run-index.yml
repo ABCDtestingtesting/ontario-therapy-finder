@@ -1,0 +1,33 @@
+name: Read exact ZIP macOS run state
+on:
+  push:
+    paths:
+      - '.github/workflows/quickscan-run-index.yml'
+permissions:
+  actions: read
+  contents: write
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Capture macOS verification run and jobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs?branch=quickscan-mac-e2e-verification&per_page=30" --jq '.workflow_runs[] | [.id,.name,.status,(.conclusion // ""),.head_sha,.html_url] | @tsv' > quickscan-run-index.tsv
+          : > quickscan-job-index.tsv
+          while IFS=$'\t' read -r id name status conclusion sha url; do
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs?per_page=100" --jq '.jobs[] | [.id,.name,.status,(.conclusion // ""),.html_url] | @tsv' >> quickscan-job-index.tsv || true
+          done < <(head -n 7 quickscan-run-index.tsv)
+          cat quickscan-run-index.tsv
+          cat quickscan-job-index.tsv
+      - name: Publish run index
+        run: |
+          git config user.name github-actions
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add quickscan-run-index.tsv quickscan-job-index.tsv
+          if ! git diff --cached --quiet; then
+            git commit -m "Index exact ZIP verification result [skip ci]"
+            git push
+          fi
