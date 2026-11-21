@@ -9,7 +9,7 @@ from shapely.geometry import shape,Point
 from shapely.ops import transform
 from finder import census
 from research.scan_all_maps import global_place_coordinates,distance_km
-EXCLUDE_90_DAYS={'L6Z','L7A','L6X','N1T','N3S','P5N','N4W'}
+EXCLUDE_90_DAYS={'L6Z','L7A','L6X','L6R','N1T','N3S','P5N','N4W'}
 COMPLETE_REASONS={'visible_end_of_list','explicit_no_results','single_place_panel'}
 
 def repair_coordinates(row):
