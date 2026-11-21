@@ -5,6 +5,11 @@ on:
   push:
     paths:
       - '.github/workflows/live-macos-verification.yml'
+      - 'finder/**'
+      - 'tests/**'
+      - 'ci/**'
+      - 'start.command'
+      - 'requirements.txt'
 
 permissions:
   contents: read
