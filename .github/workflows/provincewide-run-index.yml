@@ -1,0 +1,36 @@
+name: Index Ontario provincewide scan runs
+on:
+  push:
+    paths: ['.github/workflows/provincewide-run-index.yml']
+permissions:
+  actions: read
+  contents: write
+jobs:
+  index:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch live Google Maps run status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs?branch=ontario-401-fsa-live-ranking-20261121&per_page=20" --jq '.workflow_runs[] | [.id,.name,.status,(.conclusion // ""),.head_sha,.html_url] | @tsv' > /tmp/ontario-map-runs.tsv
+          : > /tmp/ontario-map-jobs.tsv
+          while IFS=$'\t' read -r run_id title status conclusion sha url;do
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100" --jq '.jobs[] | [.id,.name,.status,(.conclusion // ""),.html_url] | @tsv' >> /tmp/ontario-map-jobs.tsv || true
+          done < /tmp/ontario-map-runs.tsv
+          cat /tmp/ontario-map-runs.tsv
+      - name: Save exact run reference on diagnostic branch
+        run: |
+          git config user.name github-actions
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git fetch origin ci-diagnostics
+          git checkout -B ci-diagnostics origin/ci-diagnostics
+          cp /tmp/ontario-map-runs.tsv ontario-map-runs.tsv
+          cp /tmp/ontario-map-jobs.tsv ontario-map-jobs.tsv
+          git add ontario-map-runs.tsv ontario-map-jobs.tsv
+          if ! git diff --cached --quiet;then
+            git commit -m "Snapshot provincewide Google scan runs [skip ci]"
+            git push origin HEAD:ci-diagnostics
+          fi
