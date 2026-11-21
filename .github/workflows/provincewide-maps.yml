@@ -1,0 +1,44 @@
+name: Province wide 401 FSA live Maps research
+on:
+  push:
+    paths:
+      - '.github/workflows/provincewide-maps.yml'
+      - 'research/scan_all_maps.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  map-survey:
+    name: FSA shard ${{ matrix.shard }}
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
+    timeout-minutes: 55
+    env:
+      PYTHONUNBUFFERED: '1'
+      CI: 'true'
+      THERAPY_DATA_HOME: ${{ github.workspace }}/private-census
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies and real Firefox
+        run: |
+          python -m pip install -r requirements.txt
+          python -m playwright install firefox
+      - name: Collect sharded Google Maps therapy availability in 5 km circles
+        timeout-minutes: 48
+        run: |
+          python -m research.scan_all_maps --shard ${{ matrix.shard }} --shards 20
+      - name: Upload complete or partial FSA observations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maps-401-shard-${{ matrix.shard }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            scan-output/shard-*/results.json
