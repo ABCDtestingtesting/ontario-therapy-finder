@@ -15,7 +15,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs?branch=quickscan-mac-e2e-verification&per_page=25" \
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs?branch=quickscan-mac-e2e-v2&per_page=25" \
             --jq '.workflow_runs[] | [.id,.name,.status,(.conclusion // ""),.head_sha,.html_url] | @tsv' \
             > /tmp/quickscan-test-runs.tsv
           : > /tmp/quickscan-test-jobs.tsv
