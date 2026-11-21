@@ -1,4 +1,6 @@
-44927297606	Capture GitHub Actions run identifiers for diagnosis	in_progress		f7108fa5f046ee2cb8478dc76a5663ca60a7d599	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44927297606
+44927391573	Capture GitHub Actions run identifiers for diagnosis	in_progress		d235574ae91660e11de33fd0126a35e28b729010	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44927391573
+44927382931	Ontario shortlist verified FSA coordinates	in_progress		f47365225a1463ee02b61e9d530b8dbb4ccdd317	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44927382931
+44927297606	Capture GitHub Actions run identifiers for diagnosis	completed	success	f7108fa5f046ee2cb8478dc76a5663ca60a7d599	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44927297606
 44927218782	Independent Ontario Google Maps FSA opportunity screen	in_progress		a6a40b385c6d585ab3951655b34138161a5a8de0	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44927218782
 44927095261	Focused live-source Mac diagnostics	in_progress		f2084c6433f91c5859a79f33d4c3ceed9923e336	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44927095261
 44923835723	Quick PT first-page HTTP feasibility check	completed	success	63362d489a5b211ebb9de5b4674ef18feaf93b8d	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44923835723
@@ -26,5 +28,3 @@
 44913284174	Real macOS verification (live sources)	completed	cancelled	515e7e268d7a90f8c0ff5beaf34964838c5e07f5	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913284174
 44913284164	Focused live-source Mac diagnostics	completed	cancelled	515e7e268d7a90f8c0ff5beaf34964838c5e07f5	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913284164
 44913190553	Focused live-source Mac diagnostics	completed	cancelled	2820ea5d4c26b08b1d1727fe3b7170f5f1ea80df	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913190553
-44913190490	Real macOS verification (live sources)	completed	cancelled	2820ea5d4c26b08b1d1727fe3b7170f5f1ea80df	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913190490
-44913173979	Focused live-source Mac diagnostics	completed	cancelled	e522a26721217c3778aa12074a80be60f16d863e	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913173979
