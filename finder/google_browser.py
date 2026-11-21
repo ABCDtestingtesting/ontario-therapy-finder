@@ -9,7 +9,7 @@ import csv,hashlib,json,math,os,re,time
 from pathlib import Path
 from urllib.parse import quote,unquote
 from playwright.sync_api import sync_playwright
-from .common import SourceUnavailable,InvalidEvidence,write_json,read_json
+from .common import SourceUnavailable,InvalidEvidence,HumanVerificationRequired,write_json,read_json
 
 END_MARKERS=("you've reached the end of the list", "you’ve reached the end of the list",
              'end of the list', 'you have reached the end of the list')
@@ -17,7 +17,8 @@ EMPTY_MARKERS=('google maps can’t find', 'google maps can\'t find','no results
                'no results for', 'could not find', "didn't match any locations")
 CHALLENGE_MARKERS=('unusual traffic from your computer', 'are you a robot',
     'verify you are human','verify that you are a human', 'recaptcha',
-    'our systems have detected unusual traffic')
+    'our systems have detected unusual traffic','too many requests',
+    'access denied','request blocked','429 too many requests')
 
 
 def place_coordinates(url):
@@ -64,7 +65,7 @@ def _snapshot(page,path):
 
 
 def scan_one(context,query,lat,lon,diagnostics,timeout_seconds=90,max_scroll=35,
-             interactive=False,verification_wait_seconds=1200,
+             interactive=False,verification_wait_seconds=None,
              progress=lambda msg:None,cancel_requested=lambda:False):
     """Scan one actual query. Returns a *complete* search only on verified end.
 
@@ -78,7 +79,21 @@ def scan_one(context,query,lat,lon,diagnostics,timeout_seconds=90,max_scroll=35,
     evidence={'query':query,'search_lat':lat,'search_lon':lon,'search_url':url,
               'place_links':[],'completed':False,'completion_reason':None}
     try:
-        page.goto(url,wait_until='domcontentloaded',timeout=35000)
+        response=page.goto(url,wait_until='domcontentloaded',timeout=35000)
+        code=getattr(response,'status',None)
+        # Some human-verification forms themselves return HTTP 403. Let a
+        # person solve those in this visible page, while hard blocks/429 fail.
+        manual_403=(code==403 and interactive and any(m in
+                    page.locator('body').inner_text(timeout=10000).lower()
+                    for m in CHALLENGE_MARKERS))
+        if code in (403,429) and not manual_403:
+            evidence['failure']=f'Google Maps HTTP {code}: access temporarily restricted'
+            evidence['status']='verification_required'
+            _snapshot(page,diagnostics/'verification_challenge.png')
+            raise HumanVerificationRequired(f'Google Maps returned HTTP {code}. This grid cell '
+                                            'is incomplete and will be retried only after Resume.')
+        if code and code>=500:
+            raise SourceUnavailable(f'Google Maps returned HTTP {code}; grid cell preserved')
         _maybe_consent(page)
         deadline=time.monotonic()+timeout_seconds
         links={}; stagnant=0; prev_length=-1; prev_height=-1
@@ -89,21 +104,30 @@ def scan_one(context,query,lat,lon,diagnostics,timeout_seconds=90,max_scroll=35,
             if cancel_requested():
                 raise SourceUnavailable('Google Maps collection stopped; saved evidence remains')
             if any(m in body for m in CHALLENGE_MARKERS):
+                evidence['status']='verification_required'
                 _snapshot(page,diagnostics/'verification_challenge.png')
                 if not interactive:
-                    raise SourceUnavailable('Google Maps presented a human-verification challenge')
-                progress('Google Maps verification is open in Firefox. Complete it in that window; the search will resume.')
-                until=time.monotonic()+verification_wait_seconds
-                while time.monotonic()<until:
+                    raise HumanVerificationRequired('Google Maps presented a human-verification challenge')
+                progress('Google Maps verification: use this existing Firefox tab. '
+                         'The current search is paused; press Stop to save and retry later.')
+                until=(time.monotonic()+verification_wait_seconds
+                       if verification_wait_seconds is not None else None)
+                while True:
                     if cancel_requested():raise SourceUnavailable('Google verification stopped; saved evidence remains')
+                    if until is not None and time.monotonic()>=until:
+                        raise HumanVerificationRequired('Google Maps verification still pending; cell saved for Resume')
                     page.wait_for_timeout(2500)
                     try:body=page.locator('body').inner_text(timeout=10000).lower()
                     except Exception:continue
-                    if not any(m in body for m in CHALLENGE_MARKERS):break
-                else:
-                    raise SourceUnavailable('Google Maps human verification remained unresolved; progress saved')
+                    if not any(m in body for m in CHALLENGE_MARKERS):
+                        # A blank intermediary page is not verification success.
+                        if _page_evidence(page) or page.locator('[role="feed"]').count():break
+                    if int(time.monotonic())%30<3:
+                        progress('Google Maps verification is still pending in Firefox. '
+                                 'Solve it there, or press Stop. Saved cells will not be lost.')
+                evidence['status']='running'
                 deadline=time.monotonic()+timeout_seconds
-                progress('Google Maps verification cleared; continuing the same search')
+                progress('Google Maps verification cleared; continuing the SAME search')
             for a in _page_evidence(page):
                 url_=a.get('href') or ''
                 if '/maps/place/' in url_:
