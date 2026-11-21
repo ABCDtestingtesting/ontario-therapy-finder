@@ -56,8 +56,19 @@ jobs:
       - name: Repair saved global coordinates and rank 498 local census catchments
         timeout-minutes: 14
         run: |
+          python -m compileall -q research finder
           python -m unittest research.test_google_pipeline -v
           python -m research.build_google_database raw-google google-only-output
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('google-only-output/preliminary_top_180.json').read_text())
+          candidates = data['candidates']
+          codes = [item['fsa'] for item in candidates]
+          assert len(candidates) == 180, f'Expected 180 Google candidates, got {len(candidates)}'
+          assert len(set(codes)) == 180, 'Duplicate postal codes in preliminary 180'
+          print('PRELIMINARY_GOOGLE_CANDIDATES_VALIDATED', len(candidates), flush=True)
+          PY
           cp google-only-output/preliminary_top_180.json preliminary_top_180.json
       - uses: actions/upload-artifact@v4
         if: always()
