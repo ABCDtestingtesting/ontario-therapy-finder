@@ -1,0 +1,109 @@
+name: Real macOS ZIP two-stage integration verification
+on:
+  push:
+    paths:
+      - '.github/workflows/twostage-mac-live.yml'
+      - 'Ontario_Therapy_Finder_Two_Stage_90_Day_Mac.zip'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mac-live:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 32
+    env:
+      CI: 'true'
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Unpack exact user ZIP and run every included test
+        run: |
+          shasum -a 256 Ontario_Therapy_Finder_Two_Stage_90_Day_Mac.zip
+          mkdir package
+          unzip -q Ontario_Therapy_Finder_Two_Stage_90_Day_Mac.zip -d package
+          cd package/Ontario_Therapy_Automated_Competition
+          /bin/zsh -n START.command
+          test -x START.command
+          python -m pip install 'playwright>=1.49,<2'
+          python -m playwright install firefox
+          python -m unittest discover -v
+      - name: Exercise actual Stage 1 Google, Stage 2 PT, publish and final CSV
+        timeout-minutes: 23
+        run: |
+          cd package/Ontario_Therapy_Automated_Competition
+          python - <<'PY'
+          import os,json,csv,io,threading,tempfile,time,traceback
+          from pathlib import Path
+          from urllib.request import urlopen
+          from http.server import ThreadingHTTPServer
+          import staged,google_auto
+          output=Path('mac-e2e-report.json')
+          with tempfile.TemporaryDirectory() as home:
+              staged.STATE=Path(home)/'staged_results.json'
+              staged.DB=staged.fresh_state()
+              staged.HALT.clear()
+              original=google_auto.launch_context
+              google_auto.launch_context=lambda pw,data_path,headless=False:original(pw,data_path,headless=True)
+              original_pool=staged.load_pool
+              def get_pool(*args,**kwargs):
+                  pool=original_pool(*args,**kwargs)
+                  # Validate genuine browser searches in two physically separate eligible FSAs.
+                  return {c:pool[c] for c in ('P9N','K8V')}
+              staged.load_pool=get_pool
+              report={'platform':os.uname().machine,'source':'exact packaged ZIP','areas':['P9N','K8V']}
+              try:
+                  staged.stage1(batch=2)
+                  campaign=staged.current()
+                  report['stage1']=campaign['stage1']
+                  report['google']={code:{k:v.get(k) for k in ('status','google_count','coverage','missing_coordinates','error')} for code,v in campaign['maps'].items()}
+                  print('REAL_STAGE_1',json.dumps(report['google']),flush=True)
+                  if len(campaign['shortlist'])<1:raise RuntimeError('Stage 1 produced no verified shortlist')
+                  staged.stage2()
+                  report['stage2']=campaign['stage2']
+                  report['pt']={c:{k:v.get(k) for k in ('status','checked_at','error','count')} for c,v in campaign['pt'].items()}
+                  print('REAL_STAGE_2',json.dumps(report['pt']),flush=True)
+                  if campaign['stage2']!='complete':raise RuntimeError('Stage 2 did not complete')
+                  final=staged.publish(campaign)
+                  if not final:raise RuntimeError('No published recommendations')
+                  with ThreadingHTTPServer(('127.0.0.1',0),staged.Handler) as srv:
+                      t=threading.Thread(target=srv.serve_forever,daemon=True);t.start()
+                      try:
+                          base='http://127.0.0.1:'+str(srv.server_port)
+                          with urlopen(base+'/api/state',timeout=10) as f:state=json.load(f)
+                          with urlopen(base+'/export-google.csv',timeout=10) as f:google_csv=list(csv.DictReader(io.StringIO(f.read().decode('utf-8-sig'))))
+                          with urlopen(base+'/export-final.csv',timeout=10) as f:final_csv=list(csv.DictReader(io.StringIO(f.read().decode('utf-8-sig'))))
+                          assert len(google_csv)==2,(len(google_csv),'Google export incomplete')
+                          assert len(final_csv)==len(final),(len(final_csv),'Final export incomplete')
+                          assert len(state['rows'])==len(final_csv)
+                          report['csv']={'google':len(google_csv),'final':len(final_csv)}
+                      finally:srv.shutdown();t.join(timeout=10)
+                  # Fresh campaign must exclude just-published codes for 90 days.
+                  next_campaign=staged.start_campaign(get_pool())
+                  assert not set(campaign['shortlist']).intersection(next_campaign['queue'])
+                  report['ninety_day_exclusion']=True
+                  report['status']='PASS'
+                  print('FULL_E2E_PASS',json.dumps(report),flush=True)
+              except Exception as exc:
+                  report['status']='FAIL';report['error']=repr(exc)
+                  traceback.print_exc()
+                  raise
+              finally:
+                  output.write_text(json.dumps(report,indent=2,default=str))
+          PY
+      - name: Upload source evidence and final report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: two-stage-real-mac-${{ matrix.os }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            package/Ontario_Therapy_Automated_Competition/mac-e2e-report.json
+            package/Ontario_Therapy_Automated_Competition/research_data/
