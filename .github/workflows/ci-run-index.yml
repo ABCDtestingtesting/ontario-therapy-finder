@@ -1,8 +1,8 @@
 name: Capture GitHub Actions run identifiers for diagnosis
 on:
+  # Run diagnostic indexing only when troubleshooting is requested.
+  # Routine code pushes should not create unrelated index-push failures.
   workflow_dispatch:
-  push:
-    branches: [main]
 permissions:
   actions: read
   contents: write
