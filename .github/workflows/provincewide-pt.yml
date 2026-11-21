@@ -1,0 +1,33 @@
+name: Ontario 401 FSA weekly PT live counts
+on:
+  push:
+    paths:
+      - '.github/workflows/provincewide-pt.yml'
+      - 'research/scan_all_pt.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pt:
+    name: PT shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9]
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch current Ontario Psychology Today directory counts
+        run: python -m research.scan_all_pt --shard ${{ matrix.shard }} --shards 10
+      - name: Retain current listing evidence and checks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pt-weekly-401-shard-${{ matrix.shard }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: pt-output/shard-*/results.json
