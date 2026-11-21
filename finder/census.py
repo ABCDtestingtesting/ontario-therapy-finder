@@ -17,6 +17,9 @@ DA_URL='https://www150.statcan.gc.ca/n1/tbl/csv/98100015-eng.zip'
 GIS='https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_files/MapServer'
 FSA_LAYER=GIS+'/14/query'
 DA_LAYER=GIS+'/12/query'
+DA_BOUNDARY_ARCHIVES=(
+ 'https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lda_000b21a_e.zip',
+ 'https://data.source.coop/dataforcanada/d4c-datapkg-statistical/archive/statcan/boundaries/2021/lda_000b21a_e.zip')
 UA='OntarioTherapyAreaResearch/5.1 census-geography'
 FSA_BOUNDARY_ARCHIVES=(
  'https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lfsa000b21a_e.zip',
@@ -308,6 +311,89 @@ def fsa_geometry(progress=None):
 def representative(geometry):
     p=shape(geometry).representative_point();return (round(p.y,6),round(p.x,6))
 
+def _parse_da_shapefile_archive(archive,bbox,progress=None):
+    """Return Ontario DAs intersecting a lon/lat envelope from 2021 CBF.
+
+    Verify the full zipped national file and inspect records before using any
+    filtered geometries. Materialize only trusted shapefile components; the
+    archive is reused across nearby FSA searches, not downloaded repeatedly.
+    """
+    import shapefile
+    archive=Path(archive)
+    root=DATA/'downloads'/'da_extracted'
+    prefix=root/'source_da'
+    root.mkdir(parents=True,exist_ok=True)
+    with zipfile.ZipFile(archive) as zipped:
+        shapes=[n for n in zipped.namelist() if n.lower().endswith('.shp')]
+        if len(shapes)!=1:raise InvalidEvidence('Expected one DA shapefile in verified census archive')
+        base=shapes[0][:-4]
+        for ext in ('.shp','.shx','.dbf'):
+            member=next((n for n in zipped.namelist() if n.lower()==(base+ext).lower()),None)
+            if not member:raise InvalidEvidence(f'DA shapefile missing {ext}')
+            outpath=prefix.with_suffix(ext)
+            if not outpath.exists() or outpath.stat().st_size!=zipped.getinfo(member).file_size:
+                tmp=outpath.with_suffix(ext+'.partial')
+                try:
+                    with zipped.open(member) as inp,tmp.open('wb') as out:shutil.copyfileobj(inp,out)
+                    os.replace(tmp,outpath)
+                finally:tmp.unlink(missing_ok=True)
+    # Conservative preliminary bounds in EPSG:3347, with margin for nonlinear
+    # projections. Every candidate is checked again in true lon/lat geometry.
+    from shapely.geometry import box
+    projected_envelope=transform(project(),box(*bbox)).buffer(2500).bounds
+    west,south,east,north=projected_envelope
+    wanted=box(*bbox)
+    results={}
+    with shapefile.Reader(str(prefix),encoding='latin1') as reader:
+        cols=[x[0] for x in reader.fields[1:]]
+        if 'DAUID' not in cols or len(reader)<20000:
+            raise InvalidEvidence('DA shapefile is missing identifiers or has too few national records')
+        id_index=cols.index('DAUID')
+        for index,record in enumerate(reader.iterRecords()):
+            code=str(record[id_index] or '').strip()
+            if not re.fullmatch(r'35\d{6}',code):continue
+            feature=reader.shape(index)
+            bounds=feature.bbox
+            if not bounds or bounds[2]<west or bounds[0]>east or bounds[3]<south or bounds[1]>north:
+                continue
+            g=transform(unproject(),shape(feature.__geo_interface__))
+            if not g.is_valid:g=g.buffer(0)
+            if g.is_empty or g.area<=0:raise InvalidEvidence(f'Invalid DA archive geometry: {code}')
+            if not g.intersects(wanted):continue
+            if code in results:raise InvalidEvidence(f'Duplicate DA in official archive: {code}')
+            p=g.representative_point()
+            if not (41<p.y<57 and -96<p.x<-73):
+                raise InvalidEvidence(f'Incorrect DA archive projection: {code}')
+            results[code]=g.__geo_interface__
+    if not results:raise InvalidEvidence(f'Official DA archive found no Ontario DA boundaries in {bbox}')
+    if progress:progress(f'Validated {len(results)} DA geometries from full 2021 Statistics Canada archive')
+    return results
+
+
+def _da_archive_fallback(bbox,progress=None):
+    archive=DATA/'downloads'/'lda_000b21a_e.zip'
+    errors=[]
+    # An existing archive is reused, but always pass its shapefile validations.
+    if archive.exists() and zipfile.is_zipfile(archive):
+        try:return _parse_da_shapefile_archive(archive,bbox,progress)
+        except (InvalidEvidence,ValueError,OSError,zipfile.BadZipFile) as exc:
+            if progress:progress(f'Invalid cached DA archive: {exc}; downloading clean copy')
+            archive.unlink(missing_ok=True)
+    for uri in DA_BOUNDARY_ARCHIVES:
+        try:
+            if progress:progress('Downloading official 2021 dissemination-area boundaries after ArcGIS failure')
+            fetch_to_file(uri,archive,progress,retries=1)
+            result=_parse_da_shapefile_archive(archive,bbox,progress)
+            write_json(DATA/'da_archive_provenance.json',
+                       {'url':uri,'sha256':sha256(archive),'national_archive':'lda_000b21a_e.zip',
+                        'selected_ontario_das':len(result),'census_year':2021})
+            return result
+        except (SourceUnavailable,InvalidEvidence,zipfile.BadZipFile,ValueError,OSError) as exc:
+            errors.append(f'{uri}: {exc}')
+            archive.unlink(missing_ok=True)
+    raise SourceUnavailable('DA official archive unavailable: '+'; '.join(errors))
+
+
 def da_near(fsa,geom,progress=None,pad_km=6.2):
     target=DATA/'da_boundaries'/f'{fsa}.json'
     if target.exists():
@@ -315,7 +401,12 @@ def da_near(fsa,geom,progress=None,pad_km=6.2):
         if data:return data
     g=transform(project(),shape(geom)).buffer(pad_km*1000)
     lonlat=transform(unproject(),g)
-    found=load_layer(DA_LAYER,"PRUID='35'",'DAUID',bbox=lonlat.bounds,progress=progress)
+    try:
+        found=load_layer(DA_LAYER,"PRUID='35'",'DAUID',bbox=lonlat.bounds,progress=progress)
+    except (SourceUnavailable,InvalidEvidence) as arc_error:
+        if progress:progress(f'DA ArcGIS incomplete ({arc_error}); using official 2021 archive')
+        found=_da_archive_fallback(lonlat.bounds,progress)
+    if not found:raise InvalidEvidence(f'No verified DA boundaries for {fsa}')
     write_json(target,found)
     return found
 
