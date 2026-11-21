@@ -1,0 +1,48 @@
+name: Capture GitHub Actions run identifiers for diagnosis
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/ci-run-index.yml'
+permissions:
+  actions: read
+  contents: write
+jobs:
+  index:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Capture recent workflow and job identifiers
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=30" \
+            --jq '.workflow_runs[] | [.id,.name,.status,(.conclusion // ""),.head_sha,.html_url] | @tsv' \
+            > /tmp/ci-run-index.tsv
+          : > /tmp/ci-job-index.tsv
+          while IFS=$'\t' read -r run_id run_name status conclusion sha url; do
+            echo "RUN $run_id $status $conclusion $url" >> /tmp/ci-job-index.tsv
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100" \
+              --jq '.jobs[] | [.id,.name,.status,(.conclusion // ""),.html_url] | @tsv' \
+              >> /tmp/ci-job-index.tsv || true
+          done < <(head -n 15 /tmp/ci-run-index.tsv)
+      - name: Publish identifiers to a diagnostic branch
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git ls-remote --exit-code --heads origin ci-diagnostics >/dev/null; then
+            git fetch origin ci-diagnostics
+            git checkout -B ci-diagnostics origin/ci-diagnostics
+          else
+            git checkout -b ci-diagnostics
+          fi
+          cp /tmp/ci-run-index.tsv ci-run-index.tsv
+          cp /tmp/ci-job-index.tsv ci-job-index.tsv
+          git add ci-run-index.tsv ci-job-index.tsv
+          if ! git diff --cached --quiet; then
+            git commit -m 'Record GitHub Actions run IDs for troubleshooting [skip ci]'
+            git push origin HEAD:ci-diagnostics
+          fi
