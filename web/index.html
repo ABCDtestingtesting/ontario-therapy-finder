@@ -108,6 +108,8 @@ button('mapButton',async()=>{
  mapRef.fitBounds(boundary.getBounds());setTimeout(()=>mapRef.invalidateSize(),250);
 });
 button('rankButton',async()=>{
+ // Never display previous results as the outcome of a failed recheck.
+ el('results').replaceChildren();
  msg('rankFeedback','Checking every required source and calculating 5-km candidate catchments…');
  let j=await send('/api/rank',{areas:codes().join(',')});
  msg('rankFeedback','Calculation complete. '+j.rows.length+' postal areas ranked and '+j.two.length+' separated locations shortlisted.','good');
