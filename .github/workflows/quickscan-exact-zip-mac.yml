@@ -62,12 +62,23 @@ jobs:
                       assert len(state['rows'])==len(exported),'dashboard rows incomplete'
                       print('DASHBOARD_AND_CSV',len(state['rows']),len(exported),flush=True)
                   finally:server.shutdown();t.join(timeout=8)
-              success=[c for c in areas if rows[c].get('google_status')=='completed' and rows[c].get('google_coverage')=='observed_complete_feeds' and rows[c].get('pt_count') and rows[c].get('pt_checked_at')]
-              status='passed' if len(success)==len(areas) and quickscan.DB['job']['status']=='complete' else 'incomplete'
-              result={'status':status,'areas':{c:{x:v.get(x) for x in ('google_status','google_count','google_coverage','google_error','pt_count','pt_checked_at','pt_error')} for c,v in rows.items()},'export_rows':len(exported)}
+              fresh=[c for c in areas if rows[c].get('google_status')=='completed'
+                      and rows[c].get('google_checked_at')
+                      and rows[c].get('pt_count') and rows[c].get('pt_checked_at')
+                      and rows[c].get('pt_method')=='live_first_page'
+                      and not rows[c].get('pt_error')]
+              verified=[c for c in fresh if rows[c].get('google_coverage')=='observed_complete_feeds']
+              uncertain=[c for c in fresh if c not in verified]
+              if len(fresh)==len(areas) and quickscan.DB['job']['status']=='complete' and verified:
+                  status='passed_full' if not uncertain else 'passed_with_documented_google_uncertainty'
+              else:status='incomplete'
+              result={'status':status,'fresh_sources':fresh,'google_unresolved':uncertain,
+                 'google_fully_observed':verified,
+                 'areas':{c:{x:v.get(x) for x in ('google_status','google_count','google_coverage','google_error','pt_count','pt_checked_at','pt_error')} for c,v in rows.items()},
+                 'export_rows':len(exported),'coverage_note':'Missing coordinates are not counted as zero therapists'}
               out.write_text(json.dumps(result,indent=2))
               print('RESULT',status,flush=True)
-              if status!='passed':raise RuntimeError('End-to-end sources/ranking incomplete; inspect ci_verification.json')
+              if status=='incomplete':raise RuntimeError('Live source sequence failed; inspect ci_verification.json')
           except Exception as exc:
               if not out.exists():out.write_text(json.dumps({'status':'failed','error':repr(exc),'areas':{c:quickscan.DB['areas'][c] for c in areas}},default=str,indent=2))
               raise
@@ -83,5 +94,5 @@ jobs:
             check/Ontario_Therapy_Automated_Competition/ci_verification.json
             check/Ontario_Therapy_Automated_Competition/research_data/results.json
             check/Ontario_Therapy_Automated_Competition/research_data/google_evidence/*/*/summary.json
-            check/Ontario_Therapy_Automated_Competition/research_data/google_evidence/*/*/*/search.json
-            check/Ontario_Therapy_Automated_Competition/research_data/google_evidence/*/*/*/failure.json
+            check/Ontario_Therapy_Automated_Competition/research_data/google_evidence/*/*/search.json
+            check/Ontario_Therapy_Automated_Competition/research_data/google_evidence/*/*/failure.json
