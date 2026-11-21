@@ -36,7 +36,7 @@ if [[ ! -x .venv/bin/python ]];then
  "$PY" -m venv .venv || fail 'Python could not create .venv. Check permissions and free storage.'
 fi
 source .venv/bin/activate || fail 'Local Python environment could not be activated'
-if ! python -c 'import fastapi,uvicorn,requests,bs4,playwright,shapely,pyproj,PIL,pytest,httpx' >/dev/null 2>&1;then
+if ! python -c 'import fastapi,uvicorn,requests,bs4,playwright,shapely,pyproj,PIL,pytest,httpx,shapefile' >/dev/null 2>&1;then
  print 'Installing free Python dependencies (first run only)…'
  python -m pip install --disable-pip-version-check --prefer-binary -r requirements.txt || fail 'Python dependency installation failed. Read the error above.'
 fi

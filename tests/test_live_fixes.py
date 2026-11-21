@@ -65,3 +65,15 @@ def test_real_shapefile_archive_fallback_preserves_coordinates(monkeypatch,tmp_p
     assert set(data)=={'L7A','L6Z','N1T'}
     lat,lon=census.representative(data['L7A'])
     assert abs(lat-43.72)<.03 and abs(lon+79.82)<.03
+
+
+def test_primary_census_geometry_uses_archive_before_arcgis(monkeypatch,tmp_path):
+    from finder import census
+    from shapely.geometry import mapping,box
+    monkeypatch.setattr(census,'DATA',tmp_path)
+    # Generate a full-size Ontario set of synthetic but valid FSA boundaries.
+    data={f'L{(i//26)%10}{chr(65+i%26)}':mapping(box(-80,43,-79,44)) for i in range(260)}
+    data.update({f'N{(i//26)%10}{chr(65+i%26)}':mapping(box(-80,43,-79,44)) for i in range(260)})
+    monkeypatch.setattr(census,'_fsa_archive_fallback',lambda progress=None:data)
+    monkeypatch.setattr(census,'load_layer',lambda *args,**kwargs:(_ for _ in ()).throw(AssertionError('ArcGIS called despite successful archive')))
+    assert len(census.fsa_geometry())==520

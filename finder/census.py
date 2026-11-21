@@ -282,14 +282,26 @@ def _fsa_archive_fallback(progress=None):
 def fsa_geometry(progress=None):
     target=DATA/'fsa_boundaries.json'
     if target.exists():
-        data=read_json(target)
-        if len(data)>=300:return data
-        target.unlink()
+        try:
+            data=read_json(target)
+            if isinstance(data,dict) and len(data)>=300 and all(
+                    valid_fsa(code) and isinstance(geom,dict) and
+                    not shape(geom).is_empty and shape(geom).area>0
+                    for code,geom in data.items()):
+                return data
+        except (ValueError,TypeError,KeyError,AttributeError):
+            pass
+        if progress:progress('Cached census boundaries failed geometry validation; downloading verified source')
+        target.unlink(missing_ok=True)
     try:
-        polys=load_layer(FSA_LAYER,"PRUID='35'",'CFSAUID',progress=progress)
-    except (SourceUnavailable,InvalidEvidence) as arc_error:
-        if progress:progress(f'ArcGIS geometry incomplete ({arc_error}); retrying official census shapefile archive')
+        # The official archive is more reliable than querying hundreds of
+        # national polygons through the rate-limited ArcGIS geometry service.
+        # Prefer the complete archive and independently validate all Ontario
+        # identifiers and geometries before accepting it.
         polys=_fsa_archive_fallback(progress)
+    except (SourceUnavailable,InvalidEvidence,zipfile.BadZipFile,OSError) as archive_error:
+        if progress:progress(f'Census boundary archive unavailable ({archive_error}); retrying ArcGIS geometry service')
+        polys=load_layer(FSA_LAYER,"PRUID='35'",'CFSAUID',progress=progress)
     if len(polys)<300 or any(not valid_fsa(x) for x in polys):raise InvalidEvidence('Ontario FSA boundaries invalid')
     write_json(target,polys);return polys
 
