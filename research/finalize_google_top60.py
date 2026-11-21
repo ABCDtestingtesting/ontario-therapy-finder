@@ -5,7 +5,7 @@ import csv,json,math,sys,re
 from pathlib import Path
 from collections import Counter
 
-HISTORY_90_DAYS={'L6Z','L7A','L6X','N1T','N3S','P5N','N4W'}
+HISTORY_90_DAYS={'L6Z','L7A','L6X','L6R','N1T','N3S','P5N','N4W'}
 
 def load_focused(root):
     data={};dup=[]
