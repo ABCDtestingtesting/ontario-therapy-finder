@@ -105,6 +105,31 @@ def test_housing_affects_candidate_selection(geo):
     for photo in s['samples']:
         photo['point']['lat']=0.0;photo['point']['lon']=0.0
     state.stage('L7A','housing','verified',s)
-    out=rank.analyse(['L7A','N1T'])
-    assert not any(p['fsa']=='L7A' for p in out['two'])
-    assert any(p['fsa']=='L7A' and p['status']=='housing_photo_gap' for p in out['sites'])
+    # An incomplete source must never result in one recommendation labelled as two.
+    with pytest.raises(InvalidEvidence,match='Only 1 geographically distinct'):
+        rank.analyse(['L7A','N1T'])
+
+
+def test_one_postal_area_never_creates_a_two_recommendation_export(geo):
+    populate_approved(geo)
+    for name in ('postal_area_comparison.csv','candidate_locations.csv','results.json'):
+        (OUTPUT/name).unlink(missing_ok=True)
+    with pytest.raises(InvalidEvidence,match='At least two distinct postal areas'):
+        rank.analyse(['L7A'])
+    assert not (OUTPUT/'results.json').exists()
+
+
+def test_two_areas_without_two_eligible_sites_do_not_export(geo):
+    populate_approved(geo)
+    hou=state.read()['areas']['L7A']['housing']['evidence']
+    for photo in hou['samples']:
+        photo['point']['lat']=0.0
+        photo['point']['lon']=0.0
+    state.stage('L7A','housing','verified',hou)
+    for name in ('postal_area_comparison.csv','candidate_locations.csv','results.json'):
+        (OUTPUT/name).unlink(missing_ok=True)
+    with pytest.raises(InvalidEvidence,match='Only 1 geographically distinct'):
+        rank.analyse(['L7A','N1T'])
+    assert not (OUTPUT/'postal_area_comparison.csv').exists()
+    assert not (OUTPUT/'candidate_locations.csv').exists()
+    assert not (OUTPUT/'results.json').exists()
