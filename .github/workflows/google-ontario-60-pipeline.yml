@@ -1,0 +1,138 @@
+name: Ontario 498 Google-only verified top 60 final research pipeline
+on:
+  push:
+    paths:
+      - '.github/workflows/google-ontario-60-pipeline.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+env:
+  PYTHONUNBUFFERED: '1'
+  CI: 'true'
+jobs:
+  census-and-google:
+    name: Combine complete postcode-scoped Google source observations
+    runs-on: ubuntu-latest
+    timeout-minutes: 58
+    env:
+      GH_TOKEN: ${{ github.token }}
+      THERAPY_DATA_HOME: ${{ github.workspace }}/official_2021_census
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Await complete 401+97 latest postal-specific searches
+        timeout-minutes: 39
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 75); do
+            runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?branch=ontario-401-fsa-live-ranking-20261121&per_page=100")
+            large=$(echo "$runs" | jq -r '[.workflow_runs[] | select(.name == "Resolve Google locations provincewide across 401 FSAs")] | max_by(.id).id // empty')
+            small=$(echo "$runs" | jq -r '[.workflow_runs[] | select(.name == "Resolve Google locations for Ontario small FSAs")] | max_by(.id).id // empty')
+            if [ -n "$large" ] && [ -n "$small" ]; then
+              a=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$large/artifacts?per_page=100" --jq '.total_count')
+              b=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$small/artifacts?per_page=100" --jq '.total_count')
+              echo "Fresh locally scoped Google Maps: large run $large $a/32, small run $small $b/12, check $attempt"
+              if [ "$a" -ge 32 ] && [ "$b" -ge 12 ];then
+                echo "LARGE_GOOGLE_RUN=$large" >> "$GITHUB_ENV"
+                echo "SMALL_GOOGLE_RUN=$small" >> "$GITHUB_ENV"
+                exit 0
+              fi
+            fi
+            sleep 30
+          done
+          echo "Ontario full Google coverage not yet recorded" >&2
+          exit 1
+      - name: Download 498 raw Google-source FSA records, no PT
+        run: |
+          gh run download "$LARGE_GOOGLE_RUN" -p 'resolved-large-*' -D raw-google
+          gh run download "$SMALL_GOOGLE_RUN" -p 'resolved-small-*' -D raw-google
+          test "$(find raw-google -name results.json | wc -l | tr -d ' ')" -eq 44
+      - run: python -m pip install -r requirements.txt
+      - name: Repair saved global coordinates and rank 498 local census catchments
+        timeout-minutes: 14
+        run: |
+          python -m unittest research.test_google_pipeline -v
+          python -m research.build_google_database raw-google google-only-output
+          cp google-only-output/preliminary_top_180.json preliminary_top_180.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: full-ontario-498-google-census-audit
+          retention-days: 14
+          if-no-files-found: warn
+          path: google-only-output/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: first-pass-google-candidate-180
+          retention-days: 14
+          path: preliminary_top_180.json
+  focused-google:
+    name: Double-check 180 finalist FSAs on Google Maps, shard ${{ matrix.shard }}
+    needs: census-and-google
+    runs-on: ubuntu-latest
+    timeout-minutes: 37
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29]
+    env:
+      THERAPY_DATA_HOME: ${{ github.workspace }}/followup_google_cache
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: first-pass-google-candidate-180
+          path: research/
+      - name: Prepare visible-source browser on host
+        run: |
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps firefox
+      - name: Independently verify local psychotherapy and counselling searches
+        timeout-minutes: 28
+        run: python -m research.verify_top_google --shard ${{ matrix.shard }} --shards 30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: google-second-pass-${{ matrix.shard }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: focused-output/shard-*/results.json
+  final-rank:
+    name: Certify 60 fully geolocated Google-only candidates for database
+    needs: focused-google
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: first-pass-google-candidate-180
+          path: research/
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: google-second-pass-*
+          path: focused-output-raw/
+      - name: Build deduplicated Google-only top 60 and enforce no unknown coordinates
+        run: python -m research.finalize_google_top60 focused-output-raw google-60-final
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: final-60-ontario-google-only-database
+          retention-days: 14
+          if-no-files-found: warn
+          path: google-60-final/
