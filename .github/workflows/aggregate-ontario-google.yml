@@ -1,0 +1,61 @@
+name: Merge complete Google-only Ontario scans and prepare candidate verification
+on:
+  push:
+    paths: ['.github/workflows/aggregate-ontario-google.yml']
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 47
+    env:
+      PYTHONUNBUFFERED: '1'
+      THERAPY_DATA_HOME: ${{ github.workspace }}/official_2021_census
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Await both corrected Google Maps scans to finish all 498 areas
+        timeout-minutes: 28
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 55); do
+            a=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/44948503680/artifacts?per_page=100" --jq '.total_count')
+            b=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/44948506295/artifacts?per_page=100" --jq '.total_count')
+            echo "Source artifacts (of 32 large, 12 small): $a / $b, attempt $attempt"
+            if [ "$a" -ge 32 ] && [ "$b" -ge 12 ];then exit 0;fi
+            sleep 30
+          done
+          echo "Full province-wide source coverage not yet delivered" >&2
+          exit 1
+      - name: Download all raw Google Maps FSA results
+        run: |
+          gh run download 44948503680 -p 'resolved-large-*' -D raw-google
+          gh run download 44948506295 -p 'resolved-small-*' -D raw-google
+          find raw-google -name results.json | wc -l
+      - name: Install official census geo and population dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Calculate 5km catchment population-to-Google competitors and screen 180
+        timeout-minutes: 15
+        run: python -m research.build_google_database raw-google google-only-output
+      - name: Save candidate handoff on source branch
+        run: |
+          cp google-only-output/preliminary_top_180.json research/preliminary_top_180.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add research/preliminary_top_180.json
+          git commit -m 'Verified Google-only preliminary Ontario 180 candidate screening [skip ci]'
+          git push
+      - name: Preserve audited Ontario-wide database and ratio estimates
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: google-all-ontario-498-population-ratio
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            google-only-output/
