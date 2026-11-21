@@ -1,4 +1,4 @@
-name: Index Ontario provincewide scan runs
+name: Index Ontario provincewide scans and PT live runs
 on:
   push:
     paths: ['.github/workflows/provincewide-run-index.yml']
