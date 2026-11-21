@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 import requests
 from shapely.geometry import shape
 from shapely.ops import transform
-from .common import ROOT,DATA,BIN,LOGS,write_json,read_json,InvalidEvidence,SourceUnavailable,sha256
+from .common import ROOT,DATA,BIN,LOGS,write_json,read_json,InvalidEvidence,SourceUnavailable,HumanVerificationRequired,sha256
 from .census import project,unproject
 VERSION='v1.19.0'
 RELEASE_URL=f'https://api.github.com/repos/gosom/google-maps-scraper/releases/tags/{VERSION}'
@@ -193,6 +193,10 @@ def execute(fsa,fsa_geometry,progress=lambda msg:None,run_cmd=None,force=False,c
                  'collector_used':'playwright-firefox','native_issue':None})
             write_json(normalized,parsed)
             return parsed
+        except HumanVerificationRequired:
+            # Do not launch a second scraper while Google is blocking the
+            # current Firefox session. All completed grid cells remain saved.
+            raise
         except Exception as exc:
             if cancel_requested():
                 raise SourceUnavailable('Google Maps scan stopped; saved Firefox progress preserved') from exc
