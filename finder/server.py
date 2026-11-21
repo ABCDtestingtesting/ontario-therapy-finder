@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse,JSONResponse,FileResponse
 from . import __version__,census,maps,psychology_today,housing,rank,state
-from .common import ROOT,DATA,OUTPUT,LOGS,read_json,write_json,SourceUnavailable,InvalidEvidence,Incomplete,valid_fsa
+from .common import ROOT,DATA,OUTPUT,LOGS,read_json,write_json,SourceUnavailable,HumanVerificationRequired,InvalidEvidence,Incomplete,valid_fsa
 app=FastAPI(title='Ontario Therapy Area Research',docs_url=None,redoc_url=None)
 JOB_LOCK=threading.Lock()
 CANCEL=threading.Event()
@@ -105,20 +105,32 @@ def do_housing(fsa,geom,auto_vision=False):
     state.stage(fsa,'housing','review_required',report)
     return report
 
-def process_area(fsa,auto_vision=False):
+def process_area(fsa,auto_vision=False,blocked_sources=None):
     geos=census.fsa_geometry()
     if fsa not in geos:raise InvalidEvidence(f'{fsa} was not found in official 2021 Ontario FSA boundaries')
     geom=geos[fsa]
     jobs=(('population',lambda:do_population(fsa,geom)),('google',lambda:do_google(fsa,geom)),
           ('psychology_today',lambda:do_pt(fsa)),('housing',lambda:do_housing(fsa,geom,auto_vision)))
     failures=[]
+    blocked_sources=blocked_sources if blocked_sources is not None else set()
     for name,work in jobs:
         if CANCEL.is_set():break
         existing=state.read()['areas'].get(fsa,{}).get(name,{})
         if existing.get('status') in ('verified','review_required'):continue
+        if name in blocked_sources:
+            message=f'{name} search deferred after access restriction in another area; Resume later'
+            failures.append(f'{fsa}/{name}: {message}')
+            state.stage(fsa,name,'verification_required',existing.get('evidence'),message)
+            continue
         state.stage(fsa,name,'running',existing.get('evidence'))
         state.progress(f'{fsa}: collecting {name}')
         try:work()
+        except HumanVerificationRequired as exc:
+            blocked_sources.add(name)
+            failures.append(f'{fsa}/{name}: {exc}')
+            record=state.read()['areas'][fsa].get(name,{})
+            state.stage(fsa,name,'verification_required',record.get('evidence'),str(exc))
+            state.event(f'VERIFICATION REQUIRED {fsa}/{name}: {exc}')
         except Exception as exc:
             failures.append(f'{fsa}/{name}: {exc}')
             record=state.read()['areas'][fsa].get(name,{})
@@ -128,11 +140,11 @@ def process_area(fsa,auto_vision=False):
 
 def research_selected(codes,auto_vision=False):
     if not census_health()['ready']:raise Incomplete('Download and validate census data first')
-    errors=[]
+    errors=[];blocked_sources=set()
     for i,fsa in enumerate(codes):
         if CANCEL.is_set():break
         progress(f'Area {i+1}/{len(codes)}: {fsa}')
-        errors.extend(process_area(fsa,auto_vision))
+        errors.extend(process_area(fsa,auto_vision,blocked_sources))
     if errors:raise Incomplete(f'{len(errors)} required source job(s) remain incomplete. '+ '; '.join(errors[:5]))
 
 @app.get('/')
