@@ -1,152 +1,123 @@
+RUN 44952655975 in_progress 0be1cb2f920ade7c6bc6ad78679c39d1c5cb2913 
+136993774637	Combine complete postcode-scoped Google source observations	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44952655975/job/136993774637
+RUN 44952655965 in_progress 0be1cb2f920ade7c6bc6ad78679c39d1c5cb2913 
+136993774765	index	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44952655965/job/136993774765
+RUN 44951022751 completed success https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44951022751
+136988747464	force	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44951022751/job/136988747464
 RUN 44950073036 completed success https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44950073036
 136985837969	status	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44950073036/job/136985837969
-RUN 44949666397 in_progress 701ba7bc86823682c0c2540e7b1e167084fb086c 
-136984578701	index	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949666397/job/136984578701
-RUN 44949619271 in_progress 9d081de13e4373892dc0b663f63b408fd37a58ed 
-136984439050	Combine complete postcode-scoped Google source observations	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949619271/job/136984439050
-RUN 44949527104 queued 10b526dcd071e975e1ea51d6a4044b129ef688b9 
-136984153612	aggregate	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949527104/job/136984153612
+RUN 44949666397 completed success https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949666397
+136984578701	index	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949666397/job/136984578701
+RUN 44949619271 completed failure https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949619271
+136984439050	Combine complete postcode-scoped Google source observations	completed	failure	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949619271/job/136984439050
+136992864317	Double-check 180 finalist FSAs on Google Maps, shard ${{ matrix.shard }}	completed	skipped	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949619271/job/136992864317
+136992864841	Certify 60 fully geolocated Google-only candidates for database	completed	skipped	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949619271/job/136992864841
+RUN 44949527104 completed failure https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949527104
+136984153612	aggregate	completed	failure	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949527104/job/136984153612
 RUN 44949490512 completed success https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949490512
 136984044502	force	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949490512/job/136984044502
 RUN 44949444173 completed success https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949444173
 136983909938	test	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949444173/job/136983909938
-RUN 44949340024 in_progress 80d1d4e5c0f1cd57bd94a68ad9778948effbc283 
-136983584114	locate	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949340024/job/136983584114
-RUN 44949323771 queued e5187638518445602a600bdf9efc3204fbb4a002 
+RUN 44949340024 completed success https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949340024
+136983584114	locate	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949340024/job/136983584114
+RUN 44949323771 completed success https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771
 136983536781	Small FSA resolution 2	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983536781
 136983536931	Small FSA resolution 8	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983536931
 136983536987	Small FSA resolution 0	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983536987
-136983536994	Small FSA resolution 3	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983536994
-136983536998	Small FSA resolution 9	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983536998
-136983537017	Small FSA resolution 4	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983537017
-136983537043	Small FSA resolution 11	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983537043
-136983537059	Small FSA resolution 5	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983537059
-136983537072	Small FSA resolution 6	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983537072
-136983537128	Small FSA resolution 7	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983537128
-136983537144	Small FSA resolution 1	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983537144
-136983537383	Small FSA resolution 10	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983537383
-RUN 44949323753 in_progress e5187638518445602a600bdf9efc3204fbb4a002 
+136983536994	Small FSA resolution 3	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983536994
+136983536998	Small FSA resolution 9	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983536998
+136983537017	Small FSA resolution 4	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983537017
+136983537043	Small FSA resolution 11	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983537043
+136983537059	Small FSA resolution 5	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983537059
+136983537072	Small FSA resolution 6	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983537072
+136983537128	Small FSA resolution 7	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983537128
+136983537144	Small FSA resolution 1	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983537144
+136983537383	Small FSA resolution 10	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771/job/136983537383
+RUN 44949323753 completed cancelled https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753
 136983536125	Low population FSA shard 8	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753/job/136983536125
 136983536305	Low population FSA shard 5	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753/job/136983536305
-136983536339	Low population FSA shard 4	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753/job/136983536339
+136983536339	Low population FSA shard 4	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753/job/136983536339
 136983536349	Low population FSA shard 3	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753/job/136983536349
 136983536364	Low population FSA shard 1	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753/job/136983536364
 136983536368	Low population FSA shard 7	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753/job/136983536368
-136983536417	Low population FSA shard 11	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753/job/136983536417
-136983536429	Low population FSA shard 6	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753/job/136983536429
-136983536441	Low population FSA shard 9	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753/job/136983536441
-136983536457	Low population FSA shard 2	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753/job/136983536457
-136983536521	Low population FSA shard 0	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753/job/136983536521
-136983536543	Low population FSA shard 10	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753/job/136983536543
-RUN 44949320101 queued a9e15740a86bff87ad915069dc0f55c783137b82 
-136983525265	FSA shard 10	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525265
-136983525459	FSA shard 12	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525459
-136983525461	FSA shard 9	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525461
-136983525471	FSA shard 1	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525471
+136983536417	Low population FSA shard 11	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753/job/136983536417
+136983536429	Low population FSA shard 6	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753/job/136983536429
+136983536441	Low population FSA shard 9	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753/job/136983536441
+136983536457	Low population FSA shard 2	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753/job/136983536457
+136983536521	Low population FSA shard 0	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753/job/136983536521
+136983536543	Low population FSA shard 10	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753/job/136983536543
+RUN 44949320101 completed cancelled https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101
+136983525265	FSA shard 10	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525265
+136983525459	FSA shard 12	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525459
+136983525461	FSA shard 9	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525461
+136983525471	FSA shard 1	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525471
 136983525489	FSA shard 8	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525489
-136983525515	FSA shard 0	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525515
-136983525541	FSA shard 14	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525541
-136983525565	FSA shard 3	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525565
-136983525578	FSA shard 5	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525578
-136983525592	FSA shard 2	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525592
-136983525628	FSA shard 7	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525628
-136983525637	FSA shard 11	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525637
-136983525649	FSA shard 4	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525649
-136983525650	FSA shard 18	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525650
-136983525659	FSA shard 19	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525659
-136983525681	FSA shard 6	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525681
-136983525701	FSA shard 17	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525701
-136983525717	FSA shard 16	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525717
-136983525721	FSA shard 15	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525721
-136983525736	FSA shard 13	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525736
-RUN 44949320059 queued a9e15740a86bff87ad915069dc0f55c783137b82 
-136983525240	Large FSA resolution 2	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525240
-136983525401	Large FSA resolution 14	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525401
-136983525420	Large FSA resolution 5	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525420
-136983525425	Large FSA resolution 19	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525425
-136983525432	Large FSA resolution 7	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525432
-136983525441	Large FSA resolution 17	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525441
-136983525449	Large FSA resolution 1	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525449
-136983525465	Large FSA resolution 0	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525465
-136983525466	Large FSA resolution 6	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525466
-136983525475	Large FSA resolution 24	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525475
-136983525479	Large FSA resolution 16	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525479
-136983525481	Large FSA resolution 18	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525481
-136983525486	Large FSA resolution 28	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525486
-136983525488	Large FSA resolution 4	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525488
-136983525499	Large FSA resolution 23	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525499
-136983525501	Large FSA resolution 9	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525501
-136983525502	Large FSA resolution 22	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525502
-136983525503	Large FSA resolution 10	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525503
-136983525509	Large FSA resolution 13	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525509
-136983525514	Large FSA resolution 26	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525514
-136983525520	Large FSA resolution 12	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525520
-136983525535	Large FSA resolution 3	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525535
-136983525564	Large FSA resolution 29	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525564
-136983525586	Large FSA resolution 11	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525586
-136983525598	Large FSA resolution 21	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525598
-136983525613	Large FSA resolution 15	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525613
-136983525642	Large FSA resolution 30	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525642
-136983525672	Large FSA resolution 25	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525672
-136983525683	Large FSA resolution 20	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525683
-136983525698	Large FSA resolution 31	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525698
-136983525731	Large FSA resolution 8	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525731
-136983525743	Large FSA resolution 27	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525743
-RUN 44949192270 queued cd3b952a2b33779ad7dcd7a2ab34b72c750d3cd9 
+136983525515	FSA shard 0	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525515
+136983525541	FSA shard 14	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525541
+136983525565	FSA shard 3	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525565
+136983525578	FSA shard 5	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525578
+136983525592	FSA shard 2	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525592
+136983525628	FSA shard 7	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525628
+136983525637	FSA shard 11	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525637
+136983525649	FSA shard 4	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525649
+136983525650	FSA shard 18	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525650
+136983525659	FSA shard 19	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525659
+136983525681	FSA shard 6	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525681
+136983525701	FSA shard 17	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525701
+136983525717	FSA shard 16	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525717
+136983525721	FSA shard 15	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525721
+136983525736	FSA shard 13	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101/job/136983525736
+RUN 44949320059 completed success https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059
+136983525240	Large FSA resolution 2	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525240
+136983525401	Large FSA resolution 14	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525401
+136983525420	Large FSA resolution 5	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525420
+136983525425	Large FSA resolution 19	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525425
+136983525432	Large FSA resolution 7	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525432
+136983525441	Large FSA resolution 17	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525441
+136983525449	Large FSA resolution 1	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525449
+136983525465	Large FSA resolution 0	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525465
+136983525466	Large FSA resolution 6	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525466
+136983525475	Large FSA resolution 24	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525475
+136983525479	Large FSA resolution 16	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525479
+136983525481	Large FSA resolution 18	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525481
+136983525486	Large FSA resolution 28	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525486
+136983525488	Large FSA resolution 4	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525488
+136983525499	Large FSA resolution 23	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525499
+136983525501	Large FSA resolution 9	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525501
+136983525502	Large FSA resolution 22	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525502
+136983525503	Large FSA resolution 10	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525503
+136983525509	Large FSA resolution 13	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525509
+136983525514	Large FSA resolution 26	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525514
+136983525520	Large FSA resolution 12	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525520
+136983525535	Large FSA resolution 3	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525535
+136983525564	Large FSA resolution 29	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525564
+136983525586	Large FSA resolution 11	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525586
+136983525598	Large FSA resolution 21	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525598
+136983525613	Large FSA resolution 15	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525613
+136983525642	Large FSA resolution 30	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525642
+136983525672	Large FSA resolution 25	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525672
+136983525683	Large FSA resolution 20	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525683
+136983525698	Large FSA resolution 31	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525698
+136983525731	Large FSA resolution 8	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525731
+136983525743	Large FSA resolution 27	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059/job/136983525743
+RUN 44949192270 completed cancelled https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270
 136983161094	FSA shard 5	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161094
 136983161311	FSA shard 7	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161311
 136983161323	FSA shard 14	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161323
-136983161343	FSA shard 19	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161343
+136983161343	FSA shard 19	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161343
 136983161346	FSA shard 12	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161346
-136983161348	FSA shard 10	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161348
-136983161356	FSA shard 4	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161356
-136983161359	FSA shard 8	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161359
-136983161361	FSA shard 18	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161361
-136983161365	FSA shard 9	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161365
-136983161370	FSA shard 1	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161370
-136983161374	FSA shard 2	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161374
-136983161382	FSA shard 17	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161382
-136983161384	FSA shard 16	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161384
-136983161401	FSA shard 6	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161401
-136983161411	FSA shard 0	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161411
-136983161417	FSA shard 3	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161417
-136983161469	FSA shard 11	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161469
-136983161503	FSA shard 15	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161503
-136983161548	FSA shard 13	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161548
-RUN 44949192177 completed cancelled https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177
-136983160908	Large FSA resolution 3	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983160908
-136983161101	Large FSA resolution 2	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161101
-136983161162	Large FSA resolution 0	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161162
-136983161173	Large FSA resolution 8	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161173
-136983161178	Large FSA resolution 10	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161178
-136983161180	Large FSA resolution 12	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161180
-136983161187	Large FSA resolution 22	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161187
-136983161210	Large FSA resolution 26	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161210
-136983161217	Large FSA resolution 31	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161217
-136983161221	Large FSA resolution 4	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161221
-136983161232	Large FSA resolution 7	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161232
-136983161234	Large FSA resolution 1	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161234
-136983161251	Large FSA resolution 11	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161251
-136983161253	Large FSA resolution 20	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161253
-136983161255	Large FSA resolution 9	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161255
-136983161259	Large FSA resolution 21	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161259
-136983161262	Large FSA resolution 14	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161262
-136983161265	Large FSA resolution 28	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161265
-136983161282	Large FSA resolution 15	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161282
-136983161283	Large FSA resolution 25	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161283
-136983161284	Large FSA resolution 18	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161284
-136983161296	Large FSA resolution 27	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161296
-136983161305	Large FSA resolution 5	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161305
-136983161307	Large FSA resolution 6	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161307
-136983161334	Large FSA resolution 19	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161334
-136983161336	Large FSA resolution 13	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161336
-136983161337	Large FSA resolution 23	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161337
-136983161340	Large FSA resolution 17	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161340
-136983161349	Large FSA resolution 16	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161349
-136983161378	Large FSA resolution 30	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161378
-136983161396	Large FSA resolution 24	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161396
-136983161407	Large FSA resolution 29	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177/job/136983161407
-RUN 44949012142 completed failure https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949012142
-136982601103	aggregate	completed	failure	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949012142/job/136982601103
-RUN 44948993357 completed failure https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44948993357
-136982542229	aggregate	completed	failure	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44948993357/job/136982542229
+136983161348	FSA shard 10	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161348
+136983161356	FSA shard 4	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161356
+136983161359	FSA shard 8	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161359
+136983161361	FSA shard 18	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161361
+136983161365	FSA shard 9	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161365
+136983161370	FSA shard 1	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161370
+136983161374	FSA shard 2	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161374
+136983161382	FSA shard 17	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161382
+136983161384	FSA shard 16	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161384
+136983161401	FSA shard 6	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161401
+136983161411	FSA shard 0	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161411
+136983161417	FSA shard 3	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161417
+136983161469	FSA shard 11	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161469
+136983161503	FSA shard 15	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161503
+136983161548	FSA shard 13	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270/job/136983161548

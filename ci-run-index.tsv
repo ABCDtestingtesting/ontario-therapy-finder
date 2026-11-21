@@ -1,15 +1,18 @@
+44952655975	Ontario 498 Google-only verified top 60 final research pipeline	in_progress		0be1cb2f920ade7c6bc6ad78679c39d1c5cb2913	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44952655975
+44952655965	Capture GitHub Actions run identifiers for diagnosis	in_progress		0be1cb2f920ade7c6bc6ad78679c39d1c5cb2913	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44952655965
+44951022751	Force-stop obsolete revisions	completed	success	82f059603cc866c88300125a13601687839301e3	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44951022751
 44950073036	Capture active Ontario Google-only research source and final job IDs	completed	success	ba8a2eaaefc6b6a8214e224d7cec86cb3996015c	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44950073036
-44949666397	Capture GitHub Actions run identifiers for diagnosis	in_progress		701ba7bc86823682c0c2540e7b1e167084fb086c	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949666397
-44949619271	Ontario 498 Google-only verified top 60 final research pipeline	in_progress		9d081de13e4373892dc0b663f63b408fd37a58ed	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949619271
-44949527104	Merge complete Google-only Ontario scans and prepare candidate verification	queued		10b526dcd071e975e1ea51d6a4044b129ef688b9	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949527104
+44949666397	Capture GitHub Actions run identifiers for diagnosis	completed	success	701ba7bc86823682c0c2540e7b1e167084fb086c	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949666397
+44949619271	Ontario 498 Google-only verified top 60 final research pipeline	completed	failure	9d081de13e4373892dc0b663f63b408fd37a58ed	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949619271
+44949527104	Merge complete Google-only Ontario scans and prepare candidate verification	completed	failure	10b526dcd071e975e1ea51d6a4044b129ef688b9	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949527104
 44949490512	Force-stop obsolete revisions	completed	success	09167748d941b186f515339b1482b98dd2bd6d58	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949490512
 44949444173	Verify Ontario Google-only coordinate and ratio regressions	completed	success	d4e57403871d7d1c1e7e7c088e6692791d2c6cc1	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949444173
-44949340024	Updated postal-specific Ontario Google research run locator	in_progress		80d1d4e5c0f1cd57bd94a68ad9778948effbc283	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949340024
-44949323771	Resolve Google locations for Ontario small FSAs	queued		e5187638518445602a600bdf9efc3204fbb4a002	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771
-44949323753	Live Google Maps remaining Ontario low-population FSAs	in_progress		e5187638518445602a600bdf9efc3204fbb4a002	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753
-44949320101	Province wide 401 FSA live Maps research	queued		a9e15740a86bff87ad915069dc0f55c783137b82	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101
-44949320059	Resolve Google locations provincewide across 401 FSAs	queued		a9e15740a86bff87ad915069dc0f55c783137b82	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059
-44949192270	Province wide 401 FSA live Maps research	queued		cd3b952a2b33779ad7dcd7a2ab34b72c750d3cd9	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270
+44949340024	Updated postal-specific Ontario Google research run locator	completed	success	80d1d4e5c0f1cd57bd94a68ad9778948effbc283	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949340024
+44949323771	Resolve Google locations for Ontario small FSAs	completed	success	e5187638518445602a600bdf9efc3204fbb4a002	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323771
+44949323753	Live Google Maps remaining Ontario low-population FSAs	completed	cancelled	e5187638518445602a600bdf9efc3204fbb4a002	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949323753
+44949320101	Province wide 401 FSA live Maps research	completed	cancelled	a9e15740a86bff87ad915069dc0f55c783137b82	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320101
+44949320059	Resolve Google locations provincewide across 401 FSAs	completed	success	a9e15740a86bff87ad915069dc0f55c783137b82	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949320059
+44949192270	Province wide 401 FSA live Maps research	completed	cancelled	cd3b952a2b33779ad7dcd7a2ab34b72c750d3cd9	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192270
 44949192177	Resolve Google locations provincewide across 401 FSAs	completed	cancelled	cd3b952a2b33779ad7dcd7a2ab34b72c750d3cd9	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949192177
 44949012142	Merge complete Google-only Ontario scans and prepare candidate verification	completed	failure	2a8a0015540802498b802c6883b757c2f5db4de3	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44949012142
 44948993357	Merge complete Google-only Ontario scans and prepare candidate verification	completed	failure	69cbf62adcd6ce36fe285b33ba94fe8ad762f432	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44948993357
@@ -25,6 +28,3 @@
 44947763762	This week's PT counts for remaining Ontario FSAs	completed	success	f71256bbe8b7b6fe06d9c1e991f3641d45cb81de	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947763762
 44947738317	Live Google Maps remaining Ontario low-population FSAs	completed	success	8c3112334ecaf0fc83322273caea662a8a2af99c	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947738317
 44947671237	Index Ontario provincewide scan runs	completed	success	54c98d32625a42cea57007fdd5989488917444bb	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947671237
-44947581100	Export all Ontario populated 2021 FSA codes	completed	success	f8eb109509a1ee1ab98e81e430e8ec196b61cf6a	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947581100
-44947526931	Ontario 401 FSA weekly PT live counts	completed	success	dfcaa3834a6830fd18dafdee273671f6aa725a7a	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947526931
-44947463944	Index Ontario provincewide scan runs	completed	success	f1f1d66c95dc39033d4fd64fc89b9970b6ff0c02	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44947463944
