@@ -9,7 +9,7 @@ from pathlib import Path
 from urllib.parse import urljoin,urlparse,parse_qs
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
-from .common import DATA,write_json,read_json,InvalidEvidence,SourceUnavailable
+from .common import DATA,write_json,read_json,InvalidEvidence,SourceUnavailable,HumanVerificationRequired
 BAD=('captcha','verify you are human','unusual traffic','are you a robot','access denied',
      'checking your browser','automated traffic','just a moment','request blocked','security check')
 BASE='https://www.psychologytoday.com'
@@ -106,34 +106,65 @@ def collect(fsa,progress=lambda msg:None,max_pages=200,context_factory=None,canc
                     raise SourceUnavailable('Psychology Today search stopped by user; completed pages saved')
                 target=f'{BASE}/ca/therapists/{fsa.lower()}' + (f'?page={index}' if index>1 else '')
                 progress(f'{fsa}: Psychology Today page {index+1}, {len(found)} profiles saved')
-                try:page.goto(target,wait_until='domcontentloaded',timeout=60000)
+                # Leave the page open for manual verification. Requests after a
+                # 429 or 403 must not be hammered or silently counted as zero.
+                response=None
+                unattended=(os.environ.get('CI','').lower() in ('true','1') or
+                            os.environ.get('THERAPY_UNATTENDED')=='1')
+                try:response=page.goto(target,wait_until='domcontentloaded',timeout=60000)
                 except Exception as exc:
                     save(index,'retry_needed')
-                    raise SourceUnavailable(f'Psychology Today navigation failed on page {index}: {exc}')
-                page.wait_for_timeout(500 if os.environ.get('THERAPY_UNATTENDED')=='1' else 1800)
+                    raise SourceUnavailable(f'Psychology Today navigation failed on page {index}; '
+                                            f'completed pages saved: {exc}') from exc
+                http_status=getattr(response,'status',None)
+                # A 403 can contain a solvable human-verification page. Keep
+                # that visible tab open; rate limits and hard denials stop.
+                manual_403=(http_status==403 and not unattended and
+                            blocked(page.content(),page.title()))
+                if http_status in (403,429) and not manual_403:
+                    save(index,'verification_required')
+                    try:page.screenshot(path=str(folder/f'verification_{index}.png'))
+                    except Exception:pass
+                    raise HumanVerificationRequired(
+                        f'Psychology Today HTTP {http_status} on page {index}. '
+                        'The page and completed results were saved. Wait before using Resume; '
+                        'repeated requests may extend the restriction.')
+                if http_status and http_status>=500:
+                    save(index,'retry_needed')
+                    raise SourceUnavailable(f'Psychology Today returned HTTP {http_status} on page {index}; '
+                                            'saved for a later retry')
+                page.wait_for_timeout(500 if unattended else 1800)
                 # Trigger below-the-fold directory cards before parsing.
                 for _scroll in range(3):
                     page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
-                    page.wait_for_timeout(200 if os.environ.get('THERAPY_UNATTENDED')=='1' else 450)
+                    page.wait_for_timeout(200 if unattended else 450)
                 raw=page.content()
                 if blocked(raw,page.title()):
-                    shot=folder/f'verification_{index}.png';page.screenshot(path=str(shot))
-                    save(index,'waiting_for_browser_verification')
-                    progress('Psychology Today verification required. Complete it in the OPEN FIREFOX WINDOW; this tab remains open.')
-                    if os.environ.get('THERAPY_UNATTENDED')=='1':
-                        raise SourceUnavailable('Psychology Today verification required during unattended Mac test. Diagnostic screenshot saved.')
-                    # Keep same tab, recheck rather than redirecting/closing immediately.
+                    shot=folder/f'verification_{index}.png'
+                    try:page.screenshot(path=str(shot))
+                    except Exception:pass
+                    save(index,'verification_required')
+                    progress('Psychology Today verification: use the existing Firefox tab. '
+                             'The scan stays paused until a real directory page appears, or you press Stop.')
+                    if unattended:
+                        raise HumanVerificationRequired('Psychology Today requires human verification; '
+                                                        'unattended testing cannot complete it. Screenshot saved.')
                     waited=0
-                    while blocked(page.content(),page.title()):
+                    while True:
                         if cancel_requested():
                             save(index,'stopped_by_user')
-                            raise SourceUnavailable('Psychology Today verification stopped by user; same-page checkpoint saved')
-                        page.wait_for_timeout(5000);waited+=5
-                        if waited%30==0:progress(f'PT browser verification still required ({waited}s). Solve it in the existing Firefox tab.')
-                        if waited>=900:
-                            save(index,'waiting_for_browser_verification')
-                            raise SourceUnavailable('Browser verification not solved within 15 minutes. Saved current page and screenshot; restart to resume.')
-                    raw=page.content()
+                            raise SourceUnavailable('Psychology Today verification stopped by user; '
+                                                    'page checkpoint preserved')
+                        page.wait_for_timeout(3000);waited+=3
+                        raw=page.content()
+                        # Challenge disappearing is insufficient: wait for actual
+                        # valid links on the *same* directory page before resuming.
+                        if not blocked(raw,page.title()) and extract(raw,fsa)['profiles']:
+                            progress(f'Psychology Today verification cleared for {fsa}, page {index}; continuing')
+                            break
+                        if waited%30==0:
+                            progress(f'Psychology Today still waiting for directory verification '
+                                     f'({waited}s). Use this Firefox tab or press Stop; results are saved.')
                 parsed=extract(raw,fsa)
                 if not parsed['profiles']:
                     page.screenshot(path=str(folder/f'unrecognised_{index}.png'))
