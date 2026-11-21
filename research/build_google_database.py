@@ -116,6 +116,22 @@ def main(root='raw-google',out_dir='google-only-output'):
     (out/'top60.json').write_text(json.dumps({'metadata':meta,'top60':top},indent=2))
     print('GOOGLE_ONLY_RESEARCH_QUALITY',json.dumps(meta),flush=True)
     print('TOP60_CANDIDATES',json.dumps([(i+1,r['fsa'],r['population_5km_estimate'],r['google_observed_5km'],r['residents_per_observed_google_listing']) for i,r in enumerate(top)]),flush=True)
-    if missing or len(top)<60:
-        raise RuntimeError(f'Cannot certify top 60: {len(missing)} missing areas and only {len(top)} eligible results')
+    prospective=[]
+    for row in rows:
+        if row['previous_90_days'] or row['google_observed_5km'] is None or row['population_5km_estimate']<=0:
+            continue
+        if row['status'] in ('source_incomplete','no_scan','list_end_unverified'):continue
+        quality=(0.2 if row['feed_capped'] else 1.0)
+        if (row['unlocated_links'] or 0)>0:quality*=0.3
+        score=row['residents_per_observed_google_listing']*quality
+        prospective.append((score,row))
+    prospective.sort(key=lambda x:(-x[0],x[1]['fsa']))
+    candidates=[dict(row,first_pass_weighted_score=round(score,2)) for score,row in prospective[:180]]
+    (out/'preliminary_top_180.json').write_text(json.dumps({
+        'candidate_count':len(candidates),'source_fsas':len(records),
+        'ranking':'Preliminary only: source quality penalties; must independently verify 5km businesses with local postal-code Google Maps queries.',
+        'candidates':candidates},indent=2))
+    print('PRELIMINARY_CANDIDATES',len(candidates),flush=True)
+    if missing:raise RuntimeError(f'Cannot certify Ontario completeness: {len(missing)} FSAs not observed')
+
 if __name__=='__main__':main(*(sys.argv[1:]))
