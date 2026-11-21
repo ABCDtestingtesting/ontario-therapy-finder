@@ -49,6 +49,8 @@ def pick_distinct_candidates(sites,fsa_centres,min_distance_km=10):
     return picks
 
 def analyse(fsas,min_sites_each=4,max_sites_each=70):
+    if any(code in census.HAMILTON_POSTAL_AREAS for code in fsas):
+        raise InvalidEvidence('Hamilton municipality or ambiguous Hamilton-linked postal area is excluded')
     if len(set(fsas)) < 2:
         raise InvalidEvidence('At least two distinct postal areas are needed for two recommendations')
     if len(set(fsas)) != len(fsas):
