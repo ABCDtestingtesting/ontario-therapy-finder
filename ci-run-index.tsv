@@ -1,7 +1,9 @@
+44905058933	Verify official DA archive fallback against real 2021 data	in_progress		a7936c8ee8a409f8a45f7f30d7a7e7e87084a863	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44905058933
+44905058878	Capture GitHub Actions run identifiers for diagnosis	in_progress		a7936c8ee8a409f8a45f7f30d7a7e7e87084a863	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44905058878
 44905020663	Real macOS verification (live sources)	queued		6df2aa3fd498278049b2f291a603321cd4d4662c	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44905020663
-44905020589	Capture GitHub Actions run identifiers for diagnosis	in_progress		6df2aa3fd498278049b2f291a603321cd4d4662c	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44905020589
+44905020589	Capture GitHub Actions run identifiers for diagnosis	completed	success	6df2aa3fd498278049b2f291a603321cd4d4662c	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44905020589
 44905020585	Focused live-source Mac diagnostics	queued		6df2aa3fd498278049b2f291a603321cd4d4662c	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44905020585
-44905006536	Capture GitHub Actions run identifiers for diagnosis	in_progress		cfbc776bf3adbd7498981646701a1325aea40d2f	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44905006536
+44905006536	Capture GitHub Actions run identifiers for diagnosis	completed	success	cfbc776bf3adbd7498981646701a1325aea40d2f	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44905006536
 44905006513	Focused live-source Mac diagnostics	in_progress		cfbc776bf3adbd7498981646701a1325aea40d2f	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44905006513
 44905006501	Real macOS verification (live sources)	queued		cfbc776bf3adbd7498981646701a1325aea40d2f	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44905006501
 44904341109	Capture GitHub Actions run identifiers for diagnosis	completed	success	d6194f1055b8c33f0ac1584019921ac9457ceb94	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44904341109
