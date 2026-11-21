@@ -1,0 +1,72 @@
+name: Current Ontario Psychology Today directory screen
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/ontario-pt-current-screen.yml'
+permissions:
+  contents: read
+jobs:
+  pt-summary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Read displayed counselor totals with one request per area
+        run: |
+          python - <<'PY'
+          import re,html,json,time
+          from html.parser import HTMLParser
+          from urllib.request import Request,urlopen
+          from urllib.error import HTTPError,URLError
+          from urllib.parse import urlparse
+          from pathlib import Path
+          class P(HTMLParser):
+              def __init__(self):super().__init__(convert_charrefs=True);self.parts=[];self.ignore=0
+              def handle_starttag(self,t,a):
+                  if t in ('script','style','noscript'):self.ignore+=1
+              def handle_endtag(self,t):
+                  if t in ('script','style','noscript'):self.ignore=max(0,self.ignore-1)
+              def handle_data(self,s):
+                  if not self.ignore:self.parts.append(s)
+          codes='N4G P1P P2A K8A P1H N4W N4K L4R N8H P1L L9Y K6J K6V K8V N3Y N4N P8N P9N P4N P5N L6Z L7A N1T'.split()
+          rows=[]
+          for code in codes:
+              url='https://www.psychologytoday.com/ca/therapists/'+code.lower()
+              item={'fsa':code,'url':url,'status':'unknown'}
+              try:
+                  req=Request(url,headers={'User-Agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 13.0; rv:129.0) Gecko/20100101 Firefox/129.0','Accept':'text/html,application/xhtml+xml','Accept-Language':'en-CA,en;q=0.8'})
+                  with urlopen(req,timeout=30) as r:
+                      payload=r.read(2500000).decode('utf-8','replace')
+                      code_http=r.status
+                      final=r.url
+                  parser=P();parser.feed(payload)
+                  page=re.sub(r'\s+',' ',' '.join(parser.parts)).strip()
+                  m=re.search(r'Number\s+of\s+Counsellors\s+in\s+'+code+r'\s*([\d,]+)\s*(\+?)',page,re.I)
+                  if code_http==200 and urlparse(final).path.rstrip('/')==urlparse(url).path.rstrip('/') and m:
+                      item.update(status='observed',display=m.group(1)+m.group(2),lower_bound=int(m.group(1).replace(',','')),rounded=bool(m.group(2)))
+                  else:
+                      item.update(status='unknown',reason='No verified displayed count on the expected page',http_status=code_http)
+              except HTTPError as exc:
+                  item.update(status='blocked',reason='HTTP '+str(exc.code))
+              except Exception as exc:
+                  item.update(status='unknown',reason=type(exc).__name__+': '+str(exc)[:160])
+              rows.append(item)
+              print('CURRENT_PT_FSA',json.dumps(item),flush=True)
+              if item['status']=='blocked':
+                  print('Provider restriction; stopping further PT requests')
+                  break
+              time.sleep(1.0)
+          Path('pt_ontario_current.json').write_text(json.dumps({'rows':rows},indent=2))
+          PY
+      - name: Preserve PT observations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: current-ontario-pt-summary
+          retention-days: 7
+          if-no-files-found: warn
+          path: pt_ontario_current.json
