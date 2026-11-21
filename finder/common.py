@@ -12,6 +12,9 @@ for p in (DATA,LOGS,OUTPUT,BIN):p.mkdir(parents=True,exist_ok=True)
 FSA_RE=re.compile(r'^[KLMNP][0-9][A-Z]$')
 class Incomplete(RuntimeError):pass
 class SourceUnavailable(Incomplete):pass
+class HumanVerificationRequired(SourceUnavailable):
+    """A provider has suspended automated access; pause this source until manual retry."""
+    pass
 class InvalidEvidence(Incomplete):pass
 
 def valid_fsa(code):return bool(FSA_RE.fullmatch(str(code).upper()))
