@@ -45,11 +45,16 @@ def test_real_subprocess_cancel_and_resume_data_kept(monkeypatch,tmp_path):
         'time.sleep(30)\n')
     exe.chmod(exe.stat().st_mode|stat.S_IXUSR)
     monkeypatch.setattr(maps,'ensure_binary',lambda progress:exe)
+    # Wait until the child has actually produced a partial result before
+    # requesting cancellation. CPU-constrained hosted runners may take longer
+    # than 0.25 s merely to start the interpreter. Killing it before it
+    # starts cannot prove the collector preserves output on interruption.
+    folder=tmp_path/'areas'/'L7A'/'google'
+    result_file=folder/'google_raw.csv'
     started=time.monotonic()
     with pytest.raises(SourceUnavailable,match='stopped by user'):
         maps.execute('L7A',mapping(box(-79.85,43.68,-79.82,43.71)),
-                     cancel_requested=lambda:time.monotonic()-started>0.25)
-    folder=tmp_path/'areas'/'L7A'/'google'
+                     cancel_requested=lambda:result_file.exists() or time.monotonic()-started>5)
     assert (folder/'google_raw.csv').exists()
     assert not (folder/'locations.json').exists()
     assert time.monotonic()-started<8
