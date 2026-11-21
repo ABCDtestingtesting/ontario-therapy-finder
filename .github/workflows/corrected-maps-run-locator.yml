@@ -1,0 +1,35 @@
+name: One-time corrected Ontario Google research run locator
+on:
+  push:
+    paths: ['.github/workflows/corrected-maps-run-locator.yml']
+permissions:
+  contents: write
+  actions: read
+jobs:
+  locate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read all running source research jobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs?branch=ontario-401-fsa-live-ranking-20261121&per_page=50" --jq '.workflow_runs[] | [.id,.name,.status,(.conclusion // ""),.head_sha,.html_url] | @tsv' > /tmp/live-ontario-runs.tsv
+          head -30 /tmp/live-ontario-runs.tsv
+      - name: Upload source status snapshot to diagnostic branch
+        run: |
+          set -e
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          for attempt in 1 2 3; do
+            git fetch origin ci-diagnostics
+            git checkout -B ci-diagnostics origin/ci-diagnostics
+            cp /tmp/live-ontario-runs.tsv corrected-ontario-runs.tsv
+            git add corrected-ontario-runs.tsv
+            if git diff --cached --quiet;then exit 0;fi
+            git commit -m 'Capture updated Ontario Google-only run IDs [skip ci]'
+            if git push origin HEAD:ci-diagnostics; then exit 0; fi
+            sleep 1
+          done
+          exit 1
