@@ -2,15 +2,6 @@ name: Real macOS verification (live sources)
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'finder/**'
-      - 'tests/**'
-      - 'web/**'
-      - 'ci/**'
-      - '.github/workflows/live-macos-verification.yml'
-      - 'requirements.txt'
-      - 'start.command'
 
 permissions:
   contents: read
@@ -41,6 +32,7 @@ jobs:
           sw_vers
           python --version
           zsh -n start.command
+          test -x start.command
           ls -la start.command
           go version || true
       - name: Install application requirements and actual Playwright Firefox
@@ -50,7 +42,8 @@ jobs:
           python -m playwright install firefox
           python -m finder.selfcheck
       - name: Run existing tests on the actual hosted Mac
-        run: python -m pytest -q
+        timeout-minutes: 8
+        run: python -m pytest -vv -q
       - name: Live localhost server and dashboard HTTP
         if: always()
         continue-on-error: true

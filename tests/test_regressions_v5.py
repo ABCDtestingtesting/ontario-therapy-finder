@@ -33,6 +33,7 @@ def test_cancellation_before_pt_navigation_keeps_checkpoint(monkeypatch,tmp_path
 
 
 def test_real_subprocess_cancel_and_resume_data_kept(monkeypatch,tmp_path):
+    monkeypatch.setenv('THERAPY_NATIVE_MAPS_FIRST','1')
     monkeypatch.setattr(maps,'DATA',tmp_path)
     exe=tmp_path/'fake-google-engine'
     exe.write_text('#!'+sys.executable+'\nimport sys,time,csv\n'

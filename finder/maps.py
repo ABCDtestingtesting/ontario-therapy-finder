@@ -159,7 +159,7 @@ def execute(fsa,fsa_geometry,progress=lambda msg:None,run_cmd=None,force=False,c
     if normalized.exists() and not force:return read_json(normalized)
     if cancel_requested():
         raise SourceUnavailable('Google Maps search stopped before starting; saved work preserved')
-    exe=ensure_binary(progress) if run_cmd is None else 'fake-collector'
+    exe='google-maps-scraper' if run_cmd is None else 'fake-collector'
     bbox=bbox_with_margin(fsa_geometry)
     query_file=folder/'queries.txt';query_file.write_text('\n'.join(SEARCHES)+'\n',encoding='utf8')
     output=folder/'google_raw.csv'
@@ -174,6 +174,38 @@ def execute(fsa,fsa_geometry,progress=lambda msg:None,run_cmd=None,force=False,c
     write_json(folder/'plan.json',spec)
     progress(f'{fsa}: scanning Google Maps grid (saved progress supported)')
     logfile=folder/'collector.log'
+    firefox_issue=None
+    # Start with the browser that is already installed by start.command. This
+    # avoids requiring Go/Homebrew or an external native binary for a Mac where
+    # regular Firefox can complete the search successfully.
+    if run_cmd is None and os.environ.get('THERAPY_NATIVE_MAPS_FIRST')!='1':
+        try:
+            from .google_browser import collect as collect_firefox
+            south,west,north,east=[float(n) for n in bbox.split(',')]
+            collect_firefox((south,west,north,east),SEARCHES,output,
+                            progress=progress,cancel_requested=cancel_requested)
+            parsed=parse_csv(output)
+            if not parsed['locations']:
+                raise InvalidEvidence('Firefox produced no geolocated Google listings')
+            parsed.update({'source_url':'https://www.google.com/maps/','plan':spec,
+                 'raw_sha256':sha256(output),'sidecar_present':False,
+                 'source_file':str(output),'manual_audit_needed':True,
+                 'collector_used':'playwright-firefox','native_issue':None})
+            write_json(normalized,parsed)
+            return parsed
+        except Exception as exc:
+            if cancel_requested():
+                raise SourceUnavailable('Google Maps scan stopped; saved Firefox progress preserved') from exc
+            firefox_issue=str(exc)
+            progress(f'{fsa}: Firefox collection incomplete ({exc}); checking native fallback')
+    if run_cmd is None:
+        try:exe=ensure_binary(progress)
+        except (SourceUnavailable,InvalidEvidence) as exc:
+            raise SourceUnavailable(f'No complete Google results. Firefox: {firefox_issue}; '
+                        f'native prerequisite: {exc}') from exc
+        cmd[0]=str(exe)
+        spec['command']=cmd
+        write_json(folder/'plan.json',spec)
     if run_cmd:
         rc=run_cmd(cmd,output)
     else:
@@ -237,7 +269,7 @@ def execute(fsa,fsa_geometry,progress=lambda msg:None,run_cmd=None,force=False,c
                             progress=progress,cancel_requested=cancel_requested)
             parsed=parse_csv(output)
             used='playwright-firefox'
-        except (InvalidEvidence,SourceUnavailable) as firefox_error:
+        except Exception as firefox_error:
             raise SourceUnavailable(
                 f'Both Google collection methods failed. Native: {native_issue}; '
                 f'Firefox: {firefox_error}. See {folder}/firefox_evidence for diagnostics') from firefox_error

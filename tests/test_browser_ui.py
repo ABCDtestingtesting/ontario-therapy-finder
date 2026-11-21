@@ -8,20 +8,25 @@ import pytest
 from playwright.sync_api import sync_playwright
 from finder.common import ROOT
 
-@pytest.fixture
-def page():
+@pytest.fixture(scope='module')
+def browser():
+    """One browser process across all UI tests; individual pages remain isolated."""
     exe=Path('/usr/bin/chromium')
-    html=(ROOT/'web'/'index.html').read_text()
     with sync_playwright() as pw:
         if exe.exists():
             b=pw.chromium.launch(headless=True,executable_path=str(exe),args=['--no-sandbox'])
         else:
-            # start.command installs Playwright Firefox on macOS.
             b=pw.firefox.launch(headless=True)
-        pg=b.new_page(viewport={'width':1440,'height':900})
-        pg.route('https://unpkg.com/**',lambda route:route.abort())
-        pg.goto('about:blank')
-        pg.evaluate('''() => {
+        try:yield b
+        finally:b.close()
+
+@pytest.fixture
+def page(browser):
+    html=(ROOT/'web'/'index.html').read_text()
+    pg=browser.new_page(viewport={'width':1440,'height':900})
+    pg.route('https://unpkg.com/**',lambda route:route.abort())
+    pg.goto('about:blank')
+    pg.evaluate('''() => {
          window.__requests=[];
          window.fetch=async function(u,opt){
           let url=String(u);window.__requests.push(url);
@@ -31,7 +36,6 @@ def page():
               census:{fsa_population:false,da_population:false,fsa_boundaries:false,ready:false},
               state:{job:{status:'idle',message:'Ready'},areas:{},events:[]}};
           }else if(url.startsWith('/api/census')){
-           // Deliberately omit "ok" to reproduce the user's earlier HTTP 200 bug.
            body={message:'Census request accepted (HTTP 200 without ok)'};
           }else if(url.startsWith('/api/eligible')){
            status=409;body={ok:false,error:'Census data are missing. Complete the first step.'};
@@ -49,9 +53,9 @@ def page():
           return {ok:status>=200&&status<300,status:status,json:async()=>body};
          }
         }''')
-        pg.set_content(html,wait_until='domcontentloaded')
-        yield pg
-        b.close()
+    pg.set_content(html,wait_until='domcontentloaded')
+    try:yield pg
+    finally:pg.close()
 
 def test_actual_page_buttons_and_dashboard_health(page):
     assert 'Ontario Therapy Area Research' in page.locator('h1').inner_text()

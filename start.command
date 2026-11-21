@@ -18,7 +18,18 @@ for candidate in /opt/homebrew/bin/python3.13 /opt/homebrew/bin/python3.12 /opt/
    PY="$candidate";break
  fi
 done
-[[ -z "$PY" ]] && fail 'Python 3.11+ is required. Install it free from https://www.python.org/downloads/macos/'
+if [[ -z "$PY" ]];then
+  print 'No suitable Python found. Installing a free local Python automatically…'
+  TOOL_DIR="$PWD/.therapy_tools"
+  mkdir -p "$TOOL_DIR" || fail 'Cannot create local runtime folder'
+  curl -fLsS --retry 3 'https://astral.sh/uv/install.sh' -o "$TOOL_DIR/uv_install.sh" || fail 'Could not download free Python installer; check Internet access'
+  UV_INSTALL_DIR="$TOOL_DIR" UV_NO_MODIFY_PATH=1 /bin/sh "$TOOL_DIR/uv_install.sh" || fail 'Could not install local Python manager'
+  export UV_PYTHON_INSTALL_DIR="$TOOL_DIR/managed_python"
+  [[ -x "$TOOL_DIR/uv" ]] || fail 'Local Python manager installation did not produce an executable'
+  "$TOOL_DIR/uv" python install 3.12 || fail 'Could not download managed Python 3.12'
+  PY="$("$TOOL_DIR/uv" python find 3.12 --managed-python --python-preference only-managed 2>/dev/null)"
+  [[ -x "$PY" ]] || fail 'Managed Python 3.12 was installed but could not be found'
+fi
 print "Python: $PY"
 if [[ ! -x .venv/bin/python ]];then
  print 'Creating a clean local Python environment…'

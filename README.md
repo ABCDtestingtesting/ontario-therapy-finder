@@ -3,10 +3,10 @@
 ## Start (Mac)
 
 1. Extract the ZIP to your Desktop or Documents; do not run it from inside the ZIP.
-2. Double-click **start.command**. It sets up its own Python environment and downloads Playwright Firefox. Before opening the dashboard, it runs all bundled local tests on your Mac. These are software checks, not proof that Google or Psychology Today will respond to searches. No Google Cloud or credit card required. Python dependencies and Playwright Firefox still require an internet connection. A modern Python (3.11+) is required; if missing, the launcher will provide the free Python download location.
+2. Double-click **start.command**. It sets up its own Python environment and downloads Playwright Firefox. Before opening the dashboard, it runs all bundled local tests on your Mac. These are software checks, not proof that Google or Psychology Today will respond to searches. No Google Cloud or credit card required. Python dependencies and Playwright Firefox require internet access. If Python 3.11+ is missing, the launcher now attempts to install a user-local Python 3.12 automatically using uv without administrator privileges.
 3. Wait for the local dashboard to open automatically. Keep its Terminal window open.
 4. Click **Download and validate census data**. Its progress and errors appear beneath the button. The program downloads Statistics Canada 2021 FSA populations, DA populations, and official Ontario FSA boundaries.
-5. Start with **L7A** and click **Run / resume all four sources**. This live pilot checks the external sources before you run hundreds of areas. The program installs a pinned free Google Maps collection engine on first use; if a Mac binary is unavailable, it builds the tagged open-source release using Go. If an installation fails, the dashboard shows the error, saves logs, and preserves the unfinished job. This external binary has not been run live on your Mac.
+5. Start with **L7A** and click **Run / resume all four sources**. This live pilot checks the external sources before you run hundreds of areas. The program first attempts visible Firefox Google Maps collection with resumable grid searches. If that cannot collect complete evidence, it tries the pinned free Google Maps engine and, if necessary, its Go-based source-build fallback. If an installation fails, the dashboard shows the error, saves logs, and preserves the unfinished job. This external binary has not been run live on your Mac.
 6. Use **Inspect evidence** to examine the original Google results, Psychology Today records and housing photographs. If any Psychology Today profiles have an unknown local/online classification, open their linked original profiles and classify them in that panel. For housing, review at least six actual residential photos per FSA (or use the optional local vision model). Record the audit you performed. The final ranking refuses to treat unresolved searches as zero competitors. A directory listing with an L7A postal code is counted as a locally advertised listing, not automatically as an in-person practice.
 7. When the pilot works, use **Show eligible areas**, **Select all listed**, **Run / resume**. Click **Check completeness and rank** after every selected area has passed the source reviews. The exports appear in `output/` and as download links on the dashboard.
 
@@ -14,7 +14,7 @@ The system is free and local, but the initial census tables and map scans involv
 
 ## Revision 5.1 — verified regression fix
 
-- Corrected Psychology Today to follow actual 1-based pagination: the initial URL is `/ca/therapists/l7a`, and the following page is `?page=2`, then `?page=3`, etc. V5 expected `?page=1`, and could stop at page one. The current public directory links were independently checked in November 2026.
+- Corrected Psychology Today to follow actual 1-based pagination: the initial URL is `/ca/therapists/l7a`, and the following page is `?page=2`, then `?page=3`, etc. An earlier collector expected `?page=1`, and could stop at page one. The current public directory links were independently checked in November 2026.
 - Added simulated four-page continuation, page-gap detection, and interruption regression tests; the local package passes 64 automated tests.
 - IMPORTANT: Public website navigation was verified with web retrieval, but real browser collection on the user's Mac, external Google Maps executable installation, automatic housing-photo classification, and the complete census download are still untested end-to-end. No 100% guarantee is possible from this environment. If a stage fails, consult `diagnose.command` without deleting its saved records.
 
@@ -52,3 +52,11 @@ This package has passed local unit, HTTP, UI, simulated collector and interrupti
 - Google scraper public documentation: https://github.com/gosom/google-maps-scraper
 - Psychology Today Ontario directory: https://www.psychologytoday.com/ca/therapists/ontario
 - Google Street View URL schema: https://developers.google.com/maps/documentation/urls/get-started
+
+## Subsequent live-testing corrections
+
+- ArcGIS FSA and DA geometry queries now split server-failing batches without skipping any results, and FSA boundaries can fall back to an independently verified copy of the official 2021 shape archive.
+- Google Maps searches use resumable Firefox first; the original native Go collector remains a backup. Search links without coordinates are reopened individually to retrieve coordinate-bearing place URLs.
+- In visible Firefox, Google verification prompts remain open until completed or explicitly stopped. In headless CI, any challenge fails the test and saves a diagnostic screenshot.
+- The Mac launcher now installs user-local Python when unavailable; executable modes are verified in the release pipeline.
+- Release is withheld until live external source checks pass; local unit tests alone are insufficient.

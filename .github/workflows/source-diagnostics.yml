@@ -4,6 +4,11 @@ on:
   push:
     paths:
       - '.github/workflows/source-diagnostics.yml'
+      - 'finder/**'
+      - 'tests/**'
+      - 'ci/**'
+      - 'start.command'
+      - 'requirements.txt'
   workflow_dispatch:
 
 permissions:

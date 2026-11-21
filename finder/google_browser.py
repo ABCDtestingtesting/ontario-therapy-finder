@@ -63,7 +63,9 @@ def _snapshot(page,path):
     except Exception:pass
 
 
-def scan_one(context,query,lat,lon,diagnostics,timeout_seconds=90,max_scroll=35):
+def scan_one(context,query,lat,lon,diagnostics,timeout_seconds=90,max_scroll=35,
+             interactive=False,verification_wait_seconds=1200,
+             progress=lambda msg:None,cancel_requested=lambda:False):
     """Scan one actual query. Returns a *complete* search only on verified end.
 
     Results with unresolved coordinates stay in the evidence for later manual
@@ -84,8 +86,24 @@ def scan_one(context,query,lat,lon,diagnostics,timeout_seconds=90,max_scroll=35)
             try:
                 body=page.locator('body').inner_text(timeout=10000).lower()
             except Exception:body=''
+            if cancel_requested():
+                raise SourceUnavailable('Google Maps collection stopped; saved evidence remains')
             if any(m in body for m in CHALLENGE_MARKERS):
-                raise SourceUnavailable('Google Maps presented a human-verification challenge')
+                _snapshot(page,diagnostics/'verification_challenge.png')
+                if not interactive:
+                    raise SourceUnavailable('Google Maps presented a human-verification challenge')
+                progress('Google Maps verification is open in Firefox. Complete it in that window; the search will resume.')
+                until=time.monotonic()+verification_wait_seconds
+                while time.monotonic()<until:
+                    if cancel_requested():raise SourceUnavailable('Google verification stopped; saved evidence remains')
+                    page.wait_for_timeout(2500)
+                    try:body=page.locator('body').inner_text(timeout=10000).lower()
+                    except Exception:continue
+                    if not any(m in body for m in CHALLENGE_MARKERS):break
+                else:
+                    raise SourceUnavailable('Google Maps human verification remained unresolved; progress saved')
+                deadline=time.monotonic()+timeout_seconds
+                progress('Google Maps verification cleared; continuing the same search')
             for a in _page_evidence(page):
                 url_=a.get('href') or ''
                 if '/maps/place/' in url_:
@@ -140,6 +158,30 @@ def scan_one(context,query,lat,lon,diagnostics,timeout_seconds=90,max_scroll=35)
         page.close()
 
 
+def resolve_place_coordinates(context,href,timeout_ms=18000):
+    """Retrieve coordinates from a Google place's canonical detail page if missing.
+
+    Never equate a search-map centre with a business coordinate. The returned
+    tuple includes the URL that proved the coordinates.
+    """
+    tab=context.new_page()
+    try:
+        tab.goto(href,wait_until='domcontentloaded',timeout=timeout_ms)
+        for _ in range(5):
+            candidates=[tab.url]
+            for selector in ('link[rel="canonical"]','meta[property="og:url"]'):
+                item=tab.locator(selector)
+                if item.count():
+                    value=item.first.get_attribute('href' if selector.startswith('link') else 'content')
+                    if value:candidates.append(value)
+            for url in candidates:
+                coords=place_coordinates(url)
+                if coords:return coords,url
+            tab.wait_for_timeout(500)
+        return None,None
+    finally:
+        tab.close()
+
 def grid_points(bbox,cell_km=1.0,max_cells=20000):
     """bbox = (south,west,north,east); every centre within a 1 km grid."""
     south,west,north,east=bbox
@@ -174,16 +216,28 @@ def collect(bbox,queries,out_csv,progress=lambda x:None,headless=None,cancel_req
                 if job in cache['completed']:continue
                 if cancel_requested():raise SourceUnavailable('Google Maps scan stopped; progress saved')
                 progress(f'Google Maps {len(cache["completed"])+1}/{len(plan)}: {query} at {lat},{lon}')
-                evidence=scan_one(context,query,lat,lon,work/job)
+                evidence=scan_one(context,query,lat,lon,work/job,interactive=not headless,
+                                  progress=progress,cancel_requested=cancel_requested)
                 cache['completed'][job]={'reason':evidence['completion_reason'],'query':query,'lat':lat,'lon':lon}
                 for link in evidence['place_links']:
                     url=link['url'];coords=link['coordinates']
-                    key=url.split('?')[0].lower()
+                    if not coords:
+                        try:
+                            coords,proven_url=resolve_place_coordinates(context,url)
+                            if proven_url:link['coordinate_evidence_url']=proven_url
+                        except Exception as exc:link['coordinate_resolution_error']=str(exc)
                     if coords:
                         la,lo=coords
-                        cache['locations'][key]={'title':link['name'] or name_from_url(url),
-                             'latitude':la,'longitude':lo,'link':url,'category':query,'place_id':key}
-                    else:cache['unlocated'][key]=link
+                        title=link['name'] or name_from_url(url)
+                        # Stable across different search grid URLs to the same
+                        # place, preserving separate businesses with distinct
+                        # names or locations.
+                        key=f'{title.strip().casefold()}|{la:.5f}|{lo:.5f}'
+                        cache['locations'][key]={'title':title,
+                             'latitude':la,'longitude':lo,'link':url,'category':query,
+                             'place_id':key}
+                        cache['unlocated'].pop(url.split('?')[0].lower(),None)
+                    else:cache['unlocated'][url.split('?')[0].lower()]=link
                 write_json(checkpoint,cache)
         finally:context.close()
     if len(cache['completed'])!=len(plan):raise InvalidEvidence('Google grid checkpoint incomplete')

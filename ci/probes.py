@@ -60,6 +60,8 @@ def mac_launcher_probe():
     """Run the real user-facing zsh launcher on a hosted Mac and query its server."""
     if platform.system()!='Darwin':
         raise RuntimeError('Launcher live test requires real macOS')
+    if not os.access(ROOT/'start.command',os.X_OK):
+        raise RuntimeError('start.command lost executable permission in the published Mac package')
     import signal
     launch_log=ROOT/'ci'/'real_launcher.log'
     with launch_log.open('w',encoding='utf8') as f:

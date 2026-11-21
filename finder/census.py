@@ -4,7 +4,7 @@ Population = the 2021 baseline. A 5-km point estimate assumes uniform population
 within each intersected dissemination area; estimates are labelled accordingly.
 """
 from __future__ import annotations
-import csv, io, re, math, json, zipfile, time, os, tempfile
+import csv, io, re, math, json, zipfile, time, os, tempfile, shutil
 from functools import lru_cache
 from pathlib import Path
 import requests
@@ -18,6 +18,9 @@ GIS='https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Cartographic_boundary_f
 FSA_LAYER=GIS+'/14/query'
 DA_LAYER=GIS+'/12/query'
 UA='OntarioTherapyAreaResearch/5.1 census-geography'
+FSA_BOUNDARY_ARCHIVES=(
+ 'https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lfsa000b21a_e.zip',
+ 'https://data.source.coop/dataforcanada/d4c-datapkg-statistical/archive/statcan/boundaries/2021/lfsa000b21a_e.zip')
 
 @lru_cache(maxsize=1)
 def project():return Transformer.from_crs(4326,3347,always_xy=True).transform
@@ -216,13 +219,77 @@ def load_layer(url,where,field,bbox=None,progress=None):
         raise InvalidEvidence(f'{field} count mismatch {len(seen)}/{expected}')
     return seen
 
+def _parse_fsa_shapefile_archive(archive,minimum=300):
+    """Use official, projected 2021 FSA shapefiles when ArcGIS requests fail.
+
+    Only the known .shp/.shx/.dbf files are extracted, to trusted local names.
+    Preserve original source provenance and validate Ontario geometry/count.
+    """
+    import shapefile
+    archive=Path(archive)
+    root=DATA/'downloads'/'fsa_extracted'
+    root.mkdir(parents=True,exist_ok=True)
+    prefix=root/'source_fsa'
+    with zipfile.ZipFile(archive) as zipped:
+        shape_files=[name for name in zipped.namelist() if name.lower().endswith('.shp')]
+        if len(shape_files)!=1:raise InvalidEvidence('Expected one FSA shapefile in verified census archive')
+        base=shape_files[0][:-4]
+        for ext in ('.shp','.shx','.dbf'):
+            item=next((n for n in zipped.namelist() if n.lower()==(base+ext).lower()),None)
+            if not item:raise InvalidEvidence(f'FSA shapefile missing {ext}')
+            with zipped.open(item) as inp,(prefix.with_suffix(ext)).open('wb') as out:
+                shutil.copyfileobj(inp,out)
+    results={}
+    with shapefile.Reader(str(prefix),encoding='latin1') as reader:
+        columns=[x[0] for x in reader.fields[1:]]
+        if 'CFSAUID' not in columns:raise InvalidEvidence('Expected CFSAUID in census shapefile')
+        for rec in reader.iterShapeRecords():
+            item=dict(zip(columns,rec.record))
+            code=str(item.get('CFSAUID') or '').strip().upper()
+            if not valid_fsa(code):continue
+            g=transform(unproject(),shape(rec.shape.__geo_interface__))
+            if not g.is_valid:g=g.buffer(0)
+            if g.is_empty or g.area<=0:raise InvalidEvidence(f'Bad FSA shape from archive: {code}')
+            if code in results:raise InvalidEvidence(f'Duplicate archived Ontario FSA: {code}')
+            point=g.representative_point()
+            if not (41<point.y<57 and -96<point.x<-73):
+                raise InvalidEvidence(f'Wrong FSA boundary projection: {code}')
+            results[code]=g.__geo_interface__
+    if len(results)<minimum:
+        raise InvalidEvidence(f'Archived Ontario FSA count {len(results)} < {minimum}')
+    return results
+
+
+def _fsa_archive_fallback(progress=None):
+    archive=DATA/'downloads'/'lfsa000b21a_e.zip'
+    errors=[];source=None
+    if archive.exists() and zipfile.is_zipfile(archive):
+        return _parse_fsa_shapefile_archive(archive)
+    for uri in FSA_BOUNDARY_ARCHIVES:
+        try:
+            if progress:progress('Trying full official FSA geometry archive (fallback)')
+            fetch_to_file(uri,archive,progress,retries=1)
+            regions=_parse_fsa_shapefile_archive(archive)
+            source=uri
+            write_json(DATA/'fsa_archive_provenance.json',
+                       {'url':source,'sha256':sha256(archive),'count':len(regions)})
+            return regions
+        except (SourceUnavailable,InvalidEvidence,zipfile.BadZipFile,ValueError,OSError) as exc:
+            errors.append(f'{uri}: {exc}')
+            archive.unlink(missing_ok=True)
+    raise SourceUnavailable('All official FSA geometry sources failed: '+'; '.join(errors))
+
 def fsa_geometry(progress=None):
     target=DATA/'fsa_boundaries.json'
     if target.exists():
         data=read_json(target)
         if len(data)>=300:return data
         target.unlink()
-    polys=load_layer(FSA_LAYER,"PRUID='35'",'CFSAUID',progress=progress)
+    try:
+        polys=load_layer(FSA_LAYER,"PRUID='35'",'CFSAUID',progress=progress)
+    except (SourceUnavailable,InvalidEvidence) as arc_error:
+        if progress:progress(f'ArcGIS geometry incomplete ({arc_error}); retrying official census shapefile archive')
+        polys=_fsa_archive_fallback(progress)
     if len(polys)<300 or any(not valid_fsa(x) for x in polys):raise InvalidEvidence('Ontario FSA boundaries invalid')
     write_json(target,polys);return polys
 
