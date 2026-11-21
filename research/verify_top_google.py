@@ -18,7 +18,7 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument('--shard',type=int,required=True)
     p.add_argument('--shards',type=int,default=20)
-    p.add_argument('--input',default='research/preliminary_top_120.json')
+    p.add_argument('--input',default='research/preliminary_top_180.json')
     args=p.parse_args()
     candidates=json.loads(Path(args.input).read_text())['candidates']
     jobs=[x for i,x in enumerate(candidates) if i%args.shards==args.shard]
