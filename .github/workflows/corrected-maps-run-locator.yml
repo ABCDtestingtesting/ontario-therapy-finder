@@ -1,4 +1,4 @@
-name: One-time corrected Ontario Google research run locator
+name: Updated postal-specific Ontario Google research run locator
 on:
   push:
     paths: ['.github/workflows/corrected-maps-run-locator.yml']
