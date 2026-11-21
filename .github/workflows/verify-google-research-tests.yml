@@ -1,0 +1,20 @@
+name: Verify Ontario Google-only coordinate and ratio regressions
+on:
+  push:
+    paths: ['.github/workflows/verify-google-research-tests.yml','research/test_google_pipeline.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install geospatial dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Run actual Google URL parser and 5km ranking tests
+        run: python -m unittest research.test_google_pipeline -v
