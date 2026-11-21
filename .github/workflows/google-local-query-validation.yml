@@ -1,0 +1,32 @@
+name: Validate geographically focused Google Maps search and coordinate parser
+on:
+  push:
+    paths: ['.github/workflows/google-local-query-validation.yml','research/validate_local_query.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  geolocate:
+    runs-on: macos-15
+    timeout-minutes: 26
+    env:
+      PYTHONUNBUFFERED: '1'
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install -r requirements.txt
+          python -m playwright install firefox
+      - name: Trial unscoped and locally scoped searches live
+        timeout-minutes: 20
+        run: python -m research.validate_local_query
+      - name: Retain live evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maps-scoped-search-pilot
+          retention-days: 7
+          path: pilot-query-results/observations.jsonl
