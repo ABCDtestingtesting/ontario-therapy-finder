@@ -92,6 +92,8 @@ def main(root='raw-google',out_dir='google-only-output'):
     missing=sorted(expected-observed)
     extra=sorted(observed-expected)
     if extra:raise RuntimeError('Unexpected FSAs: '+str(extra[:12]))
+    wrong_query=[code for code,row in records.items() if row.get('search_query')!=f'psychotherapist near {code} Ontario Canada']
+    if wrong_query:raise RuntimeError('Source data used geographically unscoped Google query; replace these FSA artifacts: '+str(wrong_query[:20]))
     populations=calculate_fsa_weighted_5km_population(sorted(observed))
     rows=[];counts=Counter()
     for fsa in sorted(expected):
