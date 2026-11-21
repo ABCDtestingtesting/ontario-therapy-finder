@@ -1,0 +1,51 @@
+name: Export all Ontario populated 2021 FSA codes
+on:
+  push:
+    paths: ['.github/workflows/ontario-all-fsa-census.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    env:
+      THERAPY_DATA_HOME: ${{ github.workspace }}/provincial_census
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - name: Gather full FSA enumeration with no 12000-population threshold
+        run: |
+          python - <<'PY'
+          from finder import census
+          from pathlib import Path
+          import json
+          geos=census.fsa_geometry(print)
+          pops=census.load_population('fsa',print)
+          rows=[]
+          for code,geometry in geos.items():
+              if code in census.HAMILTON_POSTAL_AREAS:continue
+              population=pops.get(code,{}).get('population')
+              if not population or population<=0:continue
+              lat,lon=census.representative(geometry)
+              rows.append({'fsa':code,'lat':round(lat,6),'lon':round(lon,6),'population_2021':int(population)})
+          rows.sort(key=lambda r:r['fsa'])
+          Path('research').mkdir(exist_ok=True)
+          Path('research/ontario_all_populated_fsa_2021.json').write_text(json.dumps({
+              'source':'Statistics Canada 2021 FSA boundaries and population',
+              'excludes':'Hamilton municipal FSA list',
+              'minimum_population':1,'areas':rows},indent=2))
+          print('FULL_ONTARIO_POPULATED_FSA_COUNT',len(rows))
+          PY
+      - name: Publish verified full populated FSA pool on this branch
+        run: |
+          git config user.name github-actions
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add research/ontario_all_populated_fsa_2021.json
+          if ! git diff --cached --quiet;then
+            git commit -m "Verified all populated Ontario FSAs without minimum size [skip ci]"
+            git push
+          fi
