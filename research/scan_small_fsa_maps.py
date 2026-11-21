@@ -6,6 +6,7 @@ from pathlib import Path
 from datetime import datetime,timezone
 from playwright.sync_api import sync_playwright
 from finder.google_browser import scan_one
+from research.scan_all_maps import global_place_coordinates
 from finder.common import HumanVerificationRequired,SourceUnavailable
 
 def distance_km(a,b):
@@ -17,7 +18,7 @@ def score_links(links,center):
     known={};missing={};outside=0
     for x in links:
         url=x.get('url','')
-        coords=x.get('coordinates')
+        coords=x.get('coordinates') or global_place_coordinates(url)
         if coords is None:
             missing[url.split('?')[0]]=x
             continue
@@ -58,8 +59,9 @@ def main():
                         folder/'evidence'/code,timeout_seconds=65,max_scroll=30)
                     known,unknown,outside=score_links(evidence['place_links'],center)
                     c=len(evidence['place_links'])
-                    record.update(status='observed',local_count=len(known),
+                    record.update(status='observed' if not unknown else 'unresolved',local_count=len(known),
                         unlocated_count=len(unknown),outside_5km=outside,
+                        unlocated_links=list(unknown.values()),
                         visible_links=c,feed_capped=c>=120,locations=list(known.values()),
                         search_url=evidence['search_url'],reason=evidence['completion_reason'])
                 except HumanVerificationRequired as exc:
