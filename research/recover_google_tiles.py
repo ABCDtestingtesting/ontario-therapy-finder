@@ -162,7 +162,9 @@ def run_area(context, area, folder, max_seconds):
     doc['local_places'] = list(merged.values())
     doc['capped_leaf_tiles'] = capped_final
     doc['unresolved_leaf_links'] = unresolved_final
-    if not doc['pending'] and capped_final == 0 and unresolved_final == 0:
+    if len(doc['complete_tiles']) < len(tuple(tile_tasks())) and not doc['pending']:
+        doc['status'] = 'coverage_incomplete'
+    if not doc['pending'] and capped_final == 0 and unresolved_final == 0 and len(doc['complete_tiles']) >= len(tuple(tile_tasks())):
         doc['status'] = 'verified_tile_feed'
     elif doc.get('status') not in ('access_restricted', 'needs_retry'):
         doc['status'] = 'coverage_incomplete'
@@ -190,7 +192,7 @@ def main():
     if len(targets) != 241:
         raise RuntimeError(f'Unexpected unresolved source set: {len(targets)}')
     targets = [a for i, a in enumerate(targets) if i % args.shards == args.shard]
-    root = Path(args.out) / f'shard-{args.shard:02d}'
+    root = Path(args.out) / f'shard-{args.shard}'
     root.mkdir(parents=True, exist_ok=True)
     with sync_playwright() as pw:
         ctx = pw.firefox.launch_persistent_context(
