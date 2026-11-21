@@ -1,0 +1,39 @@
+name: Capture active Ontario Google-only research source and final job IDs
+on:
+  push:
+    paths: ['.github/workflows/ontario-active-google-status.yml']
+permissions:
+  contents: write
+  actions: read
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch newest Google source jobs and final pipeline state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=100" --jq '.workflow_runs[] | select(.name | test("Ontario 498 Google-only verified|Resolve Google locations|Validate geographically focused Google|Verify Ontario Google-only coordinate|Stop obsolete")) | [.id,.name,.status,(.conclusion // ""),.head_sha,.html_url] | @tsv' > /tmp/ontario-google-live-runs.tsv
+          : > /tmp/ontario-google-live-jobs.tsv
+          while IFS=$'\t' read -r id label status result sha url; do
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs?per_page=100" --jq '.jobs[] | [.id,.name,.status,(.conclusion // ""),.html_url] | @tsv' >> /tmp/ontario-google-live-jobs.tsv || true
+          done < /tmp/ontario-google-live-runs.tsv
+          cat /tmp/ontario-google-live-runs.tsv
+      - name: Commit snapshots to diagnosis branch
+        run: |
+          set -euo pipefail
+          git config user.name github-actions
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          for attempt in 1 2 3; do
+            git fetch origin ci-diagnostics
+            git checkout -B ci-diagnostics origin/ci-diagnostics
+            cp /tmp/ontario-google-live-runs.tsv ontario-google-current-runs.tsv
+            cp /tmp/ontario-google-live-jobs.tsv ontario-google-current-jobs.tsv
+            git add ontario-google-current-runs.tsv ontario-google-current-jobs.tsv
+            if git diff --cached --quiet; then exit 0; fi
+            git commit -m "Publish active Ontario Google-only CI state [skip ci]"
+            if git push origin HEAD:ci-diagnostics;then exit 0;fi
+          done
+          exit 1
