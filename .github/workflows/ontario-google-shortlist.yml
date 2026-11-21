@@ -1,0 +1,92 @@
+name: Independent Ontario Google Maps FSA opportunity screen
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/ontario-google-shortlist.yml'
+permissions:
+  contents: read
+jobs:
+  scout:
+    runs-on: macos-15
+    timeout-minutes: 65
+    env:
+      THERAPY_DATA_HOME: ${{ github.workspace }}/scouting_data
+      CI: 'true'
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser and geospatial requirements
+        run: |
+          python -m pip install -r requirements.txt
+          python -m playwright install firefox
+      - name: Scan actual Ontario FSA coordinates and save observed local therapy competition
+        timeout-minutes: 56
+        run: |
+          python - <<'PY'
+          import json,math,time
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+          from finder import census
+          from finder.google_browser import scan_one
+          from finder.common import DATA
+          codes='N4G P1P P2A K8A P1H N4W N4K L4R N8H P1L L9Y K6J K6V K8V N3Y N4N P8N P9N P4N P5N L6Z L7A N1T'.split()
+          areas=census.fsa_geometry(print)
+          out=DATA/'scout';out.mkdir(exist_ok=True,parents=True)
+          def distance(a,b):
+              la,lo=a;lb,ln=b
+              rad=math.pi/180
+              z=math.sin((lb-la)*rad/2)**2+math.cos(la*rad)*math.cos(lb*rad)*math.sin((ln-lo)*rad/2)**2
+              return 12742*math.asin(min(1,math.sqrt(z)))
+          rows=[];centers={}
+          with sync_playwright() as pw:
+              ctx=pw.firefox.launch_persistent_context(str(out/'profile'),headless=True,
+                 viewport={'width':1400,'height':960},locale='en-CA')
+              try:
+                  for code in codes:
+                      if code not in areas:
+                          rows.append({'fsa':code,'status':'missing_geometry'});continue
+                      center=census.representative(areas[code]);centers[code]=center
+                      record={'fsa':code,'center':center,'query':'psychotherapist','radius_km':5}
+                      try:
+                          found=scan_one(ctx,'psychotherapist',*center,out/code,timeout_seconds=85)
+                          near={};unknown=0;outside=0
+                          for p in found['place_links']:
+                              xy=p.get('coordinates')
+                              if not xy:unknown+=1;continue
+                              if distance(center,xy)>5:outside+=1;continue
+                              name=(p.get('name') or '').strip()
+                              if not name:continue
+                              key=(name.casefold(),round(xy[0],4),round(xy[1],4))
+                              near[key]={'name':name,'latitude':xy[0],'longitude':xy[1],'url':p['url']}
+                          record.update(status='observed',observed_5km=len(near),
+                              visible_google_place_links=len(found['place_links']),
+                              missing_coordinates=unknown,outside_5km=outside,
+                              coverage='capped_lower_bound' if len(found['place_links'])>=120
+                                  else 'unresolved_coordinates' if unknown else 'completed_google_result_feed',
+                              sample=list(near.values())[:12],places=list(near.values()),
+                              search_url=found['search_url'])
+                      except Exception as exc:
+                          record.update(status='incomplete',error=type(exc).__name__+': '+str(exc))
+                      rows.append(record)
+                      with (out/'results.json').open('w') as f:json.dump({'rows':rows,'centers':centers,'all_23_scanned':len(rows)==len(codes)},f,indent=2)
+                      print('GOOGLE_FSA_RESULT',json.dumps({k:v for k,v in record.items() if k not in ('places','sample')}),flush=True)
+                      if record.get('status')=='incomplete' and ('verification' in str(record.get('error','')).lower() or 'blocked' in str(record.get('error','')).lower()):
+                          print('GOOGLE ACCESS RESTRICTION; STOPPING',flush=True)
+                          break
+              finally:ctx.close()
+          print('GOOGLE_SCREEN_COMPLETED',len(rows),'of',len(codes),'FSAs',flush=True)
+          PY
+      - name: Save observed place evidence for each Ontario FSA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ontario-google-shortlist
+          retention-days: 7
+          path: |
+            scouting_data/scout/results.json
+            scouting_data/scout/*/search_evidence.json
+            scouting_data/scout/*/google_failure.png
