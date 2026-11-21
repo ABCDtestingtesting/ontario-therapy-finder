@@ -1,0 +1,41 @@
+RUN 44904171717 in_progress f72de9f0fd4a579cda5c6dec1adc53b143f94120 
+136846124231	index	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44904171717/job/136846124231
+RUN 44903999783 in_progress 5cca7be3a676e71c4a1f498a8b013fb17e7c225c 
+136845613900	real-source-diagnostics (macos-15-intel)	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44903999783/job/136845613900
+136845614085	real-source-diagnostics (macos-15)	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44903999783/job/136845614085
+RUN 44867696252 completed failure https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44867696252
+136734963335	macos-15-intel — real external data checks	completed	failure	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44867696252/job/136734963335
+136734963489	macos-26-intel — real external data checks	completed	failure	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44867696252/job/136734963489
+136734963509	macos-15 — real external data checks	completed	failure	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44867696252/job/136734963509
+136734963553	macos-26 — real external data checks	completed	failure	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44867696252/job/136734963553
+RUN 44867430575 completed success https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44867430575
+136734127743	real-source-diagnostics (macos-15)	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44867430575/job/136734127743
+136734127943	real-source-diagnostics (macos-15-intel)	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44867430575/job/136734127943
+RUN 44867198850 completed success https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44867198850
+136733416402	fsa-archive	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44867198850/job/136733416402
+RUN 44867079996 completed success https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44867079996
+136733037739	force	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44867079996/job/136733037739
+RUN 44867037860 completed failure https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44867037860
+136732901600	force	completed	failure	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44867037860/job/136732901600
+RUN 44866914313 completed success https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44866914313
+136732518411	stop-old	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44866914313/job/136732518411
+RUN 44866640325 completed success https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44866640325
+136731671364	source (psychology_today)	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44866640325/job/136731671364
+136731671573	source (census)	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44866640325/job/136731671573
+136731671574	source (maps)	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44866640325/job/136731671574
+RUN 44866524569 completed success https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44866524569
+136731316985	real-source-diagnostics (macos-15-intel)	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44866524569/job/136731316985
+136731317202	real-source-diagnostics (macos-15)	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44866524569/job/136731317202
+RUN 44865801809 completed cancelled https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44865801809
+136729059315	real-source-diagnostics (macos-15-intel)	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44865801809/job/136729059315
+136729059447	real-source-diagnostics (macos-15)	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44865801809/job/136729059447
+RUN 44864955517 completed cancelled https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44864955517
+136726454524	macos-15-intel — real external data checks	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44864955517/job/136726454524
+136726454711	macos-26 — real external data checks	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44864955517/job/136726454711
+136726454815	macos-15 — real external data checks	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44864955517/job/136726454815
+136726454849	macos-26-intel — real external data checks	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44864955517/job/136726454849
+RUN 44863228460 completed failure https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44863228460
+136721073292	macos-26 — real external data checks	completed	failure	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44863228460/job/136721073292
+136721073498	macos-15 — real external data checks	completed	failure	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44863228460/job/136721073498
+136721073502	macos-26-intel — real external data checks	completed	failure	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44863228460/job/136721073502
+136721073538	macos-15-intel — real external data checks	completed	failure	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44863228460/job/136721073538
