@@ -1,0 +1,58 @@
+name: Audit recovered Google Maps evidence across all 498 Ontario areas
+on:
+  workflow_run:
+    workflows:
+      - Recover all capped and incomplete Ontario Google Maps postal areas
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      recovery_run_id:
+        description: GitHub Actions ID of completed Google tile recovery run
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RECOVERY_RUN_ID: ${{ inputs.recovery_run_id || github.event.workflow_run.id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Read 498 official census/Google baseline
+        run: |
+          mkdir -p first-pass
+          gh run download 44952655975 -n full-ontario-498-google-census-audit -D first-pass
+          test -s first-pass/google_all_ontario_498.csv
+      - name: Download all 48 recovery shards
+        run: |
+          mkdir -p recovery-output
+          gh run download "$RECOVERY_RUN_ID" -p 'google-tile-recovery-*' -D recovery-output
+          python - <<'PY'
+          import pathlib
+          p=pathlib.Path('recovery-output')
+          names={x.name for x in p.glob('google-tile-recovery-*') if x.is_dir()}
+          expected={f'google-tile-recovery-{i}' for i in range(48)}
+          missing=expected-names
+          if missing:raise RuntimeError(f'Missing {len(missing)} recovery artifacts: {sorted(missing)}')
+          print('RECOVERED_GOOGLE_SHARD_ARTIFACTS',len(names))
+          PY
+      - name: Rank only if all populated Ontario FSAs have complete Google evidence
+        run: |
+          python -m research.finalize_full_google_498 first-pass/google_all_ontario_498.csv recovery-output audited-google-498
+      - name: Upload full source-quality audit and certified 60 if available
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: google-498-completeness-and-ratio-audit
+          retention-days: 30
+          if-no-files-found: warn
+          path: audited-google-498/
