@@ -12,6 +12,7 @@ on:
       - '.github/workflows/ontario-quick-centroids.yml'
       - '.github/workflows/ontario-pt-current-screen.yml'
       - '.github/workflows/p5n-exact-directory-format.yml'
+      - '.github/workflows/build-ontario-fsa-pool.yml'
 permissions:
   actions: read
   contents: write
