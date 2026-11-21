@@ -1,8 +1,11 @@
+44908313840	Real macOS verification (live sources)	queued		ccf16e33dbf3d842b608cf7ab83fb329fbe04756	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908313840
+44908313791	Focused live-source Mac diagnostics	queued		ccf16e33dbf3d842b608cf7ab83fb329fbe04756	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908313791
+44908313776	Capture GitHub Actions run identifiers for diagnosis	queued		ccf16e33dbf3d842b608cf7ab83fb329fbe04756	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908313776
 44908311017	Real macOS verification (live sources)	queued		6f4b0293ad71386147a908607b0863a814150f82	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908311017
-44908310840	Capture GitHub Actions run identifiers for diagnosis	queued		6f4b0293ad71386147a908607b0863a814150f82	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908310840
+44908310840	Capture GitHub Actions run identifiers for diagnosis	in_progress		6f4b0293ad71386147a908607b0863a814150f82	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908310840
 44908310837	Focused live-source Mac diagnostics	queued		6f4b0293ad71386147a908607b0863a814150f82	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908310837
 44908307535	Focused live-source Mac diagnostics	queued		4423c4778197422023bdd05bbd6705f851710a40	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908307535
-44908307524	Capture GitHub Actions run identifiers for diagnosis	queued		4423c4778197422023bdd05bbd6705f851710a40	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908307524
+44908307524	Capture GitHub Actions run identifiers for diagnosis	in_progress		4423c4778197422023bdd05bbd6705f851710a40	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908307524
 44908307520	Real macOS verification (live sources)	queued		4423c4778197422023bdd05bbd6705f851710a40	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908307520
 44908303560	Real macOS verification (live sources)	queued		8eff5ad2b5d9611c8bde8ce7170faa8111d0bbb8	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908303560
 44908303548	Capture GitHub Actions run identifiers for diagnosis	in_progress		8eff5ad2b5d9611c8bde8ce7170faa8111d0bbb8	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908303548
@@ -25,6 +28,3 @@
 44905006501	Real macOS verification (live sources)	completed	cancelled	cfbc776bf3adbd7498981646701a1325aea40d2f	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44905006501
 44904341109	Capture GitHub Actions run identifiers for diagnosis	completed	success	d6194f1055b8c33f0ac1584019921ac9457ceb94	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44904341109
 44904328499	Real macOS verification (live sources)	completed	success	fc14acb22d5b8d735f0fc7c0c8406d6687f7b2f9	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44904328499
-44904295353	Focused live-source Mac diagnostics	completed	failure	9eafbfefde47058a2b52a32da85310911bbc8600	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44904295353
-44904171717	Capture GitHub Actions run identifiers for diagnosis	completed	success	f72de9f0fd4a579cda5c6dec1adc53b143f94120	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44904171717
-44903999783	Focused live-source Mac diagnostics	completed	success	5cca7be3a676e71c4a1f498a8b013fb17e7c225c	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44903999783
