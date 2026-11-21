@@ -12,7 +12,7 @@ from PIL import Image,ImageStat
 from shapely.geometry import shape
 from shapely.ops import transform
 from playwright.sync_api import sync_playwright
-from .common import DATA,write_json,read_json,SourceUnavailable,InvalidEvidence
+from .common import DATA,write_json,read_json,SourceUnavailable,InvalidEvidence,HumanVerificationRequired
 from .census import project,unproject
 MODEL='qwen2.5vl:3b'
 LABELS=('detached','semi-detached','townhouse','low-rise apartments','mid-rise apartments',
@@ -79,8 +79,26 @@ def capture(fsa,points,progress=lambda s:None,max_usable=8,minimum_usable=6,cont
                     page.goto(url,wait_until='domcontentloaded',timeout=65000)
                     page.wait_for_timeout(1200 if os.environ.get('THERAPY_UNATTENDED')=='1' else 4500)
                     body=page.locator('body').inner_text(timeout=12000).lower()
-                    if any(k in body for k in ('verify you are human','captcha','unusual traffic','automated queries')):
-                        raise SourceUnavailable('Google requested verification; review open Firefox window')
+                    verification_signals=('verify you are human','captcha','unusual traffic',
+                                          'automated queries','access denied','request blocked')
+                    if any(k in body for k in verification_signals):
+                        shot=folder/f'verification_{point["id"]}.png'
+                        try:page.screenshot(path=str(shot),full_page=False)
+                        except Exception:pass
+                        progress(f'{fsa}: Street View verification required at DA {point["id"]}. '
+                                 'Complete it in the same Firefox tab, or press Stop to preserve progress.')
+                        if os.environ.get('THERAPY_UNATTENDED')=='1' or os.environ.get('CI')=='true':
+                            raise HumanVerificationRequired('Street View requires interactive verification; '
+                                                            'sample and screenshot preserved')
+                        # Never navigate to another address until access clears.
+                        while any(k in body for k in verification_signals):
+                            if cancel_requested():
+                                raise HumanVerificationRequired('Street View verification interrupted; '
+                                                                'current sample saved for Resume')
+                            page.wait_for_timeout(5000)
+                            try:body=page.locator('body').inner_text(timeout=12000).lower()
+                            except Exception:body='access denied'
+                        progress(f'{fsa}: Street View verification cleared; continuing same sample')
                     if any(k in body for k in ('street view not available','no street view available','could not find street view')):
                         raise InvalidEvidence('No Street View panorama at this point')
                     image=folder/f'{point["id"]}_90.png'
@@ -88,6 +106,12 @@ def capture(fsa,points,progress=lambda s:None,max_usable=8,minimum_usable=6,cont
                     if not screenshot_is_nonblank(image):
                         image.unlink(missing_ok=True);raise InvalidEvidence('Screenshot is blank or invalid')
                     record.update(status='captured_pending_review',image=str(image))
+                except HumanVerificationRequired as exc:
+                    record.update(status='verification_required',error=str(exc))
+                    existing[point['id']]=record
+                    manifest={'samples':list(existing.values()),'planned':len(points),'target':max_usable}
+                    write_json(folder/'manifest.json',manifest)
+                    raise
                 except Exception as exc:record['error']=str(exc)
                 existing[point['id']]=record
                 manifest={'samples':list(existing.values()),'planned':len(points),'target':max_usable}
