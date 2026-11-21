@@ -13,7 +13,7 @@ jobs:
       - uses: actions/github-script@v7
         with:
           script: |
-            for (const run_id of [44908297160, 44908297202, 44908300079, 44908300102, 44908303560, 44908303542, 44908307520, 44908307535, 44908310837, 44908311017]) {
+            for (const run_id of [44913412178, 44913412167, 44913394786, 44913394781, 44913300639, 44913300577, 44913284174, 44913284164, 44913190553, 44913190490, 44913173979, 44913173872, 44913161140, 44913161127, 44913130557, 44913130539]) {
               const run = (await github.rest.actions.getWorkflowRun({
                 owner: context.repo.owner, repo: context.repo.repo, run_id
               })).data;
@@ -21,8 +21,13 @@ jobs:
                 core.info(`Old run ${run_id} already complete`);
                 continue;
               }
-              await github.request('POST /repos/{owner}/{repo}/actions/runs/{run_id}/force-cancel',{
-                owner: context.repo.owner, repo: context.repo.repo, run_id
-              });
-              core.info(`Force cancellation requested for obsolete run ${run_id}`);
+              try {
+                await github.request('POST /repos/{owner}/{repo}/actions/runs/{run_id}/force-cancel',{
+                  owner: context.repo.owner, repo: context.repo.repo, run_id
+                });
+                core.info(`Cancellation requested for obsolete run ${run_id}`);
+              } catch (e) {
+                // Jobs may have completed between lookup and cancellation.
+                core.info(`Old run ${run_id} could not be cancelled: ${e.status || e.message}`);
+              }
             }
