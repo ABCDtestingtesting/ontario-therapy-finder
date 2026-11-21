@@ -428,10 +428,18 @@ def catchment(lat,lon,geometries,population,radius_km=5):
             'intersected_da':intersections,'radius_km':radius_km,
             'assumption':'Population uniform within each 2021 dissemination-area polygon'}
 
+# Hamilton municipality extends into Ancaster, Dundas, Stoney Creek and
+# Waterdown, beyond an arbitrary 11-km downtown exclusion. L0R also spans
+# non-Hamilton communities, so exclude that mixed FSA conservatively.
+HAMILTON_POSTAL_AREAS=frozenset(('L0R','L8B','L8E','L8G','L8H','L8J','L8K',
+ 'L8L','L8M','L8N','L8P','L8R','L8S','L8T','L8V','L8W',
+ 'L9A','L9B','L9C','L9G','L9H','L9K'))
+
 def areas_near_hamilton(radius_km=125,min_population=12000,exclude_within_km=11):
     from .rank import haversine
     pop=load_population('fsa');geom=fsa_geometry(); found=[]
     for code,g in geom.items():
+        if code in HAMILTON_POSTAL_AREAS:continue
         if code not in pop or pop[code]['population']<min_population:continue
         lat,lon=representative(g);distance=haversine((43.2557,-79.8711),(lat,lon))
         if exclude_within_km<=distance<=radius_km:
