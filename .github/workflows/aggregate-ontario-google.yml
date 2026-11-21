@@ -48,7 +48,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add research/preliminary_top_180.json
-          git commit -m 'Verified Google-only preliminary Ontario 180 candidate screening [skip ci]'
+          git commit -m 'Verified Google-only preliminary Ontario 180 candidate screening'
           git push
       - name: Preserve audited Ontario-wide database and ratio estimates
         if: always()
