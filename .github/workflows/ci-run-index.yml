@@ -1,8 +1,11 @@
 name: Capture GitHub Actions run identifiers for diagnosis
 on:
-  # Run diagnostic indexing only when troubleshooting is requested.
-  # Routine code pushes should not create unrelated index-push failures.
   workflow_dispatch:
+  # Refresh only when this diagnostic workflow itself is modified.
+  # Application commits must not create unrelated index-push noise.
+  push:
+    paths:
+      - '.github/workflows/ci-run-index.yml'
 permissions:
   actions: read
   contents: write
