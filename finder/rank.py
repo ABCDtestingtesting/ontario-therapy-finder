@@ -29,6 +29,10 @@ def merged_locations(fsas):
     return list(all_places.values())
 
 def analyse(fsas,min_sites_each=4,max_sites_each=70):
+    if len(set(fsas)) < 2:
+        raise InvalidEvidence('At least two distinct postal areas are needed for two recommendations')
+    if len(set(fsas)) != len(fsas):
+        raise InvalidEvidence('Duplicate postal area selections are not valid for this comparison')
     state.require_complete(fsas)
     all_google=merged_locations(fsas)
     fsas_geometry=census.fsa_geometry();da_pop=census.load_population('da')
@@ -98,6 +102,11 @@ def analyse(fsas,min_sites_each=4,max_sites_each=70):
         if any(haversine((cand['latitude'],cand['longitude']),(p['latitude'],p['longitude']))<8 for p in picks):continue
         picks.append(cand)
         if len(picks)==2:break
+    if len(picks)!=2:
+        raise InvalidEvidence(
+            f'Only {len(picks)} geographically distinct residential candidates were verified; '
+            'cannot produce the required two recommendations or export a completed report. '
+            'Review additional non-overlapping postal areas and housing evidence.')
     _export_csv(OUTPUT/'postal_area_comparison.csv',rows)
     _export_csv(OUTPUT/'candidate_locations.csv',sites)
     write_json(OUTPUT/'results.json',{'areas':rows,'candidate_points':sites,'two_distinct_candidates':picks,
