@@ -1,45 +1,55 @@
-RUN 44908457681 in_progress 60812f1c184bcdc402a07b2c930ae8f8c5aa02cf 
-136858951633	index	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908457681/job/136858951633
-RUN 44908390099 completed success https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908390099
-136858749054	force	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908390099/job/136858749054
-RUN 44908390075 completed success https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908390075
-136858749125	index	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908390075/job/136858749125
-RUN 44908367842 completed success https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908367842
-136858685140	index	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908367842/job/136858685140
-RUN 44908313840 queued ccf16e33dbf3d842b608cf7ab83fb329fbe04756 
-136858537321	macos-26 — real external data checks	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908313840/job/136858537321
-136858537466	macos-26-intel — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908313840/job/136858537466
-136858537476	macos-15 — real external data checks	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908313840/job/136858537476
-136858537528	macos-15-intel — real external data checks	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908313840/job/136858537528
-RUN 44908313791 in_progress ccf16e33dbf3d842b608cf7ab83fb329fbe04756 
-136858537175	real-source-diagnostics (macos-15-intel)	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908313791/job/136858537175
-136858537375	real-source-diagnostics (macos-15)	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908313791/job/136858537375
-RUN 44908313776 completed failure https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908313776
-136858537021	index	completed	failure	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908313776/job/136858537021
-RUN 44908311017 completed cancelled https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908311017
-136858528243	macos-15 — real external data checks	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908311017/job/136858528243
-136858528422	macos-26-intel — real external data checks	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908311017/job/136858528422
-136858528487	macos-15-intel — real external data checks	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908311017/job/136858528487
-136858528587	macos-26 — real external data checks	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908311017/job/136858528587
-RUN 44908310840 completed failure https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908310840
-136858527928	index	completed	failure	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908310840/job/136858527928
-RUN 44908310837 completed cancelled https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908310837
-136858527776	real-source-diagnostics (macos-15)	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908310837/job/136858527776
-136858528019	real-source-diagnostics (macos-15-intel)	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908310837/job/136858528019
-RUN 44908307535 completed cancelled https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908307535
-136858517895	real-source-diagnostics (macos-15-intel)	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908307535/job/136858517895
-136858518119	real-source-diagnostics (macos-15)	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908307535/job/136858518119
-RUN 44908307524 completed success https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908307524
-136858518072	index	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908307524/job/136858518072
-RUN 44908307520 completed cancelled https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908307520
-136858517938	macos-26-intel — real external data checks	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908307520/job/136858517938
-136858518173	macos-26 — real external data checks	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908307520/job/136858518173
-136858518209	macos-15 — real external data checks	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908307520/job/136858518209
-136858518269	macos-15-intel — real external data checks	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908307520/job/136858518269
-RUN 44908303560 completed cancelled https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908303560
-136858507316	macos-15 — real external data checks	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908303560/job/136858507316
-136858507500	macos-26-intel — real external data checks	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908303560/job/136858507500
-136858507519	macos-26 — real external data checks	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908303560/job/136858507519
-136858507574	macos-15-intel — real external data checks	completed	cancelled	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908303560/job/136858507574
-RUN 44908303548 completed success https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908303548
-136858507234	index	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44908303548/job/136858507234
+RUN 44913565352 in_progress bd0d3dfa18cc6177442671bf2aae7800b8b36efc 
+136874269597	index	in_progress		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913565352/job/136874269597
+RUN 44913423072 queued ec67331a391550aba75afb754f7026de070b5992 
+136873847827	real-source-diagnostics (macos-15-intel)	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913423072/job/136873847827
+136873847987	real-source-diagnostics (macos-15)	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913423072/job/136873847987
+RUN 44913422985 queued ec67331a391550aba75afb754f7026de070b5992 
+136873847549	macos-15-intel — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913422985/job/136873847549
+136873847711	macos-26-intel — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913422985/job/136873847711
+136873847740	macos-15 — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913422985/job/136873847740
+136873847852	macos-26 — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913422985/job/136873847852
+RUN 44913412178 queued d50adac976c4038ad0f9177727919af43b2427d4 
+136873816275	real-source-diagnostics (macos-15-intel)	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913412178/job/136873816275
+136873816496	real-source-diagnostics (macos-15)	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913412178/job/136873816496
+RUN 44913412167 queued d50adac976c4038ad0f9177727919af43b2427d4 
+136873816248	macos-26 — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913412167/job/136873816248
+136873816429	macos-15-intel — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913412167/job/136873816429
+136873816457	macos-15 — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913412167/job/136873816457
+136873816477	macos-26-intel — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913412167/job/136873816477
+RUN 44913394786 queued 2716121d1a42a161f919c3a86fa5c523798f7df1 
+136873767755	macos-15 — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913394786/job/136873767755
+136873767929	macos-26 — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913394786/job/136873767929
+136873767995	macos-15-intel — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913394786/job/136873767995
+136873768034	macos-26-intel — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913394786/job/136873768034
+RUN 44913394781 queued 2716121d1a42a161f919c3a86fa5c523798f7df1 
+136873767944	real-source-diagnostics (macos-15)	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913394781/job/136873767944
+136873768225	real-source-diagnostics (macos-15-intel)	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913394781/job/136873768225
+RUN 44913394739 completed success https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913394739
+136873767656	real-da-archive	completed	success	https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913394739/job/136873767656
+RUN 44913300639 queued 6f2f25c389ff8fe8cfd03fb6f16d7dab79cd3017 
+136873488292	macos-26 — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913300639/job/136873488292
+136873488413	macos-26-intel — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913300639/job/136873488413
+136873488582	macos-15 — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913300639/job/136873488582
+136873488624	macos-15-intel — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913300639/job/136873488624
+RUN 44913300577 queued 6f2f25c389ff8fe8cfd03fb6f16d7dab79cd3017 
+136873488159	real-source-diagnostics (macos-15-intel)	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913300577/job/136873488159
+136873488327	real-source-diagnostics (macos-15)	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913300577/job/136873488327
+RUN 44913284174 queued 515e7e268d7a90f8c0ff5beaf34964838c5e07f5 
+136873438423	macos-26 — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913284174/job/136873438423
+136873438635	macos-15 — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913284174/job/136873438635
+136873438658	macos-26-intel — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913284174/job/136873438658
+136873438659	macos-15-intel — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913284174/job/136873438659
+RUN 44913284164 queued 515e7e268d7a90f8c0ff5beaf34964838c5e07f5 
+136873438420	real-source-diagnostics (macos-15)	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913284164/job/136873438420
+136873438693	real-source-diagnostics (macos-15-intel)	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913284164/job/136873438693
+RUN 44913190553 queued 2820ea5d4c26b08b1d1727fe3b7170f5f1ea80df 
+136873150275	real-source-diagnostics (macos-15)	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913190553/job/136873150275
+136873150449	real-source-diagnostics (macos-15-intel)	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913190553/job/136873150449
+RUN 44913190490 queued 2820ea5d4c26b08b1d1727fe3b7170f5f1ea80df 
+136873149877	macos-26-intel — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913190490/job/136873149877
+136873150120	macos-15 — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913190490/job/136873150120
+136873150160	macos-26 — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913190490/job/136873150160
+136873150213	macos-15-intel — real external data checks	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913190490/job/136873150213
+RUN 44913173979 queued e522a26721217c3778aa12074a80be60f16d863e 
+136873101318	real-source-diagnostics (macos-15-intel)	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913173979/job/136873101318
+136873101433	real-source-diagnostics (macos-15)	queued		https://github.com/ABCDtestingtesting/ontario-therapy-finder/actions/runs/44913173979/job/136873101433
