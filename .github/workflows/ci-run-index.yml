@@ -2,8 +2,7 @@ name: Capture GitHub Actions run identifiers for diagnosis
 on:
   workflow_dispatch:
   push:
-    paths:
-      - '.github/workflows/ci-run-index.yml'
+    branches: [main]
 permissions:
   actions: read
   contents: write
