@@ -10,6 +10,7 @@ on:
       - '.github/workflows/google-access-observation.yml'
       - '.github/workflows/ontario-google-shortlist.yml'
       - '.github/workflows/ontario-quick-centroids.yml'
+      - '.github/workflows/ontario-pt-current-screen.yml'
 permissions:
   actions: read
   contents: write
