@@ -15,7 +15,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs?branch=ontario-401-fsa-live-ranking-20261121&per_page=20" --jq '.workflow_runs[] | [.id,.name,.status,(.conclusion // ""),.head_sha,.html_url] | @tsv' > /tmp/ontario-map-runs.tsv
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs?branch=ontario-401-fsa-live-ranking-20261121&per_page=40" --jq '.workflow_runs[] | [.id,.name,.status,(.conclusion // ""),.head_sha,.html_url] | @tsv' > /tmp/ontario-map-runs.tsv
           : > /tmp/ontario-map-jobs.tsv
           while IFS=$'\t' read -r run_id title status conclusion sha url;do
             gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100" --jq '.jobs[] | [.id,.name,.status,(.conclusion // ""),.html_url] | @tsv' >> /tmp/ontario-map-jobs.tsv || true
