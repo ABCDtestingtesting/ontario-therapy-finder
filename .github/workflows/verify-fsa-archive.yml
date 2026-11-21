@@ -1,0 +1,37 @@
+name: Validate official Census FSA archive fallback
+on:
+  push:
+    paths: ['.github/workflows/verify-fsa-archive.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fsa-archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    env:
+      PYTHONUNBUFFERED: '1'
+      THERAPY_DATA_HOME: ${{ github.workspace }}/archive_test_data
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Python geospatial libraries
+        run: python -m pip install -r requirements.txt
+      - name: Download and verify actual official shapefile archive
+        timeout-minutes: 8
+        run: |
+          python - <<'PY'
+          from finder.census import _fsa_archive_fallback
+          records=_fsa_archive_fallback(print)
+          print('Actual Canada census FSA polygons validated:',len(records))
+          assert len(records)>=300 and 'L7A' in records
+          PY
+      - name: Retain census provenance and data errors
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-fsa-archive-check
+          if-no-files-found: warn
+          path: archive_test_data/fsa_archive_provenance.json
