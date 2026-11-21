@@ -60,3 +60,12 @@ This package has passed local unit, HTTP, UI, simulated collector and interrupti
 - In visible Firefox, Google verification prompts remain open until completed or explicitly stopped. In headless CI, any challenge fails the test and saves a diagnostic screenshot.
 - The Mac launcher now installs user-local Python when unavailable; executable modes are verified in the release pipeline.
 - Release is withheld until live external source checks pass; local unit tests alone are insufficient.
+
+
+## Source restrictions and browser-verification recovery
+
+If Google Maps or Psychology Today presents a human-verification challenge during an interactive local scan, use the **existing Firefox tab** to complete it. The program keeps that session open while it waits for real search results; do not close Firefox or restart the scan. The dashboard's **Stop** control remains available if you cannot finish the challenge; reopening the application and selecting **Run / resume** retains its last completed pages or grid cells.
+
+HTTP 429 (rate limiting) and unsolvable HTTP 403 access restrictions are reported as incomplete source stages. Wait before retrying. The program neither bypasses human-verification controls nor rotates identities to evade a provider's restrictions. A blocked Google Maps Firefox search does not trigger a competing scraper against the same blocked site, and subsequent areas in the same bulk run defer that source instead of repeatedly contacting it. Other independent sources may continue. The final ranking remains unavailable until source evidence is complete and reviewed; an unverified result is never a zero-competition claim.
+
+GitHub Actions runs unattended: if a provider requires interactive verification, its stage correctly fails with saved diagnostics. A successful automated Mac test also cannot guarantee that a provider will never challenge the user's local browser or that its public listings cover every therapist.
