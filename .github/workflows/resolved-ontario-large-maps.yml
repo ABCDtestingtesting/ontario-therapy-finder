@@ -1,0 +1,41 @@
+name: Resolve Google locations provincewide across 401 FSAs
+on:
+  push:
+    paths:
+      - '.github/workflows/resolved-ontario-large-maps.yml'
+      - 'research/scan_all_maps.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  map-resolve:
+    name: Large FSA resolution ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31]
+    timeout-minutes: 36
+    env:
+      PYTHONUNBUFFERED: '1'
+      CI: 'true'
+      THERAPY_DATA_HOME: ${{ github.workspace }}/scan_scratch
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps firefox
+      - name: Validate Google Map source and global-coordinate normalization
+        timeout-minutes: 28
+        run: python -m research.scan_all_maps --shard ${{ matrix.shard }} --shards 32
+      - name: Upload source-backed place details for rank audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resolved-large-${{ matrix.shard }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: scan-output/shard-*/results.json
