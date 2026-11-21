@@ -1,0 +1,46 @@
+name: External-source smoke checks (independent)
+
+on:
+  push:
+    paths:
+      - '.github/workflows/external-source-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    strategy:
+      fail-fast: false
+      matrix:
+        name: [census, maps, psychology_today]
+    runs-on: ubuntu-latest
+    timeout-minutes: 28
+    env:
+      CI: 'true'
+      PYTHONUNBUFFERED: '1'
+      THERAPY_DATA_HOME: ${{ github.workspace }}/ci_test_data
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies and browser
+        run: |
+          python -m pip install -r requirements.txt
+          python -m playwright install firefox
+      - name: Run single real live source
+        timeout-minutes: 22
+        run: python ci/run_stage.py ${{ matrix.name }} --timeout 1200
+      - name: Retain source logs and screenshot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-${{ matrix.name }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            ci_results/
+            ci_test_data/ci_google_firefox/
+            ci_test_data/areas/*/pt/*.png
