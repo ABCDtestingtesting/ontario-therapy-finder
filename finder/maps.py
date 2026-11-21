@@ -213,15 +213,40 @@ def execute(fsa,fsa_geometry,progress=lambda msg:None,run_cmd=None,force=False,c
                     stop_tree(signal.SIGTERM)
                     try:proc.wait(timeout=8)
                     except subprocess.TimeoutExpired:stop_tree(signal.SIGKILL);proc.wait(timeout=8)
-    if rc!=0:raise SourceUnavailable(f'Google Maps collector returned exit code {rc}. See {logfile}')
-    if not output.exists() or output.stat().st_size<30:raise InvalidEvidence('Google Maps collector produced no CSV evidence')
-    parsed=parse_csv(output)
-    if parsed['raw_rows']==0:raise InvalidEvidence('Google Maps collector reported zero rows; manual audit is mandatory')
-    if not parsed['locations']:raise InvalidEvidence('No geolocated Google listings in search; cannot call that area competition-free')
+    native_issue=None
+    try:
+        if rc!=0:
+            raise SourceUnavailable(f'Google Maps native collector returned exit code {rc}')
+        if not output.exists() or output.stat().st_size<30:
+            raise InvalidEvidence('Google Maps native collector produced empty CSV')
+        parsed=parse_csv(output)
+        if parsed['raw_rows']==0 or not parsed['locations']:
+            raise InvalidEvidence('Native collector returned no valid Google places')
+        used='gosom-native'
+    except (InvalidEvidence,SourceUnavailable) as exc:
+        # A successful process exit is not evidence that the browser collected
+        # any results. Use the independent Firefox engine for the same grid.
+        if run_cmd is not None:
+            raise
+        native_issue=str(exc)
+        progress(f'{fsa}: native Maps collector failed: {native_issue}. Trying Firefox collector.')
+        from .google_browser import collect as collect_firefox
+        south,west,north,east=[float(n) for n in bbox.split(',')]
+        try:
+            collect_firefox((south,west,north,east),SEARCHES,output,
+                            progress=progress,cancel_requested=cancel_requested)
+            parsed=parse_csv(output)
+            used='playwright-firefox'
+        except (InvalidEvidence,SourceUnavailable) as firefox_error:
+            raise SourceUnavailable(
+                f'Both Google collection methods failed. Native: {native_issue}; '
+                f'Firefox: {firefox_error}. See {folder}/firefox_evidence for diagnostics') from firefox_error
+    if parsed['raw_rows']==0 or not parsed['locations']:
+        raise InvalidEvidence('Google Maps has no verified locations; cannot claim lack of competition')
     # Resume sidecar is evidence of upstream query checkpointing, not proof all local businesses exist.
     sidecar=Path(str(output)+'.resume.json')
     parsed.update({'source_url':'https://www.google.com/maps/','plan':spec,
                    'raw_sha256':sha256(output),'sidecar_present':sidecar.is_file(),
-                   'source_file':str(output),'manual_audit_needed':True})
+                   'source_file':str(output),'manual_audit_needed':True,'collector_used':used,'native_issue':native_issue})
     write_json(normalized,parsed)
     return parsed

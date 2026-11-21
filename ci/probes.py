@@ -107,28 +107,24 @@ def census_probe():
 
 
 def maps_probe():
-    from finder import maps
+    """Real Google Maps search through Firefox, no API key or Go dependency."""
+    from finder.google_browser import scan_one
     from finder.common import DATA
-    exe=maps.ensure_binary(log)
-    if not maps.command_works(exe):raise RuntimeError('Installed Maps scraper failed CLI self-test')
-    log('Verified live macOS Google Maps CLI:',exe)
-    folder=DATA/'ci_maps_small_grid';folder.mkdir(exist_ok=True,parents=True)
-    query_file=folder/'query.txt';query_file.write_text('psychotherapist\n',encoding='utf-8')
-    csv_file=folder/'probe.csv'
-    # Approximately 1 km^2 near central Hamilton, chosen to check a real Maps search.
-    cmd=[str(exe),'-input',str(query_file),'-results',str(csv_file),
-         '-grid-bbox','43.2430,-79.8750,43.2520,-79.8640',
-         '-grid-cell','1.0','-zoom','16','-depth','5','-c','1']
-    log('Running actual Maps search:',cmd)
-    r=subprocess.run(cmd,cwd=folder,timeout=420,capture_output=True,text=True)
-    (folder/'stdout.txt').write_text(r.stdout,encoding='utf-8')
-    (folder/'stderr.txt').write_text(r.stderr,encoding='utf-8')
-    if r.returncode!=0:raise RuntimeError(f'Maps scraper exit {r.returncode}. Check captured stdout/stderr')
-    if not csv_file.exists():raise RuntimeError('Maps scraper returned no CSV')
-    parsed=maps.parse_csv(csv_file)
-    log('Live Google Maps results:',len(parsed['locations']),'raw:',parsed['raw_rows'])
-    if parsed['raw_rows']<=0 or not parsed['locations']:
-        raise RuntimeError('No valid real Maps locations; cannot certify the collector')
+    from playwright.sync_api import sync_playwright
+    folder=DATA/'ci_google_firefox';folder.mkdir(parents=True,exist_ok=True)
+    with sync_playwright() as pw:
+        ctx=pw.firefox.launch_persistent_context(str(folder/'profile'),headless=True,
+                   viewport={'width':1400,'height':960},locale='en-CA')
+        try:
+            result=scan_one(ctx,'psychotherapist',43.250,-79.871,folder,timeout_seconds=105)
+        finally:ctx.close()
+    sites=result['place_links']
+    print('Actual Google Maps search:',result['completion_reason'],
+        'places=',len(sites),'with verified coordinates=',sum(bool(x['coordinates']) for x in sites))
+    if not sites:
+        raise RuntimeError('Actual Google Maps returned zero places; cannot certify collector')
+    if not any(x['coordinates'] for x in sites):
+        raise RuntimeError('Actual Google Maps search had no place coordinates')
 
 
 def pt_probe():

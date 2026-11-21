@@ -150,31 +150,70 @@ def _envelope_params(bbox):
             'inSR':'4326','spatialRel':'esriSpatialRelIntersects'} if bbox else {}
 
 def load_layer(url,where,field,bbox=None,progress=None):
+    """Retrieve all ArcGIS geometries, splitting failed pages deterministically.
+
+    A geometry-heavy request can return HTTP 500 on Statistics Canada's ArcGIS
+    server despite a working service. Retry the *same* offset in smaller chunks;
+    never move past a failed or empty page or treat a partial set as complete.
+    """
     p={'where':where,'returnCountOnly':'true','f':'json',**_envelope_params(bbox)}
     expected=_arc_json(url,p).get('count')
-    if not isinstance(expected,int) or expected<1:raise InvalidEvidence(f'ArcGIS returned invalid count: {expected}')
-    seen={}; offset=0;limit=150
+    if not isinstance(expected,int) or expected<1:
+        raise InvalidEvidence(f'ArcGIS returned invalid count: {expected}')
+    seen={};offset=0;limit=150
     while offset<expected:
-        params={'where':where,'outFields':'*','returnGeometry':'true','outSR':'4326','f':'geojson',
-                'orderByFields':'OBJECTID ASC','resultOffset':offset,
-                'resultRecordCount':min(limit,expected-offset),**_envelope_params(bbox)}
-        page=_arc_json(url,params)
-        if page.get('type')!='FeatureCollection' or not isinstance(page.get('features'),list):
-            raise InvalidEvidence('ArcGIS did not return GeoJSON FeatureCollection')
-        items=page['features']
-        if not items:raise InvalidEvidence(f'ArcGIS returned empty page at {offset}/{expected}')
+        size=min(limit,expected-offset)
+        # Track failures. One overly complex boundary can make a batch fail,
+        # so recursively halve *that exact batch* and preserve every record.
+        def get_page(start,count):
+            params={'where':where,'outFields':'*','returnGeometry':'true',
+                    'outSR':'4326','f':'geojson','orderByFields':'OBJECTID ASC',
+                    'resultOffset':start,'resultRecordCount':count,
+                    **_envelope_params(bbox)}
+            try:
+                page=_arc_json(url,params)
+                if page.get('type')!='FeatureCollection' or not isinstance(page.get('features'),list):
+                    raise InvalidEvidence('ArcGIS did not return GeoJSON FeatureCollection')
+                items=page['features']
+                if not items:
+                    raise InvalidEvidence(f'ArcGIS returned empty page at {start}/{expected}')
+                if len(items)>count:
+                    raise InvalidEvidence(f'ArcGIS returned too many geometries at {start}: {len(items)}/{count}')
+                return items
+            except (SourceUnavailable,InvalidEvidence) as exc:
+                # An actual empty page is evidence of a missing offset; never
+                # skip it. For a large request we can still retry subranges.
+                if count<=1:
+                    # ArcGIS can reject one complex raw polygon. Limited
+                    # generalization reduces payload without omitting the area.
+                    for precision in (0.00005,0.0002,0.001):
+                        try:
+                            alternative=_arc_json(url,{**params,'maxAllowableOffset':precision})
+                            features=alternative.get('features',[])
+                            if alternative.get('type')=='FeatureCollection' and len(features)==1:
+                                return features
+                        except (SourceUnavailable,InvalidEvidence):pass
+                    if isinstance(exc,InvalidEvidence):raise
+                    raise SourceUnavailable(f'ArcGIS failed single geometry at offset {start} for {field}: {exc}') from exc
+                half=count//2
+                if progress:progress(f'ArcGIS heavy geometry at {start}; retrying {half}+{count-half} records')
+                return get_page(start,half)+get_page(start+half,count-half)
+        items=get_page(offset,size)
         for feat in items:
             properties=feat.get('properties') or {}
             key=str(properties.get(field) or '')
             geometry=feat.get('geometry')
-            if not key or not geometry or key in seen:raise InvalidEvidence(f'Duplicate or missing geometry {key}')
+            if not key or not geometry or key in seen:
+                raise InvalidEvidence(f'Duplicate or missing geometry {key} at offset {offset}')
             g=shape(geometry)
             if not g.is_valid:g=g.buffer(0)
-            if g.is_empty or g.area<=0:raise InvalidEvidence(f'Invalid geometry for {key}')
+            if g.is_empty or g.area<=0:
+                raise InvalidEvidence(f'Invalid geometry for {key}')
             seen[key]=g.__geo_interface__
         offset+=len(items)
         if progress:progress(f'{field} boundaries: {offset}/{expected} verified')
-    if len(seen)!=expected:raise InvalidEvidence(f'{field} count mismatch {len(seen)}/{expected}')
+    if len(seen)!=expected:
+        raise InvalidEvidence(f'{field} count mismatch {len(seen)}/{expected}')
     return seen
 
 def fsa_geometry(progress=None):
