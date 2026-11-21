@@ -1,0 +1,36 @@
+name: Confirm P5N Psychology Today under-ten directory display
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/p5n-exact-directory-format.yml'
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Parse actual public P5N count including under-ten format
+        run: |
+          python - <<'PY'
+          from html.parser import HTMLParser
+          from urllib.request import Request,urlopen
+          import re
+          class P(HTMLParser):
+              def __init__(self):super().__init__();self.a=[];self.off=0
+              def handle_starttag(self,t,a):
+                  if t in ('script','style','noscript'):self.off+=1
+              def handle_endtag(self,t):
+                  if t in ('script','style','noscript'):self.off=max(0,self.off-1)
+              def handle_data(self,x):
+                  if not self.off:self.a.append(x)
+          u='https://www.psychologytoday.com/ca/therapists/p5n'
+          req=Request(u,headers={'User-Agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 13.0; rv:129.0) Gecko/20100101 Firefox/129.0'})
+          with urlopen(req,timeout=30) as r:raw=r.read(2500000).decode('utf8','replace');print('HTTP',r.status)
+          p=P();p.feed(raw);text=re.sub(r'\s+',' ',' '.join(p.a))
+          m=re.search(r'Number\s+of\s+Counsellors\s+in\s+P5N\s*(.{0,35})',text,re.I)
+          print('DISPLAYED_COUNT_CONTEXT',m.group(0) if m else 'NOT_AVAILABLE')
+          z=re.search(r'Number\s+of\s+Counsellors\s+in\s+P5N\s*(<\s*10|[\d,]+\s*\+?)',text,re.I)
+          print('VERIFIED_COUNT',z.group(1) if z else 'UNKNOWN')
+          PY
