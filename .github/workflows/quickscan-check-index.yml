@@ -1,0 +1,40 @@
+name: Record isolated QuickScan Mac test identifiers
+on:
+  push:
+    paths:
+      - '.github/workflows/quickscan-check-index.yml'
+permissions:
+  contents: write
+  actions: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Query branch verification jobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs?branch=quickscan-mac-e2e-verification&per_page=25" \
+            --jq '.workflow_runs[] | [.id,.name,.status,(.conclusion // ""),.head_sha,.html_url] | @tsv' \
+            > /tmp/quickscan-test-runs.tsv
+          : > /tmp/quickscan-test-jobs.tsv
+          while IFS=$'\t' read -r run_id name status result sha url; do
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100" \
+              --jq '.jobs[] | [.id,.name,.status,(.conclusion // ""),.html_url] | @tsv' \
+              >> /tmp/quickscan-test-jobs.tsv || true
+          done < /tmp/quickscan-test-runs.tsv
+          cat /tmp/quickscan-test-runs.tsv
+      - name: Write status to existing diagnostic branch
+        run: |
+          git config user.name github-actions
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git fetch origin ci-diagnostics
+          git checkout -B ci-diagnostics origin/ci-diagnostics
+          cp /tmp/quickscan-test-runs.tsv quickscan-test-runs.tsv
+          cp /tmp/quickscan-test-jobs.tsv quickscan-test-jobs.tsv
+          git add quickscan-test-runs.tsv quickscan-test-jobs.tsv
+          if ! git diff --cached --quiet;then
+            git commit -m "Record exact package macOS test status [skip ci]"
+            git push origin HEAD:ci-diagnostics
+          fi
