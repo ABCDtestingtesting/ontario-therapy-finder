@@ -8,8 +8,36 @@ from pathlib import Path
 from shapely.geometry import shape,Point
 from shapely.ops import transform
 from finder import census
+from research.scan_all_maps import global_place_coordinates,distance_km
 EXCLUDE_90_DAYS={'L6Z','L7A','L6X','N1T','N3S','P5N','N4W'}
 COMPLETE_REASONS={'visible_end_of_list','explicit_no_results','single_place_panel'}
+
+def repair_coordinates(row):
+    """Resolve stored Google URL coordinates without making unnecessary new requests."""
+    if not row.get('unlocated_links'):return row
+    center=row['center']
+    places={}
+    for p in row.get('locations',[]):
+        key=(str(p['name']).casefold(),round(p['lat'],4),round(p['lon'],4))
+        places[key]=p
+    unresolved=[];remote=int(row.get('outside_5km') or 0);repaired=0
+    for link in row['unlocated_links']:
+        point=global_place_coordinates(link['url'])
+        if point is None:
+            unresolved.append(link)
+            continue
+        repaired+=1
+        if distance_km(point,center)>5:
+            remote+=1
+        else:
+            name=link.get('name') or 'Unknown'
+            key=(name.casefold(),round(point[0],4),round(point[1],4))
+            places[key]={'name':name,'lat':point[0],'lon':point[1],'url':link['url']}
+    row={**row,'local_count':len(places),'locations':list(places.values()),
+      'unlocated_count':len(unresolved),'unlocated_links':unresolved,
+      'outside_5km':remote,'coordinates_repaired_from_saved_google_urls':repaired,
+      'status':'observed' if not unresolved and row.get('status') in ('observed','unresolved') else row.get('status')}
+    return row
 
 def read_sources(root):
     records={};duplicates=[]
@@ -19,7 +47,7 @@ def read_sources(root):
         for row in doc['rows']:
             fsa=row.get('fsa')
             if fsa in records:duplicates.append((fsa,str(p)))
-            else:records[fsa]=row
+            else:records[fsa]=repair_coordinates(row)
     if duplicates:raise RuntimeError('Duplicate Google FSA source evidence: '+str(duplicates[:10]))
     return records
 
