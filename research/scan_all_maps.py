@@ -17,11 +17,11 @@ def distance_km(a,b):
 def global_place_coordinates(url):
     """Coordinates in a Google place's identity URL can be anywhere in the world."""
     url=unquote(url)
-    m=list(re.finditer(r'!3d(-?\\d+(?:\\.\\d+)?)!4d(-?\\d+(?:\\.\\d+)?)',url))
+    m=list(re.finditer(r'!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)',url))
     if m:
         lat,lon=map(float,m[-1].groups())
         if -90<=lat<=90 and -180<=lon<=180:return (lat,lon)
-    m=list(re.finditer(r'!2d(-?\\d+(?:\\.\\d+)?)!3d(-?\\d+(?:\\.\\d+)?)',url))
+    m=list(re.finditer(r'!2d(-?\d+(?:\.\d+)?)!3d(-?\d+(?:\.\d+)?)',url))
     if m:
         lon,lat=map(float,m[-1].groups())
         if -90<=lat<=90 and -180<=lon<=180:return (lat,lon)
