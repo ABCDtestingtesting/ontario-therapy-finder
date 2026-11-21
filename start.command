@@ -44,12 +44,11 @@ print 'Checking free Firefox automation browser…'
 python -m playwright install firefox || fail 'Firefox installation failed. Check Internet access and retry.'
 print 'Running startup preflight checks…'
 python -m finder.selfcheck || fail 'One of the startup checks failed. Read the error above.'
-if [[ ! -f .venv/.therapy_5_1_tested ]];then
-  print 'Testing all bundled source, census, dashboard, interruption and ranking code on this Mac…'
-  python -m pytest -q || fail 'Local integration tests failed. The dashboard was not started with failing code. Report the test error above.'
-  touch .venv/.therapy_5_1_tested
-  print 'All local code tests passed on this Mac.'
-fi
+# Test the actual files being launched on every startup. A version-only
+# marker could skip testing after a changed or partially updated download.
+print 'Testing the actual source, census, dashboard, interruption and ranking code on this Mac…'
+python -m pytest -q || fail 'Local integration tests failed. The dashboard was not started with failing code. Report the test error above.'
+print 'All bundled local code tests passed on this Mac.'
 print '\nLaunching fresh dashboard. Keep this Terminal window open.\n'
 python -m finder.server
 code=$?
