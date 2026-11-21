@@ -55,11 +55,12 @@ def main():
                 record={'fsa':code,'center':center,'population_2021':a['population_2021'],
                         'status':'not_checked'}
                 try:
-                    evidence=scan_one(ctx,'psychotherapist',*center,
+                    query=f'psychotherapist near {code} Ontario Canada'
+                    evidence=scan_one(ctx,query,*center,
                         folder/'evidence'/code,timeout_seconds=65,max_scroll=30)
                     known,unknown,outside=score_links(evidence['place_links'],center)
                     c=len(evidence['place_links'])
-                    record.update(status='observed' if not unknown else 'unresolved',local_count=len(known),
+                    record.update(status='observed' if not unknown else 'unresolved',search_query=query,local_count=len(known),
                         unlocated_count=len(unknown),outside_5km=outside,
                         unlocated_links=list(unknown.values()),
                         visible_links=c,feed_capped=c>=120,locations=list(known.values()),
