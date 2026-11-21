@@ -1,7 +1,8 @@
 """One-pass observed Google Maps therapist competition for every official Ontario FSA.
 Runs sharded on hosted macOS; refuses to equate missing coordinates with zero.
 """
-import argparse,csv,json,math,os,time,traceback
+import argparse,csv,json,math,os,time,traceback,re
+from urllib.parse import unquote
 from pathlib import Path
 from datetime import datetime,timezone
 from playwright.sync_api import sync_playwright
@@ -13,11 +14,24 @@ def distance_km(a,b):
     x=math.sin((b[0]-a[0])*r/2)**2+math.cos(a[0]*r)*math.cos(b[0]*r)*math.sin((b[1]-a[1])*r/2)**2
     return 12742*math.asin(min(1,math.sqrt(x)))
 
+def global_place_coordinates(url):
+    """Coordinates in a Google place's identity URL can be anywhere in the world."""
+    url=unquote(url)
+    m=list(re.finditer(r'!3d(-?\\d+(?:\\.\\d+)?)!4d(-?\\d+(?:\\.\\d+)?)',url))
+    if m:
+        lat,lon=map(float,m[-1].groups())
+        if -90<=lat<=90 and -180<=lon<=180:return (lat,lon)
+    m=list(re.finditer(r'!2d(-?\\d+(?:\\.\\d+)?)!3d(-?\\d+(?:\\.\\d+)?)',url))
+    if m:
+        lon,lat=map(float,m[-1].groups())
+        if -90<=lat<=90 and -180<=lon<=180:return (lat,lon)
+    return None
+
 def score_links(links,center):
     known={};missing={};outside=0
     for x in links:
         url=x.get('url','')
-        coords=x.get('coordinates')
+        coords=x.get('coordinates') or global_place_coordinates(url)
         if coords is None:
             missing[url.split('?')[0]]=x
             continue
@@ -57,8 +71,9 @@ def main():
                         folder/'evidence'/code,timeout_seconds=65,max_scroll=30)
                     known,unknown,outside=score_links(evidence['place_links'],center)
                     c=len(evidence['place_links'])
-                    record.update(status='observed',local_count=len(known),
+                    record.update(status='observed' if not unknown else 'unresolved',local_count=len(known),
                         unlocated_count=len(unknown),outside_5km=outside,
+                        unlocated_links=list(unknown.values()),
                         visible_links=c,feed_capped=c>=120,locations=list(known.values()),
                         search_url=evidence['search_url'],reason=evidence['completion_reason'])
                 except HumanVerificationRequired as exc:
