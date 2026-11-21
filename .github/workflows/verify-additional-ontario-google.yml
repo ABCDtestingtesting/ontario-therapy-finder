@@ -1,0 +1,51 @@
+name: Independently recheck 94 remaining eligible Ontario Google areas
+on:
+  push:
+    paths:
+      - '.github/workflows/verify-additional-ontario-google.yml'
+      - 'research/prepare_remaining.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  remaining-google:
+    name: Further local Google Maps confirmation shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29]
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PYTHONUNBUFFERED: '1'
+      CI: 'true'
+      THERAPY_DATA_HOME: ${{ github.workspace }}/remaining_source_cache
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download official prior 498 FSA source audit
+        run: |
+          mkdir -p research-source
+          gh run download 44952655975 -n full-ontario-498-google-census-audit -D research-source
+          test -s research-source/google_all_ontario_498.csv
+          test -s research-source/preliminary_top_180.json
+          python -m research.prepare_remaining research-source research/additional_candidates_94.json
+      - name: Install public Google Maps browser collection environment
+        run: |
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps firefox
+      - name: Independently verify extra Ontario therapy listing counts and exact coordinates
+        timeout-minutes: 28
+        run: python -m research.verify_top_google --input research/additional_candidates_94.json --shard ${{ matrix.shard }} --shards 30
+      - name: Preserve exact Google Maps observations and incomplete source reasons
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: further-google-second-pass-${{ matrix.shard }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: focused-output/shard-*/results.json
