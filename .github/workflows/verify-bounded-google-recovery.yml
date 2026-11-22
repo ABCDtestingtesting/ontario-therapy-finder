@@ -44,3 +44,25 @@ jobs:
           assert len(dominated)==175, (len(priority),len(dominated),cutoff)
           assert 3000 < cutoff < 3200, cutoff
           PY
+      - name: Test final ranking evidence gate against 498 real areas
+        run: |
+          mkdir -p empty-recovery bounded-ranking-audit
+          set +e
+          python -m research.finalize_full_google_498 first-pass/google_all_ontario_498.csv empty-recovery bounded-ranking-audit
+          outcome=$?
+          set -e
+          test "$outcome" -eq 1
+          python - <<'PY'
+          import csv, json
+          from pathlib import Path
+          root=Path('bounded-ranking-audit')
+          report=json.loads((root/'google_498_recovery_report.json').read_text())
+          assert report['total_ontario_fsa']==498, report
+          assert report['potential_top_60_contenders_unresolved']==64, report
+          assert report['dominated_incomplete_sources']==175, report
+          assert not report['google_60_certified_within_source_observation_model'], report
+          assert len(list(csv.DictReader((root/'Ontario_Google_Top60_Completed_Feeds_Provisional.csv').open())))==60
+          assert len(list(csv.DictReader((root/'ontario_498_google_recovery_audit.csv').open())))==498
+          assert not (root/'Ontario_Google_Best_60_Across_498.csv').exists()
+          print('FINALIZER_RANK_BOUNDS_TEST_PASSED', json.dumps(report))
+          PY
