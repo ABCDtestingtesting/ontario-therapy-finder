@@ -82,7 +82,7 @@ def parse_places(path,centre):
             "not_clinical":nonclinical,"bad_coordinates":bad}
 
 
-def run(fsa,first_pass,out, timeout=1800):
+def run(fsa,first_pass,out, timeout=1800, grid_cell=2.1, depth=6, concurrency=3):
     folder=Path(out)/fsa
     folder.mkdir(parents=True,exist_ok=True)
     with open(first_pass,newline="") as fh:
@@ -103,14 +103,14 @@ def run(fsa,first_pass,out, timeout=1800):
         "docker","run","--rm","--shm-size=1g",
         "-v",f"{output}:/out",container,
         "-input","/out/queries.txt","-results","/out/native_google_raw.csv",
-        "-grid-bbox",bbox,"-grid-cell","2.1","-grid-strict",
-        "-zoom","16","-depth","6","-c","3",
+        "-grid-bbox",bbox,"-grid-cell",str(grid_cell),"-grid-strict",
+        "-zoom","16","-depth",str(depth),"-c",str(concurrency),
         "-exit-on-inactivity","12m"
     ]
     if source.exists() and source.stat().st_size>100:
         args.insert(args.index("-input"),"-resume")
     meta = {"fsa":fsa,"center":centre,"bbox":bbox,"radius_km":5,
-            "terms":TERMS,"grid_cell_km":2.1,"collector_image":container,
+            "terms":TERMS,"grid_cell_km":grid_cell,"collector_image":container,
             "collector_command":args,"started_at":datetime.now(timezone.utc).isoformat()}
     (folder/"run_plan.json").write_text(json.dumps(meta,indent=2))
     rc=None
@@ -158,5 +158,10 @@ if __name__=="__main__":
     parser.add_argument("--first-pass",default="first-pass/google_all_ontario_498.csv")
     parser.add_argument("--out",default="native-google")
     parser.add_argument("--timeout",type=int,default=1800)
+    parser.add_argument("--grid-cell",type=float,default=2.1)
+    parser.add_argument("--depth",type=int,default=6)
+    parser.add_argument("--concurrency",type=int,default=3)
     args=parser.parse_args()
-    run(args.fsa,args.first_pass,args.out,args.timeout)
+    if not (1 <= args.grid_cell <= 5 and 1 <= args.depth <= 10 and 1 <= args.concurrency <= 12):
+        parser.error("Unsupported Google search grid settings")
+    run(args.fsa,args.first_pass,args.out,args.timeout,args.grid_cell,args.depth,args.concurrency)
