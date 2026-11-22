@@ -21,7 +21,7 @@ from finder.common import HumanVerificationRequired
 from research.scan_all_maps import distance_km, global_place_coordinates
 
 RADIUS_KM = 5.0
-SEARCHES = ('psychotherapist', 'counselling therapy')
+SEARCHES = ('psychotherapist near {FSA}', 'counselling therapy near {FSA}')
 # 3.4 km grid supplies 9 overlapping centres; capped tiles subdivide.
 BASE_OFFSETS_KM = (-3.4, 0.0, 3.4)
 SUB_OFFSETS_KM = (-1.15, 0.0, 1.15)
@@ -50,7 +50,7 @@ def scan_tile(context, code, center, north, east, level, term, root):
     lat, lon = tile_coords(center, north, east)
     # Google may surface off-centre places even for a centred search. Filter by
     # actual PLACE coordinates after collection, never by map-viewport coords.
-    query = term  # The @lat,lon map viewport supplies geographic scope. FSA text caused geographically irrelevant global results.
+    query = term.replace('{FSA}', f'{code} Ontario Canada')  # Local FSA text plus geographic map centre
     token = hashlib.sha256(f'{code}|{north:.3f}|{east:.3f}|{level}|{term}'.encode()).hexdigest()[:16]
     diagnostic = root / 'evidence' / code / token
     evidence = scan_one(
@@ -190,7 +190,7 @@ def run_area(context, area, folder, max_seconds):
     # Crucial: never restore the exponential pending queue from version 1.
     doc['pending'] = [task for task in required
                       if task_key(task) not in doc['complete_tiles']]
-    doc['recovery_plan'] = 'fixed_18_local_queries_v3_geocentered'
+    doc['recovery_plan'] = 'fixed_18_local_queries_v3_fsa_localized'
     doc['discarded_recursive_pending'] = True
     record_path.write_text(json.dumps(doc, indent=2))
     started = time.monotonic()
