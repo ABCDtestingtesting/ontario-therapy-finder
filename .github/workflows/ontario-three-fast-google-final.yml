@@ -1,0 +1,78 @@
+name: Certify Google-only Ontario 60 after fast final source grids
+on:
+  workflow_run:
+    workflows:
+      - Complete three remaining Ontario Google Maps source grids
+    types: [completed]
+  push:
+    paths:
+      - '.github/workflows/ontario-three-fast-google-final.yml'
+  workflow_dispatch:
+    inputs:
+      fast_run_id:
+        description: Fast three-FSA independent Google scan workflow
+        type: string
+        required: false
+permissions:
+  contents: read
+  actions: read
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FAST_RUN_ID: ${{ inputs.fast_run_id || github.event.workflow_run.id || '45050798602' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch complete 498 FSA audit
+        run: |
+          mkdir -p first-pass
+          gh run download 44952655975 -n full-ontario-498-google-census-audit -D first-pass
+      - name: Fetch all original Google Maps recovery evidence
+        run: |
+          gh run download 45033015174 -p 'google-tile-recovery-*' -D recovery-output
+          gh run download 45047774153 -p 'native-google-*' -D native-results
+      - name: Fetch final three fast Google grids and replace prior partial source evidence if complete
+        run: |
+          gh run download "$FAST_RUN_ID" -p 'native-google-fast-*' -D native-fast-results
+          python - <<'PY'
+          from pathlib import Path
+          import json, shutil
+          from research.finalize_full_google_498 import independent_grid_searches_complete, independent_grid_empty_evidenced
+          codes=['L0M','L1A','L7M']
+          replaced=[]
+          for code in codes:
+              src=list(Path('native-fast-results').glob(f'**/{code}/native_evidence.json'))
+              dst=list(Path('native-results').glob(f'**/{code}/native_evidence.json'))
+              if len(src)!=1 or len(dst)!=1:
+                  raise RuntimeError(f'Missing fast/prior Google source for {code}: {src},{dst}')
+              data=json.loads(src[0].read_text())
+              complete=independent_grid_searches_complete(data,src[0])
+              empty=independent_grid_empty_evidenced(data,src[0])
+              if complete and (data.get('status')=='grid_observed_complete' or empty):
+                  for path in src[0].parent.glob('*'):
+                      if path.is_file():
+                          shutil.copy2(path,dst[0].parent/path.name)
+                  replaced.append(code)
+                  print('INDEPENDENT_GOOGLE_SOURCE_REPLACED',code,data.get('status'),data.get('unique_clinical_local_places'))
+              else:
+                  print('INDEPENDENT_GOOGLE_SOURCE_INCOMPLETE',code,data.get('status'),data.get('process_returncode'))
+          print('INDEPENDENT_GOOGLE_REPLACEMENTS',len(replaced),'/3')
+          PY
+      - name: Verify FSA source artifacts and full cross-provincial ranking
+        run: |
+          python -m research.finalize_full_google_498 first-pass/google_all_ontario_498.csv recovery-output verified-ontario-498 --native-root native-results
+      - name: Preserve full evidence-backed Ontario 60 and all 498 audit rows
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ontario-google-498-final-certified-top60
+          retention-days: 30
+          if-no-files-found: warn
+          path: verified-ontario-498/
