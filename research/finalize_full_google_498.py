@@ -18,6 +18,53 @@ from pathlib import Path
 
 EXCLUDED = {'L6Z', 'L7A', 'L6X', 'L6R', 'N1T', 'N3S', 'P5N', 'N4W'}
 SOURCE_STATUS = 'confirmed_observed_feed'
+# A Google search can return physiotherapy, animal services and other businesses
+# even for a psychotherapist query. Names without an explicit mental-health
+# designation must not count towards a PROVEN clinical-location lower bound.
+CLINICAL_TITLE_TERMS = (
+    'psychotherap', 'psycholog', 'counsel', 'counsell', 'mental health',
+    'social work', 'social worker', 'family therap', 'marriage therap',
+    'behavioral therap', 'behavioural therap', 'registered therapist',
+    'registered psychotherapist', 'msw', 'rsw',
+)
+NONCLINICAL_TITLE_TERMS = (
+    'physiotherap', 'physical therap', 'physio', 'chiropract', 'massage',
+    'naturopath', 'pharmacy', 'veterinar', 'animal shelter',
+    'conservation area', 'dog ', 'pet ', 'fitness', 'acupuncture',
+    'dental', 'dentist', 'sport injury', 'sports injury',
+    'speech therapy', 'real estate',
+)
+
+
+def confirmed_clinical_title(place):
+    name = str(place.get('name') or '').casefold().strip()
+    if not name or any(term in name for term in NONCLINICAL_TITLE_TERMS):
+        return False
+    return any(term in name for term in CLINICAL_TITLE_TERMS)
+
+
+def clinical_recovery_lower_bound(source):
+    """Only title-confirmed counselling/psychotherapy listings count as proven.
+
+    Ambiguous businesses remain in the original evidence for manual review.
+    Omitting one from this bound is conservative: it may increase the number of
+    unresolved ranking contenders, but cannot falsely rule an area out.
+    """
+    if not source:
+        return 0
+    places = source.get('local_places') or []
+    if not isinstance(places, list):
+        raise RuntimeError('Malformed recovered Google location list')
+    return sum(confirmed_clinical_title(p) for p in places)
+
+
+def recovery_clinically_classified(source):
+    if not source:
+        return False
+    places = source.get('local_places') or []
+    return (isinstance(places, list)
+            and len(places) == int(source.get('unique_observed_local_places') or 0)
+            and all(confirmed_clinical_title(place) for place in places))
 
 
 def as_bool(value):
@@ -87,9 +134,29 @@ def independent_grid_searches_complete(meta, path):
 
 def independent_grid_empty_evidenced(meta, path):
     """Prove empty Google source output only after all grid queries succeeded."""
-    return bool(meta.get('source_empty_or_missing')
-                and meta.get('raw_rows') in (None,0)
-                and independent_grid_searches_complete(meta, path))
+    # Some collectors exited zero with an EMPTY 0-byte CSV while their logs
+    # reported successful Google search jobs. A missing output cannot prove
+    # zero local therapists. Only an explicitly verified, parseable empty
+    # source may qualify; older source_failed/grid_empty_unconfirmed records
+    # must remain censored.
+    p = Path(path)
+    csv_file = p.parent / 'native_google_raw.csv'
+    if (meta.get('status') != 'grid_empty_verified'
+        or meta.get('process_returncode') != 0
+        or meta.get('raw_rows') != 0
+        or meta.get('source_empty_or_missing')
+        or not csv_file.is_file()):
+        return False
+    try:
+        with csv_file.open(newline='', encoding='utf-8-sig') as fh:
+            reader = csv.DictReader(fh)
+            if not {'title', 'latitude', 'longitude', 'link'} <= set(reader.fieldnames or []):
+                return False
+            if next(reader, None) is not None:
+                return False
+    except (OSError, UnicodeError, csv.Error):
+        return False
+    return independent_grid_searches_complete(meta, path)
 
 
 def combine(first_pass, recovery_root, output, native_root=None):
@@ -126,7 +193,8 @@ def combine(first_pass, recovery_root, output, native_root=None):
             raise RuntimeError('Missing 2021 population near ' + code)
         previous = code in EXCLUDED or as_bool(old.get('previous_90_days'))
         baseline = int(old.get('google_observed_5km') or 0)
-        observed_recovered = int(source.get('unique_observed_local_places') or 0) if source else 0
+        raw_recovered = int(source.get('unique_observed_local_places') or 0) if source else 0
+        observed_recovered = clinical_recovery_lower_bound(source)
         independent = native.get(code)
         independent_observed = int(independent.get('unique_clinical_local_places') or 0) if independent else 0
         # Never add counts from distinct searches: overlaps cannot be assumed
@@ -138,7 +206,8 @@ def combine(first_pass, recovery_root, output, native_root=None):
         recovered_ok = bool(source and source.get('status') == 'verified_tile_feed'
                             and not source.get('pending')
                             and not source.get('capped_leaf_tiles')
-                            and not source.get('unresolved_leaf_links'))
+                            and not source.get('unresolved_leaf_links')
+                            and recovery_clinically_classified(source))
         native_ok = bool(independent
                          and independent.get('status') == 'grid_observed_complete'
                          and independent.get('process_returncode') == 0
@@ -147,9 +216,9 @@ def combine(first_pass, recovery_root, output, native_root=None):
                          and independent_grid_searches_complete(independent,native_paths[code]))
         native_empty_ok = bool(independent
                                and independent_grid_empty_evidenced(independent, native_paths[code]))
-        if base_ok:
-            # Base count has a completed feed; the subsequent broader recovery
-            # is not used to change its original comparable metric.
+        if base_ok and lower == baseline:
+            # Complete single-query baseline is an observed-directory count,
+            # not an exhaustive tally of therapists or clinics.
             count = baseline
             exact = True
             status = 'first_pass_complete'
@@ -163,7 +232,7 @@ def combine(first_pass, recovery_root, output, native_root=None):
             exact = True
             status = 'native_gridded_google_complete' if native_ok else 'native_gridded_google_empty_confirmed'
         elif recovered_ok:
-            count = observed_recovered
+            count = lower
             exact = True
             status = 'local_tiled_complete'
         else:
@@ -187,6 +256,10 @@ def combine(first_pass, recovery_root, output, native_root=None):
             'longitude': old['longitude'],
             'google_first_pass_search_url': old['source_url'],
             'recovery_complete_tiles': len(source.get('complete_tiles', {})) if source else 0,
+            'recovery_raw_google_place_count': raw_recovered,
+            'recovery_title_confirmed_clinical_count': observed_recovered,
+            'recovery_nonclinical_or_unresolved_count': raw_recovered - observed_recovered,
+            'recovery_all_local_names_clinically_classified': recovery_clinically_classified(source),
             'recovery_status': source.get('status') if source else '',
             'recovery_pending_queries': len(source.get('pending', [])) if source else None,
             'recovery_capped_base_queries': source.get('capped_leaf_tiles') if source else None,
@@ -242,7 +315,7 @@ def combine(first_pass, recovery_root, output, native_root=None):
         'top_60_cutoff_residents_per_observed_google_location': cutoff,
         'google_60_certified_within_source_observation_model': certified,
         'certification_rule': 'All incomplete source upper bounds must fall strictly below 60th completed-source ratio',
-        'note': 'A completed independent Google grid certifies the configured source scan, not exhaustive clinician coverage. Capped listings remain lower bounds. Geolocated business location counts, not therapists per clinic, are scored.',
+        'note': 'Completed Google search feed means the configured search finished, not exhaustive clinician coverage. Native source_failed zero-byte CSVs cannot prove zero; recovery names not clearly counselling or psychology are excluded from confirmed clinical counts. First-pass numeric Google keyword results have no item-level clinical audit and remain directory-search proxies; a final ranking must not be mistaken for proven therapist counts.',
         'psychology_today_used': False,
         '2021_population_source': 'Statistics Canada',
         'checked_at_utc': datetime.now(timezone.utc).isoformat()
