@@ -1,5 +1,8 @@
 name: Certify complete Ontario Google Maps 60 with independent nine-area scan
 on:
+  push:
+    paths:
+      - '.github/workflows/ontario-nine-native-google-final.yml'
   workflow_run:
     workflows:
       - Independently resolve nine Ontario Google Maps ranking contenders
@@ -19,7 +22,7 @@ jobs:
     timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}
-      NATIVE_RUN_ID: ${{ inputs.source_run_id || github.event.workflow_run.id }}
+      NATIVE_RUN_ID: ${{ inputs.source_run_id || github.event.workflow_run.id || '45047774153' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,10 +54,10 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           expected={'L4M','L1A','N7M','N1R','L4P','L9L','L0B','L0M','L7M'}
-          present={p.stem for p in Path('native-results').glob('**/native_evidence.json')}
+          present={p.parent.name for p in Path('native-results').glob('**/native_evidence.json')}
           print('NATIVE_GOOGLE_EVIDENCE_FILES',len(present))
-          if len(present)!=9:
-              raise RuntimeError(f'Expected nine independent Google scan artifacts; found {len(present)}')
+          if present!=expected:
+              raise RuntimeError(f'Native Google source artifacts mismatch: expected {sorted(expected)}, got {sorted(present)}')
           PY
       - name: Audit 498 postal areas and generate rigorously qualified 60
         run: |
