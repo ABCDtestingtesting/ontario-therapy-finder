@@ -68,7 +68,7 @@ def independent_grid_empty_evidenced(meta, path):
                 or event.get('status') != 'success'
                 or '/maps/search/' not in event.get('job','')):
                 continue
-            match = re.search(r'URL: (https://www.google.com/maps/search/[^ ,]+)',event['job'])
+            match = re.search(r'URL: (https://www.google.com/maps/search/\S+?)(?:, UrlParams:|})', event['job'])
             if not match:
                 continue
             url = match.group(1)
