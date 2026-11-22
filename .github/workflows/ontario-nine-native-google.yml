@@ -1,0 +1,68 @@
+name: Independently resolve nine Ontario Google Maps ranking contenders
+on:
+  push:
+    branches:
+      - ontario-401-fsa-live-ranking-20261121
+    paths:
+      - '.github/workflows/ontario-nine-native-google.yml'
+      - 'research/native_google_nine.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  native-maps:
+    name: Native Google Maps 5km scan ${{ matrix.fsa }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 9
+      matrix:
+        fsa: ['L4M','L1A','N7M','N1R','L4P','L9L','L0B','L0M','L7M']
+    env:
+      GH_TOKEN: ${{ github.token }}
+      DISABLE_TELEMETRY: '1'
+      GOOGLE_DOCKER_IMAGE: gosom/google-maps-scraper:latest
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Get original 498 Google Maps baseline with census 2021
+        run: |
+          mkdir -p first-pass
+          gh run download 44952655975 -n full-ontario-498-google-census-audit -D first-pass
+          test -s first-pass/google_all_ontario_498.csv
+      - name: Install geospatial math and verify script
+        run: |
+          python -m pip install -r requirements.txt
+          python -m compileall -q research/native_google_nine.py
+          docker version
+      - name: Pull reproducible Google Maps collector image and record digest
+        run: |
+          docker pull "$GOOGLE_DOCKER_IMAGE"
+          docker image inspect --format '{{index .RepoDigests 0}}' "$GOOGLE_DOCKER_IMAGE" | tee docker_source_digest.txt
+          docker run --rm "$GOOGLE_DOCKER_IMAGE" -h | head -100
+      - name: Run source-specific Google Maps 5km grid
+        timeout-minutes: 32
+        run: |
+          python -m research.native_google_nine --fsa "${{ matrix.fsa }}" --timeout 1800
+      - name: Preserve raw Google business evidence even when incomplete
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-google-${{ matrix.fsa }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            native-google/${{ matrix.fsa }}/queries.txt
+            native-google/${{ matrix.fsa }}/run_plan.json
+            native-google/${{ matrix.fsa }}/native_evidence.json
+            native-google/${{ matrix.fsa }}/native_google_raw.csv
+            native-google/${{ matrix.fsa }}/native_google_raw.csv.resume.json
+            native-google/${{ matrix.fsa }}/collector.log
+            docker_source_digest.txt
