@@ -33,6 +33,17 @@ class GoogleSourceCertificationTests(unittest.TestCase):
         self.assertEqual(clinical_recovery_lower_bound(source), 1)
         self.assertFalse(recovery_clinically_classified(source))
 
+    def test_explicitly_unrelated_businesses_do_not_invalidate_complete_source(self):
+        source = {
+            'unique_observed_local_places': 2,
+            'local_places': [
+                {'name': 'Physiotherapy Associates'},
+                {'name': 'Registered Psychotherapist'},
+            ],
+        }
+        self.assertEqual(clinical_recovery_lower_bound(source), 1)
+        self.assertTrue(recovery_clinically_classified(source))
+
     def test_all_confirmed_mental_health_listings_can_pass_classification(self):
         source = {
             'unique_observed_local_places': 2,
