@@ -6,8 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       resume_run_id:
-        description: 'Prior tile-recovery GitHub run ID to restore saved FSA checkpoints (optional)'
+        description: 'Prior recovery run containing saved FSA checkpoints'
         required: false
+        default: '44959925051'
         type: string
 permissions:
   contents: read
@@ -38,10 +39,9 @@ jobs:
           mkdir -p first-pass
           gh run download 44952655975 -n full-ontario-498-google-census-audit -D first-pass
           test -s first-pass/google_all_ontario_498.csv
-      - name: Restore earlier individual-area checkpoints if requested
-        if: ${{ inputs.resume_run_id != '' && inputs.resume_run_id != null }}
+      - name: Restore previous FSA checkpoints before searching
         env:
-          RESUME_RUN_ID: ${{ inputs.resume_run_id }}
+          RESUME_RUN_ID: ${{ inputs.resume_run_id || '44959925051' }}
           SHARD: ${{ matrix.shard }}
         run: |
           mkdir -p "recovery-output/shard-$SHARD"
@@ -55,7 +55,7 @@ jobs:
       - name: Recover capped, missing-coordinate, and incomplete Google areas
         timeout-minutes: 108
         run: |
-          python -m research.recover_google_tiles --shard ${{ matrix.shard }} --shards 48 --audit first-pass/google_all_ontario_498.csv --out recovery-output --seconds-per-area 1000
+          python -m research.recover_google_tiles --shard ${{ matrix.shard }} --shards 48 --audit first-pass/google_all_ontario_498.csv --out recovery-output --seconds-per-area 1100
       - name: Preserve all individual postal-area checkpoints and source status
         if: always()
         uses: actions/upload-artifact@v4
