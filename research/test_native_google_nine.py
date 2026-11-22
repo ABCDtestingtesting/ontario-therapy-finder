@@ -21,6 +21,15 @@ class GoogleNativeNineTests(unittest.TestCase):
             self.assertFalse(category_ok({'title':title,'category':category}),
                              (title,category))
 
+    def test_clinical_query_does_not_turn_nonclinical_business_into_therapist(self):
+        for title, category in (
+            ('Physiotherapy & Wellness Clinic', 'Psychotherapist'),
+            ('Dog Behavioural Therapy', 'Mental health service'),
+            ('Sports Massage', 'Counselor'),
+        ):
+            self.assertFalse(category_ok({'title':title,'category':category}),
+                             (title,category))
+
     def test_accepts_google_clinical_categories(self):
         for title, category in (
             ('X & Y Clinical Practice','Psychotherapist'),
