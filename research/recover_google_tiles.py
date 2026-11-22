@@ -107,67 +107,99 @@ def task_key(task):
 
 
 def run_area(context, area, folder, max_seconds):
+    """Finish a bounded 18-search local coverage plan, reusing legacy evidence.
+
+    Older checkpoints may contain thousands of queued recursive descendants.
+    Those searches were not bounded and most repeats returned the same 120
+    Google listings. Keep completed evidence, replace that pending work with
+    a fixed 3x3 by two-query plan, and label capped searches honestly.
+    """
     code = area['fsa']
     centre = (area['lat'], area['lon'])
     record_path = folder / f'{code}.json'
     if record_path.exists():
         doc = json.loads(record_path.read_text())
-        if doc.get('status') == 'verified_tile_feed':
-            return doc
+        if doc.get('fsa') != code:
+            raise RuntimeError(f'Checkpoint FSA does not match {code}')
     else:
         doc = {'fsa': code, 'center': centre, 'population_2021_fsa': area['population_2021'],
-               'status': 'in_progress', 'complete_tiles': {}, 'pending': [], 'attempts': 0}
-    if not doc['pending']:
-        if not doc['complete_tiles']:
-            doc['pending'] = [list(x) for x in tile_tasks()]
+               'status': 'in_progress', 'complete_tiles': {}, 'attempts': 0}
+    doc.setdefault('complete_tiles', {})
+    doc.setdefault('attempts', 0)
+    doc.setdefault('tile_failures', {})
+    required = [list(task) for task in tile_tasks()]
+    required_keys = {task_key(task) for task in required}
+    if len(required) != 18 or len(required_keys) != 18:
+        raise RuntimeError('Bounded Google query plan must contain 18 unique tiles')
+    # Crucial: never restore the exponential pending queue from version 1.
+    doc['pending'] = [task for task in required
+                      if task_key(task) not in doc['complete_tiles']]
+    doc['recovery_plan'] = 'fixed_18_local_queries_v2'
+    doc['discarded_recursive_pending'] = True
+    record_path.write_text(json.dumps(doc, indent=2))
     started = time.monotonic()
+    failed_this_run = set()
+    access_restricted = False
     while doc['pending'] and time.monotonic() - started < max_seconds:
         task = tuple(doc['pending'][0])
         key = task_key(task)
-        if key in doc['complete_tiles']:
-            doc['pending'].pop(0)
-            continue
         try:
             evidence = scan_tile(context, code, centre, *task, folder)
             doc['complete_tiles'][key] = evidence
             doc['attempts'] += 1
             doc['pending'].pop(0)
-            if (evidence['capped'] or evidence['unresolved']) and task[2] < MAX_LEVEL:
-                doc['pending'].extend(list(x) for x in children(task))
+            doc['tile_failures'].pop(key, None)
         except HumanVerificationRequired as exc:
-            doc['status'] = 'access_restricted'
+            doc['tile_failures'][key] = {'error': str(exc),
+                                         'type': 'access_restricted',
+                                         'at': datetime.now(timezone.utc).isoformat()}
+            access_restricted = True
             doc['last_error'] = str(exc)
             break
         except Exception as exc:
-            # Never turn failed queries into zero competitors.
-            doc['status'] = 'needs_retry'
-            doc['last_error'] = type(exc).__name__ + ': ' + str(exc)
+            # A broken tile cannot block the other 17 indefinitely. Try it on
+            # the next recovery run, not in a busy retry loop.
+            doc['tile_failures'][key] = {'error': type(exc).__name__ + ': ' + str(exc),
+                                         'type': 'source_incomplete',
+                                         'at': datetime.now(timezone.utc).isoformat()}
+            failed_this_run.add(key)
             doc['attempts'] += 1
-            break
+            doc['pending'].pop(0)
         finally:
             record_path.write_text(json.dumps(doc, indent=2))
+    # Every missing base query stays pending for the next run. All completed
+    # level-1/2 results from old checkpoints remain usable for deduplication.
+    doc['pending'] = [task for task in required
+                      if task_key(task) not in doc['complete_tiles']]
     merged = {}
-    capped_final = 0
-    unresolved_final = 0
     for entry in doc['complete_tiles'].values():
-        # Intermediate coarse tiles are retained for provenance. Count a capped
-        # leaf as unresolved until its finer descendants complete.
-        if entry['level'] >= MAX_LEVEL and entry['capped']:
-            capped_final += 1
-        if entry['level'] >= MAX_LEVEL:
-            unresolved_final += len(entry['unresolved'])
-        for p in entry['places']:
+        for p in entry.get('places', []):
             merged[p['key']] = p
+    base = [doc['complete_tiles'][key] for key in required_keys
+            if key in doc['complete_tiles']]
+    capped = sum(bool(entry.get('capped')) for entry in base)
+    unresolved = {p['url'] for entry in base for p in entry.get('unresolved', [])
+                  if p.get('url')}
     doc['unique_observed_local_places'] = len(merged)
     doc['local_places'] = list(merged.values())
-    doc['capped_leaf_tiles'] = capped_final
-    doc['unresolved_leaf_links'] = unresolved_final
-    if len(doc['complete_tiles']) < len(tuple(tile_tasks())) and not doc['pending']:
+    doc['capped_leaf_tiles'] = capped
+    doc['unresolved_leaf_links'] = len(unresolved)
+    doc['completed_coverage_tiles'] = len(base)
+    doc['total_coverage_tiles'] = len(required)
+    doc['source_caps_present'] = capped > 0
+    doc['failed_tiles_this_run'] = len(failed_this_run)
+    if access_restricted:
+        doc['status'] = 'access_restricted'
+    elif doc['pending']:
         doc['status'] = 'coverage_incomplete'
-    if not doc['pending'] and capped_final == 0 and unresolved_final == 0 and len(doc['complete_tiles']) >= len(tuple(tile_tasks())):
+    elif unresolved:
+        doc['status'] = 'coordinates_unresolved'
+    elif capped:
+        # This is an OBSERVED LOWER BOUND of Google business listings. It is
+        # not an exhaustive count or an absence-of-therapists certification.
+        doc['status'] = 'observed_capped'
+    else:
         doc['status'] = 'verified_tile_feed'
-    elif doc.get('status') not in ('access_restricted', 'needs_retry'):
-        doc['status'] = 'coverage_incomplete'
     doc['updated_at'] = datetime.now(timezone.utc).isoformat()
     record_path.write_text(json.dumps(doc, indent=2))
     return doc
