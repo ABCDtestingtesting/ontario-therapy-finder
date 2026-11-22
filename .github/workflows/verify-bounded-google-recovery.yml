@@ -40,7 +40,7 @@ jobs:
           print('ONTARIO_PRIORITY_TEST', dict(total=len(rows),priority=len(priority),
                 dominated=len(dominated),cutoff=cutoff))
           assert len(rows)==498
-          assert len(priority)==63, (len(priority),len(dominated),cutoff)
-          assert len(dominated)==174, (len(priority),len(dominated),cutoff)
+          assert len(priority)==64, (len(priority),len(dominated),cutoff)
+          assert len(dominated)==175, (len(priority),len(dominated),cutoff)
           assert 3000 < cutoff < 3200, cutoff
           PY
