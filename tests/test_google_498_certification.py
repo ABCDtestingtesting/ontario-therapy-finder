@@ -76,7 +76,7 @@ class GoogleSourceCertificationTests(unittest.TestCase):
                 })
             lines.append({'message': 'scrapemate exited'})
             (root / 'collector.log').write_text(
-                '\\n'.join(json.dumps(line) for line in lines))
+                '\n'.join(json.dumps(line) for line in lines))
             with (root / 'native_google_raw.csv').open('w', newline='') as fh:
                 writer = csv.DictWriter(
                     fh, fieldnames=['title', 'latitude', 'longitude', 'link'])
