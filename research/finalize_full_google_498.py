@@ -109,6 +109,7 @@ def independent_grid_searches_complete(meta, path):
         completed = set()
         exited = False
         observed_search_responses = 0
+        max_reported_places = 0
         with log.open(encoding='utf8',errors='replace') as logfile:
             for line in logfile:
                 try:
@@ -120,8 +121,10 @@ def independent_grid_searches_complete(meta, path):
                 message = str(event.get('message') or '')
                 if message.endswith(' places found'):
                     try:
-                        if int(message.split(' ',1)[0]) > 0:
+                        reported = int(message.split(' ',1)[0])
+                        if reported > 0:
                             observed_search_responses += 1
+                            max_reported_places = max(max_reported_places, reported)
                     except ValueError:
                         pass
                 if (event.get('message') != 'job finished'
@@ -137,7 +140,22 @@ def independent_grid_searches_complete(meta, path):
                     lat,lon=map(float,point.groups())
                     if south <= lat <= north and west <= lon <= east:
                         completed.add(url)
-        return exited and len(completed) == expected and observed_search_responses > 0
+        # Google grid search results must actually have been written to disk.
+        # The collector sometimes logs 70 places returned for an individual
+        # search but emits a CSV with only 2-4 detail rows (or no file).
+        # Such truncated detail output is never a completed provider census.
+        csv_file = p.parent / 'native_google_raw.csv'
+        if not csv_file.is_file():
+            return False
+        with csv_file.open(newline='', encoding='utf-8-sig') as fh:
+            reader = csv.DictReader(fh)
+            if not {'title', 'latitude', 'longitude', 'link'} <= set(reader.fieldnames or []):
+                return False
+            actual_rows = sum(1 for _ in reader)
+        return (exited and len(completed) == expected
+                and observed_search_responses > 0
+                and actual_rows == int(meta.get('raw_rows') or 0)
+                and actual_rows >= max_reported_places)
     except (OSError,KeyError,TypeError,ValueError,ZeroDivisionError):
         return False
 
