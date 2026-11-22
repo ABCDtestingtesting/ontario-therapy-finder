@@ -144,6 +144,24 @@ def priority_unresolved_fsas(first_pass):
     return priority, excluded, cutoff
 
 
+def is_rank_dominated(area, observed_places):
+    """Prove that this area cannot enter the Google-only top 60.
+
+    Both the original search count and deduplicated tiled count are lower
+    bounds, so their maximum remains a valid lower bound without assuming
+    different searches contain disjoint results. The inequality is strict
+    because ties must remain possible contenders.
+    """
+    if not {'ranking_cutoff', 'population_5km_estimate', 'baseline_observed_5km'} <= area.keys():
+        return False
+    people = int(area['population_5km_estimate'])
+    cutoff = float(area['ranking_cutoff'])
+    baseline = int(area['baseline_observed_5km'])
+    if people <= 0 or cutoff <= 0 or baseline < 0:
+        raise RuntimeError('Bad population / observed Google bound for ' + area['fsa'])
+    return people / max(1, baseline, observed_places) < cutoff
+
+
 def run_area(context, area, folder, max_seconds):
     """Finish a bounded 18-search local coverage plan, reusing legacy evidence.
 
@@ -178,7 +196,13 @@ def run_area(context, area, folder, max_seconds):
     started = time.monotonic()
     failed_this_run = set()
     access_restricted = False
-    while doc['pending'] and time.monotonic() - started < max_seconds:
+    # Keep all legacy completed evidence; no new Google calls are necessary
+    # once known local places already disqualify a censored source.
+    def observed_count():
+        return len({p['key'] for e in doc['complete_tiles'].values()
+                    for p in e.get('places', [])})
+    early_dominated = is_rank_dominated(area, observed_count())
+    while doc['pending'] and not early_dominated and time.monotonic() - started < max_seconds:
         task = tuple(doc['pending'][0])
         key = task_key(task)
         try:
@@ -187,6 +211,7 @@ def run_area(context, area, folder, max_seconds):
             doc['attempts'] += 1
             doc['pending'].pop(0)
             doc['tile_failures'].pop(key, None)
+            early_dominated = is_rank_dominated(area, observed_count())
         except HumanVerificationRequired as exc:
             doc['tile_failures'][key] = {'error': str(exc),
                                          'type': 'access_restricted',
@@ -226,7 +251,10 @@ def run_area(context, area, folder, max_seconds):
     doc['total_coverage_tiles'] = len(required)
     doc['source_caps_present'] = capped > 0
     doc['failed_tiles_this_run'] = len(failed_this_run)
-    if access_restricted:
+    doc['rank_dominated_by_verified_cutoff'] = early_dominated
+    if early_dominated:
+        doc['status'] = 'rank_dominated_early'
+    elif access_restricted:
         doc['status'] = 'access_restricted'
     elif doc['pending']:
         doc['status'] = 'coverage_incomplete'
@@ -267,6 +295,7 @@ def main():
         'verified_60th_ratio': cutoff, 'total_fsa': len(first_pass),
         'screening_proof': 'incomplete count is lower bound, ratio is upper bound'
     }), flush=True)
+    first_pass_by_fsa = {row['fsa']: row for row in first_pass}
     # Keep ORIGINAL 241-area shard assignment so resumed artifacts never
     # duplicate the same FSA in two different shard files.
     targets = [a for i, a in enumerate(targets)
@@ -280,13 +309,18 @@ def main():
         )
         try:
             for area in targets:
-                r = run_area(ctx, area, root, args.seconds_per_area)
+                old = first_pass_by_fsa[area['fsa']]
+                enriched = dict(area, ranking_cutoff=cutoff,
+                    population_5km_estimate=int(old['population_5km_estimate']),
+                    baseline_observed_5km=int(float(old.get('google_observed_5km') or 0)))
+                r = run_area(ctx, enriched, root, args.seconds_per_area)
                 print('TILE_FSA_RESULT', json.dumps({
                     'fsa': r['fsa'], 'status': r['status'],
                     'places': r['unique_observed_local_places'],
                     'pending': len(r['pending']), 'attempts': r['attempts'],
                     'capped_leaf': r['capped_leaf_tiles'],
-                    'unresolved_leaf': r['unresolved_leaf_links']
+                    'unresolved_leaf': r['unresolved_leaf_links'],
+                    'rank_dominated': r['rank_dominated_by_verified_cutoff']
                 }), flush=True)
                 if r['status'] == 'access_restricted':
                     print('Google access restricted; preserving all evidence, ending shard', flush=True)
