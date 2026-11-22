@@ -68,6 +68,29 @@ class BoundedRecoveryTests(unittest.TestCase):
         self.assertEqual(scan.call_count, 6)
         self.assertEqual(row['completed_coverage_tiles'], 18)
 
+    def test_rank_dominated_without_any_new_search(self):
+        enriched = dict(self.area, ranking_cutoff=3000.0,
+                        population_5km_estimate=40000,
+                        baseline_observed_5km=14)
+        with patch('research.recover_google_tiles.scan_tile', side_effect=self.evidence) as scan:
+            row = run_area(None, enriched, self.folder, 1000)
+        self.assertEqual(scan.call_count, 0)
+        self.assertEqual(row['status'], 'rank_dominated_early')
+        self.assertEqual(len(row['pending']), 18)
+
+    def test_rank_dominated_after_evidence_added(self):
+        enriched = dict(self.area, ranking_cutoff=3000.0,
+                        population_5km_estimate=40000,
+                        baseline_observed_5km=12)
+        def unique_evidence(context, code, center, north, east, level, term, root):
+            e = self.evidence(context, code, center, north, east, level, term, root)
+            e['places'] = [{'key': 'extra' + str(i)} for i in range(2)]
+            return e
+        with patch('research.recover_google_tiles.scan_tile', side_effect=unique_evidence) as scan:
+            row = run_area(None, enriched, self.folder, 1000)
+        self.assertEqual(scan.call_count, 18)
+        self.assertFalse(row['rank_dominated_by_verified_cutoff'])
+
     def test_uncapped_complete_has_distinct_verified_status(self):
         def no_cap(*args):
             e = self.evidence(*args)
