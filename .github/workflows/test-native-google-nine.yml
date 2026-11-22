@@ -8,6 +8,7 @@ on:
       - 'research/native_google_nine.py'
       - 'research/test_native_google_nine.py'
       - 'research/finalize_full_google_498.py'
+      - 'research/test_native_full_rank.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,4 +26,4 @@ jobs:
       - name: Check syntax, Google category/geography and source completeness
         run: |
           python -m compileall -q research/native_google_nine.py research/finalize_full_google_498.py
-          python -m unittest research.test_native_google_nine -v
+          python -m unittest research.test_native_google_nine research.test_native_full_rank -v
