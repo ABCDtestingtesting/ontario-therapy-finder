@@ -70,7 +70,7 @@ class CompleteOntarioRankingTests(unittest.TestCase):
             combine(self.audit,self.recovery,self.out,self.native)
         self.assertFalse((self.out/'Ontario_Google_Best_60_Across_498.csv').exists())
 
-    def test_zero_row_native_grid_needs_every_successful_seed(self):
+    def test_missing_native_csv_and_reported_places_cannot_prove_zero(self):
         folder=self.native/'L0B'
         folder.mkdir()
         (folder/'native_evidence.json').write_text('{}')
@@ -96,7 +96,7 @@ class CompleteOntarioRankingTests(unittest.TestCase):
         log=folder/'collector.log'
         log.write_text('\n'.join(events)+'\n')
         meta={'process_returncode':0,'source_empty_or_missing':True,'raw_rows':None}
-        self.assertTrue(independent_grid_empty_evidenced(meta,folder/'native_evidence.json'))
+        self.assertFalse(independent_grid_empty_evidenced(meta,folder/'native_evidence.json'))
         log.write_text('\n'.join(events[:-2]+events[-1:])+'\n')
         self.assertFalse(independent_grid_empty_evidenced(meta,folder/'native_evidence.json'))
         meta['process_returncode']=124
