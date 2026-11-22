@@ -1,0 +1,57 @@
+name: Complete three remaining Ontario Google Maps source grids
+on:
+  push:
+    branches:
+      - ontario-401-fsa-live-ranking-20261121
+    paths:
+      - '.github/workflows/ontario-three-fast-google.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  fast-google:
+    runs-on: ubuntu-latest
+    name: Focused Google grid ${{ matrix.fsa }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        fsa: ['L0M','L1A','L7M']
+    env:
+      GH_TOKEN: ${{ github.token }}
+      DISABLE_TELEMETRY: '1'
+      GOOGLE_DOCKER_IMAGE: gosom/google-maps-scraper:latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Recover audited census and original Google evidence
+        run: |
+          mkdir -p first-pass
+          gh run download 44952655975 -n full-ontario-498-google-census-audit -D first-pass
+          python -m pip install -r requirements.txt
+          python -m compileall -q research/native_google_nine.py
+      - name: Run independent targeted Google Maps grid
+        timeout-minutes: 18
+        run: |
+          docker pull "$GOOGLE_DOCKER_IMAGE"
+          docker image inspect --format '{{index .RepoDigests 0}}' "$GOOGLE_DOCKER_IMAGE" | tee docker_source_digest.txt
+          python -m research.native_google_nine --fsa "${{ matrix.fsa }}" --out native-google-fast --grid-cell 3.5 --depth 3 --concurrency 8 --timeout 900
+      - name: Preserve complete source and raw responses
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-google-fast-${{ matrix.fsa }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            native-google-fast/${{ matrix.fsa }}/queries.txt
+            native-google-fast/${{ matrix.fsa }}/run_plan.json
+            native-google-fast/${{ matrix.fsa }}/native_evidence.json
+            native-google-fast/${{ matrix.fsa }}/native_google_raw.csv
+            native-google-fast/${{ matrix.fsa }}/collector.log
+            docker_source_digest.txt
