@@ -1,0 +1,63 @@
+name: Recover all capped and incomplete Ontario Google Maps postal areas
+on:
+  workflow_dispatch:
+    inputs:
+      resume_run_id:
+        description: 'Prior tile-recovery GitHub run ID to restore saved FSA checkpoints (optional)'
+        required: false
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  tile-recovery:
+    name: Recover Google postal zones shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47]
+    env:
+      GH_TOKEN: ${{ github.token }}
+      THERAPY_DATA_HOME: ${{ github.workspace }}/source_cache
+      PYTHONUNBUFFERED: '1'
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Load complete 498-area prior Google audit
+        run: |
+          mkdir -p first-pass
+          gh run download 44952655975 -n full-ontario-498-google-census-audit -D first-pass
+          test -s first-pass/google_all_ontario_498.csv
+      - name: Restore earlier individual-area checkpoints if requested
+        if: ${{ inputs.resume_run_id != '' && inputs.resume_run_id != null }}
+        env:
+          RESUME_RUN_ID: ${{ inputs.resume_run_id }}
+          SHARD: ${{ matrix.shard }}
+        run: |
+          mkdir -p "recovery-output/shard-$SHARD"
+          gh run download "$RESUME_RUN_ID" -n "google-tile-recovery-$SHARD" -D "recovery-output/shard-$SHARD"
+      - name: Install browser and test recovery module before live searches
+        run: |
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps firefox
+          python -m compileall -q research/recover_google_tiles.py finder/google_browser.py
+          python -m unittest research.test_google_pipeline -v
+      - name: Recover capped, missing-coordinate, and incomplete Google areas
+        timeout-minutes: 108
+        run: |
+          python -m research.recover_google_tiles --shard ${{ matrix.shard }} --shards 48 --audit first-pass/google_all_ontario_498.csv --out recovery-output --seconds-per-area 1000
+      - name: Preserve all individual postal-area checkpoints and source status
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: google-tile-recovery-${{ matrix.shard }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: recovery-output/shard-${{ matrix.shard }}/*.json
