@@ -145,7 +145,10 @@ def combine(first_pass, recovery_root, output, native_root=None):
         elif native_ok or native_empty_ok:
             # Complete the bounded Google source observation, including proven
             # empty output. This never claims all therapists were enumerated.
-            count = independent_observed if native_ok else 0
+            # Different source searches may omit otherwise visible local
+            # businesses. Keep the maximum observed local count as a
+            # conservative bound instead of replacing larger source evidence.
+            count = lower
             exact = True
             status = 'native_gridded_google_complete' if native_ok else 'native_gridded_google_empty_confirmed'
         elif recovered_ok:
