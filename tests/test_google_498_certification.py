@@ -23,7 +23,8 @@ class GoogleSourceCertificationTests(unittest.TestCase):
         self.assertTrue(confirmed_clinical_title({'name': 'Counselling and Mental Health Centre'}))
 
     def test_native_collector_does_not_count_physiotherapy_under_therapy_search(self):
-        from research.native_google_nine import category_ok
+        from research.native_google_nine import category_ok, distance_km
+        self.assertEqual(distance_km((44.0, -79.0), (44.0, -79.0)), 0.0)
         self.assertFalse(category_ok({'title': 'Physiotherapy and Wellness Clinic',
                                       'category': 'Psychotherapist'}))
         self.assertFalse(category_ok({'title': 'Sports Massage and Physiotherapy',
