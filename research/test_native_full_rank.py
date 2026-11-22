@@ -91,6 +91,7 @@ class CompleteOntarioRankingTests(unittest.TestCase):
                     url=f'https://www.google.com/maps/search/{term.replace(" ","%20")}/@{lat:.6f},{lon:.6f},16z'
                     events.append(json.dumps({'message':'job finished','status':'success',
                          'job':f'Job{{ID: abc, Method: GET, URL: {url}, UrlParams: map[hl:en]}}'}))
+        events.append(json.dumps({'message':'18 places found'}))
         events.append(json.dumps({'message':'scrapemate exited'}))
         log=folder/'collector.log'
         log.write_text('\n'.join(events)+'\n')
