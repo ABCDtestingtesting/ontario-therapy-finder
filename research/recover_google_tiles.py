@@ -106,6 +106,44 @@ def task_key(task):
     return '|'.join(map(str, task))
 
 
+
+RECENTLY_SCREENED = {'L6Z', 'L7A', 'L6X', 'L6R', 'N1T', 'N3S', 'P5N', 'N4W'}
+
+
+def priority_unresolved_fsas(first_pass):
+    """Identify areas that can still beat the current 60th verified ratio.
+
+    With a capped Google feed, observed competitors are a LOWER BOUND.
+    Thus population/max(1,observed_competitors) is an UPPER BOUND on the
+    actual residents-per-listing ratio. Areas whose upper bound is strictly
+    below the 60th completed area's observed ratio cannot improve its rank
+    under this scoring model. Keep the full 498-row audit intact.
+    """
+    if len(first_pass) != 498 or len({r['fsa'] for r in first_pass}) != 498:
+        raise RuntimeError('Expected exactly 498 distinct Ontario FSAs')
+    def recent(row):
+        return row['fsa'] in RECENTLY_SCREENED or str(row.get('previous_90_days', '')).lower() == 'true'
+    def score_upper(row):
+        people = int(float(row['population_5km_estimate']))
+        competitors = int(float(row.get('google_observed_5km') or 0))
+        if people <= 0 or competitors < 0:
+            raise RuntimeError('Invalid population or Google observation for ' + row['fsa'])
+        return people / max(1, competitors)
+    base = sorted((score_upper(row) for row in first_pass
+                   if row['status'] == 'confirmed_observed_feed' and not recent(row)),
+                  reverse=True)
+    if len(base) < 60:
+        raise RuntimeError('Cannot narrow research before 60 completed baseline areas exist')
+    cutoff = base[59]
+    unfinished = [row for row in first_pass
+                  if row['status'] != 'confirmed_observed_feed' and not recent(row)]
+    priority = {row['fsa'] for row in unfinished if score_upper(row) >= cutoff}
+    excluded = {row['fsa'] for row in unfinished if score_upper(row) < cutoff}
+    if len(priority | excluded) != len(unfinished) or priority & excluded:
+        raise RuntimeError('Google research screening lost unresolved FSAs')
+    return priority, excluded, cutoff
+
+
 def run_area(context, area, folder, max_seconds):
     """Finish a bounded 18-search local coverage plan, reusing legacy evidence.
 
@@ -223,7 +261,16 @@ def main():
     targets = [a for a in full_pool if a['fsa'] in selected]
     if len(targets) != 241:
         raise RuntimeError(f'Unexpected unresolved source set: {len(targets)}')
-    targets = [a for i, a in enumerate(targets) if i % args.shards == args.shard]
+    priority, dominated, cutoff = priority_unresolved_fsas(first_pass)
+    print('GOOGLE_RANKING_PRIORITY', json.dumps({
+        'candidates_to_recover': len(priority), 'already_dominated': len(dominated),
+        'verified_60th_ratio': cutoff, 'total_fsa': len(first_pass),
+        'screening_proof': 'incomplete count is lower bound, ratio is upper bound'
+    }), flush=True)
+    # Keep ORIGINAL 241-area shard assignment so resumed artifacts never
+    # duplicate the same FSA in two different shard files.
+    targets = [a for i, a in enumerate(targets)
+               if i % args.shards == args.shard and a['fsa'] in priority]
     root = Path(args.out) / f'shard-{args.shard}'
     root.mkdir(parents=True, exist_ok=True)
     with sync_playwright() as pw:
