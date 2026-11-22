@@ -64,6 +64,11 @@ jobs:
               raise RuntimeError(f'Expected one prior checkpoint for {code}, found {len(found)}')
           print('FOUND_ORIGINAL_GOOGLE_CHECKPOINT',code,found[0])
           PY
+      - name: Install and validate Google Maps browser collector
+        run: |
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps firefox
+          python -m compileall -q research/recheck_google_contenders.py research/recover_google_tiles.py
       - name: Verify localized query keys before resuming Google checkpoints
         run: |
           python - <<'PY'
@@ -73,11 +78,6 @@ jobs:
           assert '0.0|0.0|0|psychotherapist' not in {task_key(t) for t in tile_tasks()}
           print('GOOGLE_LOCAL_SEARCH_PLAN', SEARCHES)
           PY
-      - name: Install and validate Google Maps browser collector
-        run: |
-          python -m pip install -r requirements.txt
-          python -m playwright install --with-deps firefox
-          python -m compileall -q research/recheck_google_contenders.py research/recover_google_tiles.py
       - name: Complete outstanding Google Maps local source tiles
         timeout-minutes: 66
         run: |
