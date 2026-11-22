@@ -57,26 +57,27 @@ def independent_grid_empty_evidenced(meta, path):
             return False
         completed = set()
         exited = False
-        for line in log.open(encoding='utf8',errors='replace'):
-            if '"message":"scrapemate exited"' in line:
-                exited = True
-            try:
-                event = json.loads(line)
-            except (json.JSONDecodeError, ValueError):
-                continue
-            if (event.get('message') != 'job finished'
-                or event.get('status') != 'success'
-                or '/maps/search/' not in event.get('job','')):
-                continue
-            match = re.search(r'URL: (https://www.google.com/maps/search/\S+?)(?:, UrlParams:|})', event['job'])
-            if not match:
-                continue
-            url = match.group(1)
-            point = re.search(r'/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),',url)
-            if point:
-                lat,lon=map(float,point.groups())
-                if south <= lat <= north and west <= lon <= east:
-                    completed.add(url)
+        with log.open(encoding='utf8',errors='replace') as logfile:
+            for line in logfile:
+                try:
+                    event = json.loads(line)
+                except (json.JSONDecodeError, ValueError):
+                    continue
+                if event.get('message') == 'scrapemate exited':
+                    exited = True
+                if (event.get('message') != 'job finished'
+                    or event.get('status') != 'success'
+                    or '/maps/search/' not in event.get('job','')):
+                    continue
+                match = re.search(r'URL: (https://www.google.com/maps/search/\S+?)(?:, UrlParams:|})', event['job'])
+                if not match:
+                    continue
+                url = match.group(1)
+                point = re.search(r'/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),',url)
+                if point:
+                    lat,lon=map(float,point.groups())
+                    if south <= lat <= north and west <= lon <= east:
+                        completed.add(url)
         return exited and len(completed) == expected
     except (OSError,KeyError,TypeError,ValueError,ZeroDivisionError):
         return False
