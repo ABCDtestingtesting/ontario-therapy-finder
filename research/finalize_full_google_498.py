@@ -36,11 +36,20 @@ NONCLINICAL_TITLE_TERMS = (
 )
 
 
-def confirmed_clinical_title(place):
+def clinical_title_classification(place):
+    """Classify by explicit title evidence; unrecognized titles remain unknown."""
     name = str(place.get('name') or '').casefold().strip()
-    if not name or any(term in name for term in NONCLINICAL_TITLE_TERMS):
-        return False
-    return any(term in name for term in CLINICAL_TITLE_TERMS)
+    if not name:
+        return 'ambiguous'
+    if any(term in name for term in NONCLINICAL_TITLE_TERMS):
+        return 'nonclinical'
+    if any(term in name for term in CLINICAL_TITLE_TERMS):
+        return 'clinical'
+    return 'ambiguous'
+
+
+def confirmed_clinical_title(place):
+    return clinical_title_classification(place) == 'clinical'
 
 
 def clinical_recovery_lower_bound(source):
@@ -64,7 +73,8 @@ def recovery_clinically_classified(source):
     places = source.get('local_places') or []
     return (isinstance(places, list)
             and len(places) == int(source.get('unique_observed_local_places') or 0)
-            and all(confirmed_clinical_title(place) for place in places))
+            and all(clinical_title_classification(place) != 'ambiguous'
+                    for place in places))
 
 
 def as_bool(value):
@@ -258,7 +268,12 @@ def combine(first_pass, recovery_root, output, native_root=None):
             'recovery_complete_tiles': len(source.get('complete_tiles', {})) if source else 0,
             'recovery_raw_google_place_count': raw_recovered,
             'recovery_title_confirmed_clinical_count': observed_recovered,
-            'recovery_nonclinical_or_unresolved_count': raw_recovered - observed_recovered,
+            'recovery_explicitly_nonclinical_count': sum(
+                clinical_title_classification(place) == 'nonclinical'
+                for place in (source.get('local_places') or [])) if source else 0,
+            'recovery_ambiguous_business_titles_count': sum(
+                clinical_title_classification(place) == 'ambiguous'
+                for place in (source.get('local_places') or [])) if source else 0,
             'recovery_all_local_names_clinically_classified': recovery_clinically_classified(source),
             'recovery_status': source.get('status') if source else '',
             'recovery_pending_queries': len(source.get('pending', [])) if source else None,
