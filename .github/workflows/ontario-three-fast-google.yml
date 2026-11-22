@@ -55,3 +55,19 @@ jobs:
             native-google-fast/${{ matrix.fsa }}/native_google_raw.csv
             native-google-fast/${{ matrix.fsa }}/collector.log
             docker_source_digest.txt
+      - name: Check source completion after preserving diagnostics
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('native-google-fast')
+          fsa = '${{ matrix.fsa }}'
+          path = root / fsa / 'native_evidence.json'
+          if not path.is_file():
+              raise SystemExit(f'Missing Google evidence for {fsa}')
+          data = json.loads(path.read_text())
+          print('SOURCE_STATE', fsa, data.get('status'), data.get('process_returncode'))
+          if data.get('status') != 'grid_observed_complete' or data.get('process_returncode') != 0:
+              raise SystemExit(f'Incomplete source evidence for {fsa}; artifact remains available for recovery')
+          PY
