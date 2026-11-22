@@ -1,0 +1,105 @@
+name: Audit Ontario Google 498 after targeted 31-area recovery
+on:
+  workflow_run:
+    workflows:
+      - Recheck 31 remaining Ontario Google Maps ranking contenders
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      recovery_run_id:
+        description: Completed targeted 31-area Google recheck Actions run ID
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_RUN_ID: ${{ inputs.recovery_run_id || github.event.workflow_run.id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Load verified 498-source population baseline
+        run: |
+          mkdir -p first-pass
+          gh run download 44952655975 -n full-ontario-498-google-census-audit -D first-pass
+          test -s first-pass/google_all_ontario_498.csv
+      - name: Restore original 48 Google recovery shards and all nine native grids
+        run: |
+          gh run download 45033015174 -p 'google-tile-recovery-*' -D recovery-output
+          gh run download 45047774153 -p 'native-google-*' -D native-results
+          gh run download 45050798602 -n native-google-fast-L0M -D native-fast-L0M
+      - name: Merge newer FSA checkpoints only when they preserve prior observation
+        run: |
+          mkdir -p targeted-results
+          gh run download "$TARGET_RUN_ID" -p 'targeted-google-*' -D targeted-results
+          python - <<'PY'
+          import json
+          import shutil
+          from pathlib import Path
+          targets = set('L7M M9M M3L N6M N5V L1A N7M M1L M1R M9N M1K M2J M3K M1N L4P L9L M1J N6N M9R L5W L0B M1W L5E L5M P6A M1E M1C M4C M1T M9W M3H'.split())
+          replacements = []
+          incomplete = []
+          for code in sorted(targets):
+              old = list(Path('recovery-output').glob('**/' + code + '.json'))
+              new = list(Path('targeted-results').glob('**/' + code + '.json'))
+              if len(old) != 1 or len(new) != 1:
+                  incomplete.append(code + ':missing_saved_evidence')
+                  continue
+              prior = json.loads(old[0].read_text())
+              latest = json.loads(new[0].read_text())
+              if latest.get('fsa') != code or prior.get('fsa') != code:
+                  raise RuntimeError('FSA mismatch in archived Google source ' + code)
+              prior_keys = set(prior.get('complete_tiles') or {})
+              new_keys = set(latest.get('complete_tiles') or {})
+              if not prior_keys.issubset(new_keys):
+                  incomplete.append(code + ':original_tiles_not_preserved')
+                  continue
+              old_count = int(prior.get('unique_observed_local_places') or 0)
+              new_count = int(latest.get('unique_observed_local_places') or 0)
+              if new_count < old_count:
+                  incomplete.append(code + ':lost_google_places')
+                  continue
+              shutil.copy2(new[0], old[0])
+              replacements.append(code)
+              if latest.get('status') != 'verified_tile_feed':
+                  incomplete.append(code + ':' + str(latest.get('status')))
+          report = {'targets': len(targets), 'new_checkpoints_used': len(replacements),
+                    'unresolved_rechecks': incomplete,
+                    'total_source_shards': len(list(Path('recovery-output').glob('google-tile-recovery-*')))}
+          Path('targeted_merge_report.json').write_text(json.dumps(report, indent=2))
+          print('TARGETED_31_GOOGLE_RECOVERY_MERGE', json.dumps(report), flush=True)
+          if report['total_source_shards'] != 48:
+              raise RuntimeError('Missing original Google recovery shards')
+          fast = list(Path('native-fast-L0M').glob('**/L0M/native_evidence.json'))
+          old = list(Path('native-results').glob('**/L0M/native_evidence.json'))
+          if len(fast) == 1 and len(old) == 1:
+              data = json.loads(fast[0].read_text())
+              from research.finalize_full_google_498 import independent_grid_searches_complete
+              if data.get('status') == 'grid_observed_complete' and independent_grid_searches_complete(data, fast[0]):
+                  for f in fast[0].parent.glob('*'):
+                      if f.is_file():
+                          shutil.copy2(f, old[0].parent / f.name)
+                  print('VALIDATED_FAST_NATIVE_L0M_SOURCE_REUSED')
+          PY
+      - name: Certify only when no incomplete area can alter top 60
+        run: |
+          python -m research.finalize_full_google_498 first-pass/google_all_ontario_498.csv recovery-output verified-ontario-498 --native-root native-results
+      - name: Preserve audit, provisional ranking, and certified 60 only when valid
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ontario-498-google-targeted-final-audit
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            verified-ontario-498/
+            targeted_merge_report.json
