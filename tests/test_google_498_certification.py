@@ -9,6 +9,7 @@ from research.finalize_full_google_498 import (
     clinical_recovery_lower_bound,
     confirmed_clinical_title,
     independent_grid_empty_evidenced,
+    independent_grid_searches_complete,
     recovery_clinically_classified,
 )
 
@@ -54,6 +55,39 @@ class GoogleSourceCertificationTests(unittest.TestCase):
         }
         self.assertEqual(clinical_recovery_lower_bound(source), 2)
         self.assertTrue(recovery_clinically_classified(source))
+
+    def test_search_results_not_written_to_csv_fail_even_after_completed_grid(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            evidence = root / 'native_evidence.json'
+            (root / 'run_plan.json').write_text(json.dumps({
+                'bbox': '43.0,-80.0,43.0001,-79.9999',
+                'grid_cell_km': 5, 'terms': ['a', 'b', 'c', 'd'],
+            }))
+            lines = [{'message': '20 places found'}]
+            for i in range(4):
+                lines.append({
+                    'message': 'job finished',
+                    'status': 'success',
+                    'job': (
+                        'URL: (https://www.google.com/maps/search/'
+                        + str(i)
+                        + '/@43.00005,-79.99995,16z, UrlParams: {})'),
+                })
+            lines.append({'message': 'scrapemate exited'})
+            (root / 'collector.log').write_text(
+                '\\n'.join(json.dumps(line) for line in lines))
+            with (root / 'native_google_raw.csv').open('w', newline='') as fh:
+                writer = csv.DictWriter(
+                    fh, fieldnames=['title', 'latitude', 'longitude', 'link'])
+                writer.writeheader()
+                writer.writerow({'title': 'Therapist',
+                                 'latitude': '43.0', 'longitude': '-80.0',
+                                 'link': 'https://www.google.com/maps/'})
+            meta = {'process_returncode': 0, 'raw_rows': 1}
+            evidence.write_text(json.dumps(meta))
+            self.assertFalse(independent_grid_searches_complete(meta, evidence),
+                             'Twenty Google source places cannot yield a complete one-row CSV')
 
     def test_missing_or_empty_file_does_not_prove_zero_therapists(self):
         with tempfile.TemporaryDirectory() as d:
