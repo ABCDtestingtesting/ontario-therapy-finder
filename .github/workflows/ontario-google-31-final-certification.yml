@@ -1,13 +1,13 @@
-name: Audit Ontario Google 498 after targeted 31-area recovery
+name: Audit Ontario Google 498 after targeted recovery
 on:
   workflow_run:
     workflows:
-      - Recheck 31 remaining Ontario Google Maps ranking contenders
+      - Recheck remaining Ontario Google Maps ranking contenders
     types: [completed]
   workflow_dispatch:
     inputs:
       recovery_run_id:
-        description: Completed targeted 31-area Google recheck Actions run ID
+        description: Completed targeted Google recheck Actions run ID
         required: true
         type: string
 permissions:
@@ -47,7 +47,7 @@ jobs:
           import json
           import shutil
           from pathlib import Path
-          targets = set('L7M M9M M3L N6M N5V L1A N7M M1L M1R M9N M1K M2J M3K M1N L4P L9L M1J N6N M9R L5W L0B M1W L5E L5M P6A M1E M1C M4C M1T M9W M3H'.split())
+          targets = set('L4M N1R L0M M3J L7M M9M M3L N6M N5V L1A N7M M1L M1R M9N M1K M2J M3K M1N L4P L9L M1J N6N M9R L5W L0B M1W L5E L5M P6A M1E M1C M4C M1T M9W M3H'.split())
           replacements = []
           incomplete = []
           for code in sorted(targets):
