@@ -269,14 +269,19 @@ def combine(first_pass, recovery_root, output, native_root=None):
             status = 'censored_or_incomplete'
         if count < 0:
             raise RuntimeError('Negative Google observed places for ' + code)
-        upper = pop / max(1, count)
+        # Zero observed Google businesses is a legitimate observed density of 0.
+        # A missing/incomplete zero must NEVER be excluded by replacing 0
+        # with an imaginary one-business denominator.
+        observed_density = count * 10000.0 / pop
+        residents_per_listing = round(pop / count, 2) if count else None
         quality[status] += 1
         rows.append({
             'fsa': code,
             'population_5km_estimate_2021': pop,
             'google_observed_therapy_locations_lower_bound': lower,
             'google_therapy_locations_used_in_score': count,
-            'residents_per_google_listing_or_upper_bound': round(upper, 2),
+            'google_listings_per_10000_residents_or_lower_bound': round(observed_density, 8),
+            'residents_per_google_listing_or_upper_bound': residents_per_listing,
             'completed_source_feed': exact,
             'source_evidence_status': status,
             'excluded_last_90_days': previous,
@@ -306,18 +311,19 @@ def combine(first_pass, recovery_root, output, native_root=None):
 
     verified = sorted((r for r in rows if r['completed_source_feed']
                        and not r['excluded_last_90_days']),
-                      key=lambda r: (-r['residents_per_google_listing_or_upper_bound'],
-                                     r['google_therapy_locations_used_in_score'], r['fsa']))
+                      key=lambda r: (r['google_listings_per_10000_residents_or_lower_bound'],
+                                     -r['population_5km_estimate_2021'], r['fsa']))
     if len(verified) < 60:
         raise RuntimeError('Fewer than 60 completed Google source feeds')
-    cutoff = verified[59]['residents_per_google_listing_or_upper_bound']
+    cutoff = verified[59]['google_listings_per_10000_residents_or_lower_bound']
     contenders = sorted((r for r in rows if not r['completed_source_feed']
                          and not r['excluded_last_90_days']
-                         and r['residents_per_google_listing_or_upper_bound'] >= cutoff),
-                        key=lambda r: (-r['residents_per_google_listing_or_upper_bound'], r['fsa']))
+                         and r['google_listings_per_10000_residents_or_lower_bound'] <= cutoff),
+                        key=lambda r: (r['google_listings_per_10000_residents_or_lower_bound'],
+                                       -r['population_5km_estimate_2021'], r['fsa']))
     safe_to_exclude = [r for r in rows if not r['completed_source_feed']
                        and not r['excluded_last_90_days']
-                       and r['residents_per_google_listing_or_upper_bound'] < cutoff]
+                       and r['google_listings_per_10000_residents_or_lower_bound'] > cutoff]
     certified = not contenders
     out = Path(output)
     out.mkdir(parents=True, exist_ok=True)
@@ -345,9 +351,9 @@ def combine(first_pass, recovery_root, output, native_root=None):
         'other_incomplete_google_sources': quality['censored_or_incomplete'],
         'dominated_incomplete_sources': len(safe_to_exclude),
         'potential_top_60_contenders_unresolved': len(contenders),
-        'top_60_cutoff_residents_per_observed_google_location': cutoff,
+        'top_60_cutoff_observed_google_listings_per_10000_residents': cutoff,
         'google_60_certified_within_source_observation_model': certified,
-        'certification_rule': 'All incomplete source upper bounds must fall strictly below 60th completed-source ratio',
+        'certification_rule': 'All incomplete source LOWER BOUNDS on Google listings per 10,000 must exceed the 60th completed-source observed density; zero lower bound is always a contender at a positive cutoff',
         'note': 'Completed Google search feed means the configured search finished, not exhaustive clinician coverage. Native source_failed zero-byte CSVs cannot prove zero; recovery names not clearly counselling or psychology are excluded from confirmed clinical counts. First-pass numeric Google keyword results have no item-level clinical audit and remain directory-search proxies; a final ranking must not be mistaken for proven therapist counts.',
         'psychology_today_used': False,
         '2021_population_source': 'Statistics Canada',
