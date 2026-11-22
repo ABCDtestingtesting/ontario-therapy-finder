@@ -51,6 +51,7 @@ def independent_grid_searches_complete(meta, path):
             return False
         completed = set()
         exited = False
+        observed_search_responses = 0
         with log.open(encoding='utf8',errors='replace') as logfile:
             for line in logfile:
                 try:
@@ -59,6 +60,13 @@ def independent_grid_searches_complete(meta, path):
                     continue
                 if event.get('message') == 'scrapemate exited':
                     exited = True
+                message = str(event.get('message') or '')
+                if message.endswith(' places found'):
+                    try:
+                        if int(message.split(' ',1)[0]) > 0:
+                            observed_search_responses += 1
+                    except ValueError:
+                        pass
                 if (event.get('message') != 'job finished'
                     or event.get('status') != 'success'
                     or '/maps/search/' not in event.get('job','')):
@@ -72,7 +80,7 @@ def independent_grid_searches_complete(meta, path):
                     lat,lon=map(float,point.groups())
                     if south <= lat <= north and west <= lon <= east:
                         completed.add(url)
-        return exited and len(completed) == expected
+        return exited and len(completed) == expected and observed_search_responses > 0
     except (OSError,KeyError,TypeError,ValueError,ZeroDivisionError):
         return False
 
