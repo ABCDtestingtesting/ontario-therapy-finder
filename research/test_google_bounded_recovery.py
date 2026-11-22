@@ -24,10 +24,11 @@ class BoundedRecoveryTests(unittest.TestCase):
             'term': term,
         }
 
-    def test_geocentered_queries_do_not_repeat_fsa_token(self):
-        self.assertEqual(SEARCHES, ('psychotherapist', 'counselling therapy'))
+    def test_localized_queries_have_distinct_keys_from_legacy_generic_cells(self):
+        self.assertEqual(SEARCHES, ('psychotherapist near {FSA}', 'counselling therapy near {FSA}'))
         self.assertEqual(len(list(tile_tasks())), 18)
-        self.assertFalse(any('{FSA}' in task[3] for task in tile_tasks()))
+        self.assertTrue(all('{FSA}' in task[3] for task in tile_tasks()))
+        self.assertNotIn('-3.4|-3.4|0|psychotherapist', {task_key(t) for t in tile_tasks()})
 
     def test_bounded_search_cap_never_recurses(self):
         with patch('research.recover_google_tiles.scan_tile', side_effect=self.evidence) as scan:
@@ -51,7 +52,7 @@ class BoundedRecoveryTests(unittest.TestCase):
         self.assertIn('legacy-tile', row['complete_tiles'])
         self.assertEqual(row['status'], 'observed_capped')
         self.assertEqual(row['unique_observed_local_places'], 1)
-        self.assertEqual(row['recovery_plan'], 'fixed_18_local_queries_v3_geocentered')
+        self.assertEqual(row['recovery_plan'], 'fixed_18_local_queries_v3_fsa_localized')
 
     def test_failed_source_is_never_zero_competitors(self):
         with patch('research.recover_google_tiles.scan_tile', side_effect=RuntimeError('source unavailable')) as scan:
