@@ -9,6 +9,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 jobs:
   regression:
     runs-on: ubuntu-latest
@@ -24,3 +25,22 @@ jobs:
         run: |
           python -m compileall -q finder/google_browser.py research/recover_google_tiles.py
           python -m unittest research.test_google_bounded_recovery -v
+      - name: Verify rank-bound screening on the actual Ontario 498-area audit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p first-pass
+          gh run download 44952655975 -n full-ontario-498-google-census-audit -D first-pass
+          python - <<'PY'
+          import csv
+          from research.recover_google_tiles import priority_unresolved_fsas
+          with open('first-pass/google_all_ontario_498.csv', newline='') as f:
+              rows=list(csv.DictReader(f))
+          priority, dominated, cutoff=priority_unresolved_fsas(rows)
+          print('ONTARIO_PRIORITY_TEST', dict(total=len(rows),priority=len(priority),
+                dominated=len(dominated),cutoff=cutoff))
+          assert len(rows)==498
+          assert len(priority)==63, (len(priority),len(dominated),cutoff)
+          assert len(dominated)==174, (len(priority),len(dominated),cutoff)
+          assert 3000 < cutoff < 3200, cutoff
+          PY
