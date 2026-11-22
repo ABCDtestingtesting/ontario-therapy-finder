@@ -33,9 +33,29 @@ jobs:
           mkdir -p first-pass
           gh run download 44952655975 -n full-ontario-498-google-census-audit -D first-pass
           test -s first-pass/google_all_ontario_498.csv
-      - name: Reuse existing original Google Maps checkpoint for this FSA
+      - name: Locate exact original recovery artifact shard for this FSA
+        id: source-shard
         run: |
-          gh run download 45033015174 -p 'google-tile-recovery-*' -D recovery-seed
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import csv, json
+          from pathlib import Path
+          with Path('first-pass/google_all_ontario_498.csv').open(newline='') as f:
+              prior = list(csv.DictReader(f))
+          incomplete = {r['fsa'] for r in prior if r['status'] != 'confirmed_observed_feed'}
+          all_areas = json.loads(Path('research/ontario_all_populated_fsa_2021.json').read_text())['areas']
+          ordered = [a['fsa'] for a in all_areas if a['fsa'] in incomplete]
+          if len(ordered) != 241:
+              raise RuntimeError('Original checkpoint plan changed')
+          code = '${{ matrix.fsa }}'
+          if code not in ordered:
+              raise RuntimeError(f'No original recovery task for {code}')
+          shard = ordered.index(code) % 48
+          print(f'shard={shard}')
+          PY
+      - name: Reuse only the matching Google Maps checkpoint artifact
+        run: |
+          mkdir -p recovery-seed
+          gh run download 45033015174 -n "google-tile-recovery-${{ steps.source-shard.outputs.shard }}" -D recovery-seed
           python - <<'PY'
           from pathlib import Path
           code = '${{ matrix.fsa }}'
