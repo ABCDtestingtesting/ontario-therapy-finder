@@ -1,0 +1,25 @@
+name: Validate Ontario Google 498 certification safeguards
+on:
+  push:
+    branches:
+      - ontario-401-fsa-live-ranking-20261121
+    paths:
+      - 'research/finalize_full_google_498.py'
+      - 'tests/test_google_498_certification.py'
+      - '.github/workflows/ontario-google-certification-regression.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  certification-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax and source-verification regression tests
+        run: |
+          python -m compileall -q research/finalize_full_google_498.py tests/test_google_498_certification.py
+          python -m unittest discover -s tests -p 'test_google_498_certification.py' -v
