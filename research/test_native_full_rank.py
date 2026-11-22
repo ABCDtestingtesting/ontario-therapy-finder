@@ -1,10 +1,11 @@
 """End-to-end native Google evidence gate on a synthetic 498-FSA census."""
 import csv
 import json
+import math
 import tempfile
 import unittest
 from pathlib import Path
-from research.finalize_full_google_498 import combine
+from research.finalize_full_google_498 import combine, independent_grid_empty_evidenced
 from research.native_google_nine import NINE
 
 
@@ -66,6 +67,37 @@ class CompleteOntarioRankingTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'incompletely observed'):
             combine(self.audit,self.recovery,self.out,self.native)
         self.assertFalse((self.out/'Ontario_Google_Best_60_Across_498.csv').exists())
+
+    def test_zero_row_native_grid_needs_every_successful_seed(self):
+        folder=self.native/'L0B'
+        folder.mkdir()
+        (folder/'native_evidence.json').write_text('{}')
+        south, west, north, east = 42.3, -82.3, 42.394, -82.174
+        cell=2.1
+        terms=['psychotherapist','psychologist','counselling therapy','mental health clinic']
+        (folder/'run_plan.json').write_text(json.dumps({
+            'bbox':f'{south},{west},{north},{east}',
+            'grid_cell_km':cell,'terms':terms}))
+        rows=math.ceil((north-south)/(cell/111.32))
+        cols=math.ceil((east-west)/(cell/(111.32*math.cos(math.radians((south+north)/2)))))
+        events=[]
+        for term in terms:
+            for i in range(rows):
+                for j in range(cols):
+                    lat=south+(i+.5)*(north-south)/rows
+                    lon=west+(j+.5)*(east-west)/cols
+                    url=f'https://www.google.com/maps/search/{term.replace(" ","%20")}/@{lat:.6f},{lon:.6f},16z'
+                    events.append(json.dumps({'message':'job finished','status':'success',
+                         'job':f'Job{{ID: abc, Method: GET, URL: {url}, UrlParams: map[hl:en]}}'}))
+        events.append(json.dumps({'message':'scrapemate exited'}))
+        log=folder/'collector.log'
+        log.write_text('\n'.join(events)+'\n')
+        meta={'process_returncode':0,'source_empty_or_missing':True,'raw_rows':None}
+        self.assertTrue(independent_grid_empty_evidenced(meta,folder/'native_evidence.json'))
+        log.write_text('\n'.join(events[:-2]+events[-1:])+'\n')
+        self.assertFalse(independent_grid_empty_evidenced(meta,folder/'native_evidence.json'))
+        meta['process_returncode']=124
+        self.assertFalse(independent_grid_empty_evidenced(meta,folder/'native_evidence.json'))
 
     def test_missing_independent_sources_fail_gate(self):
         with self.assertRaisesRegex(RuntimeError,'incompletely observed'):
