@@ -7,6 +7,7 @@ from pathlib import Path
 
 from research.finalize_full_google_498 import (
     clinical_recovery_lower_bound,
+    combine,
     confirmed_clinical_title,
     independent_grid_empty_evidenced,
     independent_grid_searches_complete,
@@ -103,6 +104,35 @@ class GoogleSourceCertificationTests(unittest.TestCase):
             meta.update(source_empty_or_missing=False,
                         raw_rows=0, status='grid_empty_verified')
             self.assertFalse(independent_grid_empty_evidenced(meta, p))
+
+    def test_zero_lower_bound_never_eliminates_incomplete_area(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            baseline = root / 'first_pass.csv'
+            recovery = root / 'recovery'
+            recovery.mkdir()
+            fields = ['fsa', 'population_5km_estimate', 'status',
+                      'feed_capped', 'unlocated_links', 'google_observed_5km',
+                      'previous_90_days', 'latitude', 'longitude', 'source_url']
+            with baseline.open('w', newline='') as fh:
+                writer = csv.DictWriter(fh, fieldnames=fields)
+                writer.writeheader()
+                for i in range(498):
+                    writer.writerow({
+                        'fsa': f'T{i:03d}', 'population_5km_estimate': 1000,
+                        'status': 'confirmed_observed_feed' if i < 60 else 'incomplete',
+                        'feed_capped': 'False', 'unlocated_links': 0,
+                        'google_observed_5km': 1 if i < 60 else 0,
+                        'previous_90_days': 'False' if i <= 60 else 'True',
+                        'latitude': 45, 'longitude': -79, 'source_url': '',
+                    })
+            output = root / 'output'
+            with self.assertRaisesRegex(RuntimeError, 'incompletely observed'):
+                combine(baseline, recovery, output)
+            with (output / 'Ontario_Google_Unresolved_Ranking_Contenders.csv').open(newline='') as fh:
+                contenders = list(csv.DictReader(fh))
+            self.assertEqual([v['fsa'] for v in contenders], ['T060'])
+            self.assertEqual(float(contenders[0]['google_listings_per_10000_residents_or_lower_bound']), 0.0)
 
     def test_nonzero_raw_count_without_mental_health_title_stays_ambiguous(self):
         source = {
