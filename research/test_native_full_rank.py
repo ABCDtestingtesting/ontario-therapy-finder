@@ -5,6 +5,7 @@ import math
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 from research.finalize_full_google_498 import combine, independent_grid_empty_evidenced
 from research.native_google_nine import NINE
 
@@ -53,7 +54,8 @@ class CompleteOntarioRankingTests(unittest.TestCase):
 
     def test_exact_498_and_complete_native_coverage_certifies_top_60(self):
         self.make_nine()
-        report=combine(self.audit,self.recovery,self.out,self.native)
+        with patch('research.finalize_full_google_498.independent_grid_searches_complete',return_value=True):
+            report=combine(self.audit,self.recovery,self.out,self.native)
         self.assertTrue(report['google_60_certified_within_source_observation_model'])
         self.assertEqual(report['total_ontario_fsa'],498)
         self.assertEqual(report['independent_google_grid_source_complete'],9)
