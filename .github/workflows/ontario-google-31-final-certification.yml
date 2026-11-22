@@ -4,6 +4,9 @@ on:
     workflows:
       - Recheck remaining Ontario Google Maps ranking contenders
     types: [completed]
+  schedule:
+    # Fallback when GitHub does not emit workflow_run for a feature-branch workflow.
+    - cron: '17 */2 * * *'
   workflow_dispatch:
     inputs:
       recovery_run_id:
@@ -19,7 +22,7 @@ jobs:
     timeout-minutes: 35
     env:
       GH_TOKEN: ${{ github.token }}
-      TARGET_RUN_ID: ${{ inputs.recovery_run_id || github.event.workflow_run.id }}
+      TARGET_RUN_ID: ${{ inputs.recovery_run_id || github.event.workflow_run.id || '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -27,6 +30,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Resolve latest completed targeted Google source run
+        run: |
+          if [ -z "$TARGET_RUN_ID" ]; then
+            TARGET_RUN_ID="$(gh run list --workflow ontario-google-31-targeted-recovery.yml --branch ontario-401-fsa-live-ranking-20261121 --status completed --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+          fi
+          if [ -z "$TARGET_RUN_ID" ]; then
+            echo 'No completed target Google recovery run is available yet'
+            exit 1
+          fi
+          echo "TARGET_RUN_ID=$TARGET_RUN_ID" >> "$GITHUB_ENV"
+          echo "Sourcing completed Google evidence from run $TARGET_RUN_ID"
       - name: Load verified 498-source population baseline
         run: |
           mkdir -p first-pass
