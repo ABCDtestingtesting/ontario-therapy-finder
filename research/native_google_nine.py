@@ -15,7 +15,12 @@ import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from research.scan_all_maps import distance_km
+def distance_km(a, b):
+    """Great-circle distance in km; keep CSV category validation independent of browser libraries."""
+    r = math.pi / 180
+    x = (math.sin((b[0]-a[0])*r/2)**2
+         + math.cos(a[0]*r)*math.cos(b[0]*r)*math.sin((b[1]-a[1])*r/2)**2)
+    return 12742 * math.asin(min(1, math.sqrt(x)))
 
 TERMS = ("psychotherapist", "psychologist", "counselling therapy", "mental health clinic")
 NINE = ("L4M","L1A","N7M","N1R","L4P","L9L","L0B","L0M","L7M")
