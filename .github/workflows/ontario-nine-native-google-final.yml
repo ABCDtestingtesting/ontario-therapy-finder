@@ -1,0 +1,69 @@
+name: Certify complete Ontario Google Maps 60 with independent nine-area scan
+on:
+  workflow_run:
+    workflows:
+      - Independently resolve nine Ontario Google Maps ranking contenders
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Completed nine-FSA native Google Maps collection workflow
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NATIVE_RUN_ID: ${{ inputs.source_run_id || github.event.workflow_run.id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore original 498 Ontario census and Google baseline
+        run: |
+          mkdir -p first-pass
+          gh run download 44952655975 -n full-ontario-498-google-census-audit -D first-pass
+          test -s first-pass/google_all_ontario_498.csv
+      - name: Restore complete prior 48 shard Google searches
+        run: |
+          mkdir -p recovery-output
+          gh run download 45033015174 -p 'google-tile-recovery-*' -D recovery-output
+          python - <<'PY'
+          from pathlib import Path
+          existing={p.name for p in Path('recovery-output').glob('google-tile-recovery-*') if p.is_dir()}
+          expected={f'google-tile-recovery-{x}' for x in range(48)}
+          if missing:=expected-existing:
+              raise RuntimeError(f'Missing {len(missing)} prior Google evidence shards: {sorted(missing)}')
+          print('BASELINE_RECOVERY_SHARDS',len(existing))
+          PY
+      - name: Restore nine independent Google Maps gridded source scans
+        run: |
+          mkdir -p native-results
+          gh run download "$NATIVE_RUN_ID" -p 'native-google-*' -D native-results
+          python - <<'PY'
+          from pathlib import Path
+          expected={'L4M','L1A','N7M','N1R','L4P','L9L','L0B','L0M','L7M'}
+          present={p.stem for p in Path('native-results').glob('**/native_evidence.json')}
+          print('NATIVE_GOOGLE_EVIDENCE_FILES',len(present))
+          if len(present)!=9:
+              raise RuntimeError(f'Expected nine independent Google scan artifacts; found {len(present)}')
+          PY
+      - name: Audit 498 postal areas and generate rigorously qualified 60
+        run: |
+          python -m research.finalize_full_google_498 first-pass/google_all_ontario_498.csv recovery-output verified-ontario-498 --native-root native-results
+      - name: Preserve final 498-source audit and ranked 60 only if certified
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-ontario-google-only-498-top60
+          retention-days: 30
+          if-no-files-found: warn
+          path: verified-ontario-498/
