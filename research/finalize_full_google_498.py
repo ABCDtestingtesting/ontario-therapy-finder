@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
+import re
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +28,60 @@ def source_complete(original):
     return original['status'] == SOURCE_STATUS and not as_bool(original['feed_capped']) and int(original['unlocated_links']) == 0
 
 
+def independent_grid_empty_evidenced(meta, path):
+    """Require every original Google Maps grid search to finish successfully.
+
+    Google's -grid-strict collector writes a zero-byte CSV when every found
+    place falls outside the bounded region. Do not confuse that with blocks.
+    """
+    if (meta.get('process_returncode') != 0 or
+        not meta.get('source_empty_or_missing') or
+        meta.get('raw_rows') not in (None, 0)):
+        return False
+    p = Path(path)
+    plan, log = p.parent / 'run_plan.json', p.parent / 'collector.log'
+    if not plan.is_file() or not log.is_file():
+        return False
+    try:
+        conf = json.loads(plan.read_text())
+        south, west, north, east = map(float, conf['bbox'].split(','))
+        cell = float(conf['grid_cell_km'])
+        nterms = len(conf['terms'])
+        if not (0 < cell <= 5 and south < north and west < east and nterms == 4):
+            return False
+        mid = (south+north)/2
+        rows = math.ceil((north-south) / (cell/111.32))
+        cols = math.ceil((east-west) / (cell/(111.32*math.cos(math.radians(mid)))))
+        expected = rows*cols*nterms
+        if expected < 4 or expected > 500:
+            return False
+        completed = set()
+        exited = False
+        for line in log.open(encoding='utf8',errors='replace'):
+            if '"message":"scrapemate exited"' in line:
+                exited = True
+            try:
+                event = json.loads(line)
+            except (json.JSONDecodeError, ValueError):
+                continue
+            if (event.get('message') != 'job finished'
+                or event.get('status') != 'success'
+                or '/maps/search/' not in event.get('job','')):
+                continue
+            match = re.search(r'URL: (https://www.google.com/maps/search/[^ ,]+)',event['job'])
+            if not match:
+                continue
+            url = match.group(1)
+            point = re.search(r'/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),',url)
+            if point:
+                lat,lon=map(float,point.groups())
+                if south <= lat <= north and west <= lon <= east:
+                    completed.add(url)
+        return exited and len(completed) == expected
+    except (OSError,KeyError,TypeError,ValueError,ZeroDivisionError):
+        return False
+
+
 def combine(first_pass, recovery_root, output, native_root=None):
     with open(first_pass, newline='') as fh:
         originals = list(csv.DictReader(fh))
@@ -40,6 +96,7 @@ def combine(first_pass, recovery_root, output, native_root=None):
         recovery[code] = item
 
     native = {}
+    native_paths = {}
     if native_root:
         for path in Path(native_root).glob('**/native_evidence.json'):
             item = json.loads(path.read_text())
@@ -47,6 +104,7 @@ def combine(first_pass, recovery_root, output, native_root=None):
             if not code or code in native:
                 raise RuntimeError('Duplicate or malformed independent native Google evidence')
             native[code] = item
+            native_paths[code] = path
 
     rows = []
     quality = Counter()
@@ -76,19 +134,20 @@ def combine(first_pass, recovery_root, output, native_root=None):
                          and independent.get('process_returncode') == 0
                          and independent.get('raw_rows', 0) > 0
                          and not independent.get('bad_coordinates'))
+        native_empty_ok = bool(independent
+                               and independent_grid_empty_evidenced(independent, native_paths[code]))
         if base_ok:
             # Base count has a completed feed; the subsequent broader recovery
             # is not used to change its original comparable metric.
             count = baseline
             exact = True
             status = 'first_pass_complete'
-        elif native_ok:
-            # The independent small-cell Google Maps collector finished its
-            # configured grid. This certifies the source observation protocol,
-            # not an exhaustive count of licensed therapists.
-            count = lower
+        elif native_ok or native_empty_ok:
+            # Complete the bounded Google source observation, including proven
+            # empty output. This never claims all therapists were enumerated.
+            count = independent_observed if native_ok else 0
             exact = True
-            status = 'native_gridded_google_complete'
+            status = 'native_gridded_google_complete' if native_ok else 'native_gridded_google_empty_confirmed'
         elif recovered_ok:
             count = observed_recovered
             exact = True
@@ -122,6 +181,7 @@ def combine(first_pass, recovery_root, output, native_root=None):
             'independent_google_raw_rows': independent.get('raw_rows') if independent else None,
             'independent_google_clinical_places': independent_observed,
             'independent_google_source_sha256': independent.get('raw_csv_sha256') if independent else None,
+            'independent_google_empty_log_verified': native_empty_ok,
         })
 
     verified = sorted((r for r in rows if r['completed_source_feed']
@@ -161,6 +221,7 @@ def combine(first_pass, recovery_root, output, native_root=None):
         'first_pass_complete': quality['first_pass_complete'],
         'recovery_source_complete': quality['local_tiled_complete'],
         'independent_google_grid_source_complete': quality['native_gridded_google_complete'],
+        'independent_google_grid_empty_confirmed': quality['native_gridded_google_empty_confirmed'],
         'other_incomplete_google_sources': quality['censored_or_incomplete'],
         'dominated_incomplete_sources': len(safe_to_exclude),
         'potential_top_60_contenders_unresolved': len(contenders),
