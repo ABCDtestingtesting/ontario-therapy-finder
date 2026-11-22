@@ -1,0 +1,26 @@
+name: Verify bounded Google recovery and checkpoint regression tests
+on:
+  push:
+    branches: [ontario-401-fsa-live-ranking-20261121]
+    paths:
+      - '.github/workflows/verify-bounded-google-recovery.yml'
+      - 'research/recover_google_tiles.py'
+      - 'research/test_google_bounded_recovery.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Python dependencies without launching browser
+        run: python -m pip install -r requirements.txt
+      - name: Compile and test finite queue, legacy checkpoint, and source failure paths
+        run: |
+          python -m compileall -q finder/google_browser.py research/recover_google_tiles.py
+          python -m unittest research.test_google_bounded_recovery -v
