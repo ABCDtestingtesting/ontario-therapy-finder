@@ -37,10 +37,10 @@ def category_ok(row):
     name=(row.get("title") or "").strip().casefold()
     category=(row.get("category") or "").strip().casefold()
     alltext = name + " " + category
-    if any(word in category for word in ACCEPT):
-        return True
     if any(word in alltext for word in REJECT):
         return False
+    if any(word in category for word in ACCEPT):
+        return True
     # If category is non-clinical or missing, a name alone is insufficient.
     return bool(name and any(word in name for word in ACCEPT) and not category)
 
