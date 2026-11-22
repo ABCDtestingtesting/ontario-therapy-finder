@@ -47,7 +47,7 @@ jobs:
           import json
           import shutil
           from pathlib import Path
-          targets = set('L4M N1R L0M M3J L7M M9M M3L N6M N5V L1A N7M M1L M1R M9N M1K M2J M3K M1N L4P L9L M1J N6N M9R L5W L0B M1W L5E L5M P6A M1E M1C M4C M1T M9W M3H'.split())
+          targets = set('P0R P0C K0L P0S L0A K7G K0K N0L K0B N0G P3P P0M P0G N0H L4M N1R L0M M3J L7M M9M M3L N6M N5V L1A N7M M1L M1R M9N M1K M2J M3K M1N L4P L9L M1J N6N M9R L5W L0B M1W L5E L5M P6A M1E M1C M4C M1T M9W M3H'.split())
           replacements = []
           incomplete = []
           for code in sorted(targets):
