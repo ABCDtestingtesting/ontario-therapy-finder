@@ -1,0 +1,28 @@
+name: Test independent Google Maps grid sources and 498-area finalizer
+on:
+  push:
+    branches:
+      - ontario-401-fsa-live-ranking-20261121
+    paths:
+      - '.github/workflows/test-native-google-nine.yml'
+      - 'research/native_google_nine.py'
+      - 'research/test_native_google_nine.py'
+      - 'research/finalize_full_google_498.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install source-compatible dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Check syntax, Google category/geography and source completeness
+        run: |
+          python -m compileall -q research/native_google_nine.py research/finalize_full_google_498.py
+          python -m unittest research.test_native_google_nine -v
