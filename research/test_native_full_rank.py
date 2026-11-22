@@ -29,8 +29,8 @@ class CompleteOntarioRankingTests(unittest.TestCase):
                 writer.writerow({
                     'fsa':code,'status':'confirmed_observed_feed' if verified else 'capped_feed',
                     'feed_capped':'False' if verified else 'True',
-                    'unlocated_links':0,'population_5km_estimate':8000 if verified else 1000,
-                    'google_observed_5km':1 if verified else 10,
+                    'unlocated_links':0,'population_5km_estimate':10000 if i<9 else (8000 if verified else 1000),
+                    'google_observed_5km':0 if i<9 else (1 if verified else 10),
                     'previous_90_days':'False','latitude':'44.0',
                     'longitude':'-79.0','source_url':'https://google.com/maps/search/test'
                 })
@@ -46,7 +46,7 @@ class CompleteOntarioRankingTests(unittest.TestCase):
             root.mkdir()
             record={'fsa':code, 'status':status,'process_returncode':0,
                     'raw_rows':40,'bad_coordinates':[],
-                    'unique_clinical_local_places':15,
+                    'unique_clinical_local_places':1,
                     'raw_csv_sha256':'0123456789abcdef'}
             (root/'native_evidence.json').write_text(json.dumps(record))
 
