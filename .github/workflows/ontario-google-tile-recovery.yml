@@ -1,8 +1,12 @@
 name: Recover all capped and incomplete Ontario Google Maps postal areas
 on:
   push:
+    branches:
+      - ontario-401-fsa-live-ranking-20261121
     paths:
       - '.github/workflows/ontario-google-tile-recovery.yml'
+      - 'research/recover_google_tiles.py'
+      - 'research/test_google_bounded_recovery.py'
   workflow_dispatch:
     inputs:
       resume_run_id:
@@ -51,11 +55,11 @@ jobs:
           python -m pip install -r requirements.txt
           python -m playwright install --with-deps firefox
           python -m compileall -q research/recover_google_tiles.py finder/google_browser.py
-          python -m unittest research.test_google_pipeline -v
+          python -m unittest research.test_google_pipeline research.test_google_bounded_recovery -v
       - name: Recover capped, missing-coordinate, and incomplete Google areas
         timeout-minutes: 108
         run: |
-          python -m research.recover_google_tiles --shard ${{ matrix.shard }} --shards 48 --audit first-pass/google_all_ontario_498.csv --out recovery-output --seconds-per-area 1100
+          python -m research.recover_google_tiles --shard ${{ matrix.shard }} --shards 48 --audit first-pass/google_all_ontario_498.csv --out recovery-output --seconds-per-area 480
       - name: Preserve all individual postal-area checkpoints and source status
         if: always()
         uses: actions/upload-artifact@v4
