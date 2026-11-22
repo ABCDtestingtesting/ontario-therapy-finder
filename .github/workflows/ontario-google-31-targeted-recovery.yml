@@ -1,0 +1,65 @@
+name: Recheck 31 remaining Ontario Google Maps ranking contenders
+on:
+  push:
+    branches:
+      - ontario-401-fsa-live-ranking-20261121
+    paths:
+      - '.github/workflows/ontario-google-31-targeted-recovery.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  targeted-google:
+    name: Recheck Google Maps ${{ matrix.fsa }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 83
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        fsa: ['L7M', 'M9M', 'M3L', 'N6M', 'N5V', 'L1A', 'N7M', 'M1L', 'M1R', 'M9N', 'M1K', 'M2J', 'M3K', 'M1N', 'L4P', 'L9L', 'M1J', 'N6N', 'M9R', 'L5W', 'L0B', 'M1W', 'L5E', 'L5M', 'P6A', 'M1E', 'M1C', 'M4C', 'M1T', 'M9W', 'M3H']
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PYTHONUNBUFFERED: '1'
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Recover original 498 FSA census and Google observations
+        run: |
+          mkdir -p first-pass
+          gh run download 44952655975 -n full-ontario-498-google-census-audit -D first-pass
+          test -s first-pass/google_all_ontario_498.csv
+      - name: Reuse existing original Google Maps checkpoint for this FSA
+        run: |
+          gh run download 45033015174 -p 'google-tile-recovery-*' -D recovery-seed
+          python - <<'PY'
+          from pathlib import Path
+          code = '${{ matrix.fsa }}'
+          found = list(Path('recovery-seed').glob('**/' + code + '.json'))
+          if len(found) != 1:
+              raise RuntimeError(f'Expected one prior checkpoint for {code}, found {len(found)}')
+          print('FOUND_ORIGINAL_GOOGLE_CHECKPOINT',code,found[0])
+          PY
+      - name: Install and validate Google Maps browser collector
+        run: |
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps firefox
+          python -m compileall -q research/recheck_google_contenders.py research/recover_google_tiles.py
+      - name: Complete outstanding Google Maps local source tiles
+        timeout-minutes: 66
+        run: |
+          python -m research.recheck_google_contenders --fsa "${{ matrix.fsa }}" --seconds 3500
+      - name: Save updated Google raw business search checkpoint even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: targeted-google-${{ matrix.fsa }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            targeted-google/${{ matrix.fsa }}/${{ matrix.fsa }}.json
+            targeted-google/${{ matrix.fsa }}/evidence/
