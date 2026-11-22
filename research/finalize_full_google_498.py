@@ -28,15 +28,9 @@ def source_complete(original):
     return original['status'] == SOURCE_STATUS and not as_bool(original['feed_capped']) and int(original['unlocated_links']) == 0
 
 
-def independent_grid_empty_evidenced(meta, path):
-    """Require every original Google Maps grid search to finish successfully.
-
-    Google's -grid-strict collector writes a zero-byte CSV when every found
-    place falls outside the bounded region. Do not confuse that with blocks.
-    """
-    if (meta.get('process_returncode') != 0 or
-        not meta.get('source_empty_or_missing') or
-        meta.get('raw_rows') not in (None, 0)):
+def independent_grid_searches_complete(meta, path):
+    """Require every expected Google Maps grid search to finish successfully."""
+    if meta.get('process_returncode') != 0:
         return False
     p = Path(path)
     plan, log = p.parent / 'run_plan.json', p.parent / 'collector.log'
@@ -81,6 +75,13 @@ def independent_grid_empty_evidenced(meta, path):
         return exited and len(completed) == expected
     except (OSError,KeyError,TypeError,ValueError,ZeroDivisionError):
         return False
+
+
+def independent_grid_empty_evidenced(meta, path):
+    """Prove empty Google source output only after all grid queries succeeded."""
+    return bool(meta.get('source_empty_or_missing')
+                and meta.get('raw_rows') in (None,0)
+                and independent_grid_searches_complete(meta, path))
 
 
 def combine(first_pass, recovery_root, output, native_root=None):
@@ -134,7 +135,8 @@ def combine(first_pass, recovery_root, output, native_root=None):
                          and independent.get('status') == 'grid_observed_complete'
                          and independent.get('process_returncode') == 0
                          and independent.get('raw_rows', 0) > 0
-                         and not independent.get('bad_coordinates'))
+                         and not independent.get('bad_coordinates')
+                         and independent_grid_searches_complete(independent,native_paths[code]))
         native_empty_ok = bool(independent
                                and independent_grid_empty_evidenced(independent, native_paths[code]))
         if base_ok:
