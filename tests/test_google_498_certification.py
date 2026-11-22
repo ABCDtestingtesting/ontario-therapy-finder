@@ -22,6 +22,15 @@ class GoogleSourceCertificationTests(unittest.TestCase):
         self.assertTrue(confirmed_clinical_title({'name': 'Registered Psychotherapist Ontario'}))
         self.assertTrue(confirmed_clinical_title({'name': 'Counselling and Mental Health Centre'}))
 
+    def test_native_collector_does_not_count_physiotherapy_under_therapy_search(self):
+        from research.native_google_nine import category_ok
+        self.assertFalse(category_ok({'title': 'Physiotherapy and Wellness Clinic',
+                                      'category': 'Psychotherapist'}))
+        self.assertFalse(category_ok({'title': 'Sports Massage and Physiotherapy',
+                                      'category': 'Counselor'}))
+        self.assertTrue(category_ok({'title': 'Registered Psychotherapist',
+                                     'category': 'Psychotherapist'}))
+
     def test_unclassified_google_listings_cannot_prove_completed_clinical_count(self):
         source = {
             'status': 'verified_tile_feed',
