@@ -40,7 +40,9 @@ jobs:
       - name: Merge newer FSA checkpoints only when they preserve prior observation
         run: |
           mkdir -p targeted-results
-          gh run download "$TARGET_RUN_ID" -p 'targeted-google-*' -D targeted-results
+          if ! gh run download "$TARGET_RUN_ID" -p 'targeted-google-*' -D targeted-results; then
+            echo 'Some Google source jobs produced no artifact; continue full 498 audit with original evidence.'
+          fi
           python - <<'PY'
           import json
           import shutil
