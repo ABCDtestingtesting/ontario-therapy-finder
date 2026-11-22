@@ -1,9 +1,12 @@
-"""Merge every Ontario FSA's observed Google Maps evidence without treating missing as zero.
+"""Certify Google-only top-60 by bounding censored search results.
 
-The earlier 498-row first pass remains the census baseline. Recoveries replace
-capped and unresolved Google counts only when every required tile is complete.
-No Psychology Today data enters the analysis.
+Google Maps returns observed *business locations*, not individual clinicians.
+For a capped/incomplete area, the observed listing count is a LOWER BOUND and
+residents per listing is therefore an UPPER BOUND. If 60 exact-feed areas have
+higher ratios than an area's upper bound, that area's unfinished feed cannot
+affect the top 60. All 498 areas remain in the transparent audit.
 """
+from __future__ import annotations
 import argparse
 import csv
 import json
@@ -15,15 +18,19 @@ EXCLUDED = {'L6Z', 'L7A', 'L6X', 'L6R', 'N1T', 'N3S', 'P5N', 'N4W'}
 SOURCE_STATUS = 'confirmed_observed_feed'
 
 
-def truth(value):
+def as_bool(value):
     return str(value).lower() == 'true'
+
+
+def source_complete(original):
+    return original['status'] == SOURCE_STATUS and not as_bool(original['feed_capped']) and int(original['unlocated_links']) == 0
 
 
 def combine(first_pass, recovery_root, output):
     with open(first_pass, newline='') as fh:
         originals = list(csv.DictReader(fh))
     if len(originals) != 498 or len({r['fsa'] for r in originals}) != 498:
-        raise RuntimeError('Expected 498 distinct Ontario census population/FSA records')
+        raise RuntimeError('Expected 498 distinct populated Ontario postal code areas')
     recovery = {}
     for path in Path(recovery_root).glob('**/[A-Z][0-9][A-Z].json'):
         item = json.loads(path.read_text())
@@ -31,86 +38,121 @@ def combine(first_pass, recovery_root, output):
         if code in recovery:
             raise RuntimeError('Duplicate Google tile recovery FSA: ' + code)
         recovery[code] = item
-    results = []
-    coverage = Counter()
+
+    rows = []
+    quality = Counter()
     for old in originals:
         code = old['fsa']
         source = recovery.get(code)
-        pop = int(old['population_5km_estimate'] or 0)
-        original_complete = old['status'] == SOURCE_STATUS and not truth(old['feed_capped']) and old['unlocated_links'] == '0'
-        if original_complete:
-            status = 'google_first_pass_complete'
-            count = int(old['google_observed_5km'])
-            method = 'Single postal-specific Google Maps query with confirmed feed ending'
-        elif source and source.get('status') == 'verified_tile_feed' and not source.get('pending') and source.get('capped_leaf_tiles') == 0 and source.get('unresolved_leaf_links') == 0:
-            status = 'google_local_tiles_complete'
-            count = int(source['unique_observed_local_places'])
-            method = 'Two categories of overlapping geolocated Google Maps searches with adaptive subdivision'
-        else:
-            status = 'source_incomplete'
-            count = None
-            method = 'Needs more Google evidence'
+        pop = int(old['population_5km_estimate'])
         if pop <= 0:
-            status = 'population_unavailable'
-            count = None
-        excluded = code in EXCLUDED
-        ratio = round(pop / max(1, count), 2) if count is not None and pop > 0 else None
-        coverage[status] += 1
-        results.append({
-            'fsa': code, 'population_5km_estimate_2021': pop,
-            'google_observed_therapy_listings_5km': count,
-            'residents_per_google_listing': ratio,
-            'google_verification_status': status,
-            'method': method, 'excluded_last_90_days': excluded,
-            'latitude': old['latitude'], 'longitude': old['longitude'],
-            'first_pass_google_source': old['source_url'],
-            'recovery_google_queries': len(source.get('complete_tiles', {})) if source else 0,
-            'recovery_unresolved_leaf_links': source.get('unresolved_leaf_links') if source else None,
-            'recovery_capped_leaf_tiles': source.get('capped_leaf_tiles') if source else None
+            raise RuntimeError('Missing 2021 population near ' + code)
+        previous = code in EXCLUDED or as_bool(old.get('previous_90_days'))
+        baseline = int(old.get('google_observed_5km') or 0)
+        observed_recovered = int(source.get('unique_observed_local_places') or 0) if source else 0
+        # Distinct Google searches cannot be summed without place-level
+        # deduplication. The maximum of two observed counts is a safe minimum.
+        lower = max(baseline, observed_recovered)
+        base_ok = source_complete(old)
+        recovered_ok = bool(source and source.get('status') == 'verified_tile_feed'
+                            and not source.get('pending')
+                            and not source.get('capped_leaf_tiles')
+                            and not source.get('unresolved_leaf_links'))
+        if base_ok:
+            # Base count has a completed feed; the subsequent broader recovery
+            # is not used to change its original comparable metric.
+            count = baseline
+            exact = True
+            status = 'first_pass_complete'
+        elif recovered_ok:
+            count = observed_recovered
+            exact = True
+            status = 'local_tiled_complete'
+        else:
+            count = lower
+            exact = False
+            status = 'censored_or_incomplete'
+        if count < 0:
+            raise RuntimeError('Negative Google observed places for ' + code)
+        upper = pop / max(1, count)
+        quality[status] += 1
+        rows.append({
+            'fsa': code,
+            'population_5km_estimate_2021': pop,
+            'google_observed_therapy_locations_lower_bound': lower,
+            'google_therapy_locations_used_in_score': count,
+            'residents_per_google_listing_or_upper_bound': round(upper, 2),
+            'completed_source_feed': exact,
+            'source_evidence_status': status,
+            'excluded_last_90_days': previous,
+            'latitude': old['latitude'],
+            'longitude': old['longitude'],
+            'google_first_pass_search_url': old['source_url'],
+            'recovery_complete_tiles': len(source.get('complete_tiles', {})) if source else 0,
+            'recovery_status': source.get('status') if source else '',
+            'recovery_pending_queries': len(source.get('pending', [])) if source else None,
+            'recovery_capped_base_queries': source.get('capped_leaf_tiles') if source else None,
+            'recovery_unresolved_coords': source.get('unresolved_leaf_links') if source else None,
         })
-    ranked = sorted((r for r in results if r['residents_per_google_listing'] is not None
-                     and not r['excluded_last_90_days']),
-                    key=lambda r: (-r['residents_per_google_listing'],
-                                   r['google_observed_therapy_listings_5km'],
-                                   -r['population_5km_estimate_2021'], r['fsa']))
+
+    verified = sorted((r for r in rows if r['completed_source_feed']
+                       and not r['excluded_last_90_days']),
+                      key=lambda r: (-r['residents_per_google_listing_or_upper_bound'],
+                                     r['google_therapy_locations_used_in_score'], r['fsa']))
+    if len(verified) < 60:
+        raise RuntimeError('Fewer than 60 completed Google source feeds')
+    cutoff = verified[59]['residents_per_google_listing_or_upper_bound']
+    contenders = sorted((r for r in rows if not r['completed_source_feed']
+                         and not r['excluded_last_90_days']
+                         and r['residents_per_google_listing_or_upper_bound'] >= cutoff),
+                        key=lambda r: (-r['residents_per_google_listing_or_upper_bound'], r['fsa']))
+    safe_to_exclude = [r for r in rows if not r['completed_source_feed']
+                       and not r['excluded_last_90_days']
+                       and r['residents_per_google_listing_or_upper_bound'] < cutoff]
+    certified = not contenders
     out = Path(output)
     out.mkdir(parents=True, exist_ok=True)
-    with (out/'ontario_498_google_recovery_audit.csv').open('w', newline='') as fh:
-        w = csv.DictWriter(fh, fieldnames=results[0].keys())
-        w.writeheader()
-        w.writerows(results)
-    complete = coverage['source_incomplete'] == 0 and coverage['population_unavailable'] == 0
-    top = ranked[:60] if complete and len(ranked) >= 60 else []
+
+    def write_csv(name, items, rank=False):
+        fields = (['rank'] if rank else []) + list(rows[0].keys())
+        with (out / name).open('w', newline='', encoding='utf-8') as fh:
+            writer = csv.DictWriter(fh, fieldnames=fields)
+            writer.writeheader()
+            for i, row in enumerate(items, start=1):
+                writer.writerow({'rank': i, **row} if rank else row)
+
+    write_csv('ontario_498_google_recovery_audit.csv', rows)
+    write_csv('Ontario_Google_Top60_Completed_Feeds_Provisional.csv', verified[:60], rank=True)
+    write_csv('Ontario_Google_Unresolved_Ranking_Contenders.csv', contenders)
+    if certified:
+        write_csv('Ontario_Google_Best_60_Across_498.csv', verified[:60], rank=True)
+
     report = {
-        'total_ontario_fsa': 498,
-        'first_pass_confirmed': coverage['google_first_pass_complete'],
-        'recovered_google_local_tiles': coverage['google_local_tiles_complete'],
-        'source_incomplete': coverage['source_incomplete'],
-        'population_unavailable': coverage['population_unavailable'],
-        'recovery_checkpointed_fsas': len(recovery),
-        'census_year': 2021,
+        'total_ontario_fsa': len(rows),
+        'first_pass_complete': quality['first_pass_complete'],
+        'recovery_source_complete': quality['local_tiled_complete'],
+        'other_incomplete_google_sources': quality['censored_or_incomplete'],
+        'dominated_incomplete_sources': len(safe_to_exclude),
+        'potential_top_60_contenders_unresolved': len(contenders),
+        'top_60_cutoff_residents_per_observed_google_location': cutoff,
+        'google_60_certified_within_source_observation_model': certified,
+        'certification_rule': 'All incomplete source upper bounds must fall strictly below 60th completed-source ratio',
+        'note': 'Capped Google listings are lower bounds, not missing or zero. Public Google results never guarantee a census of individual therapists. Geolocated location counts are used, not clinicians per clinic.',
         'psychology_today_used': False,
-        'note': 'Google Maps public search results do not enumerate every licensed therapist; ratios count unique observed office/business listings. Baseline and recovery query coverage differ.',
-        'top_60_certified_across_498': complete and len(top) == 60,
+        '2021_population_source': 'Statistics Canada',
         'checked_at_utc': datetime.now(timezone.utc).isoformat()
     }
-    (out/'google_498_recovery_report.json').write_text(json.dumps(report, indent=2))
-    if top:
-        with (out/'Ontario_Google_Best_60_Across_498.csv').open('w', newline='') as fh:
-            w = csv.DictWriter(fh, fieldnames=['rank'] + list(results[0]))
-            w.writeheader()
-            for i, row in enumerate(top, 1):
-                w.writerow({'rank': i, **row})
+    (out / 'google_498_recovery_report.json').write_text(json.dumps(report, indent=2))
     print('ONTARIO_GOOGLE_498_COVERAGE', json.dumps(report), flush=True)
-    if not complete:
-        raise RuntimeError(f'Google evidence remains incomplete in {coverage["source_incomplete"]} areas; ranking is withheld')
+    if not certified:
+        raise RuntimeError(f'{len(contenders)} incompletely observed areas could still enter the top 60; provisional ranked list and complete audit preserved')
     return report
 
 
 if __name__ == '__main__':
-    p = argparse.ArgumentParser()
-    p.add_argument('first_pass')
-    p.add_argument('recovery_root')
-    p.add_argument('output')
-    args = p.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('first_pass')
+    parser.add_argument('recovery_root')
+    parser.add_argument('output')
+    args = parser.parse_args()
     combine(args.first_pass, args.recovery_root, args.output)
