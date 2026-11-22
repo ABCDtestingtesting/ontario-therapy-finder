@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from research.recover_google_tiles import run_area, tile_tasks, task_key
+from research.recover_google_tiles import run_area, tile_tasks, task_key, SEARCHES
 
 
 class BoundedRecoveryTests(unittest.TestCase):
@@ -23,6 +23,11 @@ class BoundedRecoveryTests(unittest.TestCase):
                         'lat': 43.76, 'lon': -79.48, 'source_url': 'https://google.com/maps/place/a'}],
             'term': term,
         }
+
+    def test_geocentered_queries_do_not_repeat_fsa_token(self):
+        self.assertEqual(SEARCHES, ('psychotherapist', 'counselling therapy'))
+        self.assertEqual(len(list(tile_tasks())), 18)
+        self.assertFalse(any('{FSA}' in task[3] for task in tile_tasks()))
 
     def test_bounded_search_cap_never_recurses(self):
         with patch('research.recover_google_tiles.scan_tile', side_effect=self.evidence) as scan:
@@ -46,7 +51,7 @@ class BoundedRecoveryTests(unittest.TestCase):
         self.assertIn('legacy-tile', row['complete_tiles'])
         self.assertEqual(row['status'], 'observed_capped')
         self.assertEqual(row['unique_observed_local_places'], 1)
-        self.assertEqual(row['recovery_plan'], 'fixed_18_local_queries_v2')
+        self.assertEqual(row['recovery_plan'], 'fixed_18_local_queries_v3_geocentered')
 
     def test_failed_source_is_never_zero_competitors(self):
         with patch('research.recover_google_tiles.scan_tile', side_effect=RuntimeError('source unavailable')) as scan:
