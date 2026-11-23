@@ -34,6 +34,29 @@ def export(path, rows, headers):
         for r in rows:w.writerow(r)
 
 
+
+def strict_dominance_check(eligible):
+    """Return (verified ranking, cutoff, unresolved potential contenders).
+
+    The lower-bound uncertainty of a censored area can only exclude it when
+    its confirmed clinical density is strictly HIGHER than the 60th
+    independently completed source, including accurate treatment of ties.
+    """
+    order=lambda x:(float(x['google_listings_per_10000_residents_or_lower_bound']),
+                    -int(x['population_5km_estimate_2021']), x['fsa'])
+    verified=sorted((r for r in eligible
+                     if str(r['completed_source_feed']).lower()=='true'),key=order)
+    if len(verified)<60:
+        return verified,None,[r for r in eligible
+                              if str(r['completed_source_feed']).lower()!='true']
+    cutoff=float(verified[59]['google_listings_per_10000_residents_or_lower_bound'])
+    unresolved=sorted((r for r in eligible
+        if str(r['completed_source_feed']).lower()!='true'
+        and float(r['google_listings_per_10000_residents_or_lower_bound'])<=cutoff),
+        key=order)
+    return verified,cutoff,unresolved
+
+
 def review(baseline, checkpoints, destination):
     source=csv_rows(baseline)
     if len(source)!=498 or len({r['fsa'] for r in source})!=498:
@@ -148,17 +171,7 @@ def review(baseline, checkpoints, destination):
         updated.append(row)
     eligible=[r for r in updated if str(r['excluded_last_90_days']).lower()!='true'
               and r['fsa'] not in PREVIOUSLY_SCREENED]
-    done=[r for r in eligible if str(r['completed_source_feed']).lower()=='true']
-    order=lambda x:(float(x['google_listings_per_10000_residents_or_lower_bound']),
-                    -int(x['population_5km_estimate_2021']),x['fsa'])
-    done.sort(key=order)
-    if len(done)<60:
-        cutoff=None;unresolved=[r for r in eligible if str(r['completed_source_feed']).lower()!='true']
-    else:
-        cutoff=float(done[59]['google_listings_per_10000_residents_or_lower_bound'])
-        unresolved=sorted((r for r in eligible
-            if str(r['completed_source_feed']).lower()!='true'
-            and float(r['google_listings_per_10000_residents_or_lower_bound'])<=cutoff),key=order)
+    done,cutoff,unresolved=strict_dominance_check(eligible)
     complete53=len(found)==53 and all(x['fully_scoped']
                  and x['categories']['ambiguous']==0 for x in found.values())
     # Certification may rely on a mathematically proven ranking bound:
