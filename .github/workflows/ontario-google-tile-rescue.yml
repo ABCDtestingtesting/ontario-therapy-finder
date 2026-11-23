@@ -1,0 +1,156 @@
+name: Resume only incomplete Ontario Google Maps source tiles
+on:
+  workflow_run:
+    workflows:
+      - Recheck remaining Ontario Google Maps ranking contenders
+    types: [completed]
+  schedule:
+    - cron: '51 */4 * * *'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  select:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    outputs:
+      fsas: ${{ steps.choose.outputs.fsas }}
+      count: ${{ steps.choose.outputs.count }}
+      target_run: ${{ steps.choose.outputs.target_run }}
+      retry_run: ${{ steps.choose.outputs.retry_run }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_RUN_ID: ${{ github.event.workflow_run.id || '' }}
+    steps:
+      - name: Restore all available FSA Google source checkpoints
+        id: choose
+        run: |
+          set -euo pipefail
+          if [ -z "$TARGET_RUN_ID" ]; then
+            TARGET_RUN_ID="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ontario-google-31-targeted-recovery.yml --branch ontario-401-fsa-live-ranking-20261121 --status completed --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+          fi
+          test -n "$TARGET_RUN_ID"
+          mkdir -p original-target previous-retry
+          gh run download "$TARGET_RUN_ID" --repo "$GITHUB_REPOSITORY" -p 'targeted-google-*' -D original-target
+          RETRY_RUN_ID="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ontario-google-tile-rescue.yml --status completed --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+          if [ -n "$RETRY_RUN_ID" ] && [ "$RETRY_RUN_ID" != "$GITHUB_RUN_ID" ]; then
+            gh run download "$RETRY_RUN_ID" --repo "$GITHUB_REPOSITORY" -p 'resumed-google-*' -D previous-retry || true
+          fi
+          echo "target_run=$TARGET_RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "retry_run=$RETRY_RUN_ID" >> "$GITHUB_OUTPUT"
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+          fsas='N7M L9L L0B L0M K7G P3P L0A N0L K0K K0B N0G N0H K0L P0C P0G P0R P0M P0S L4M L7M M9M M3L N6M N5V L1A M1L M1R M9N N1R'.split()
+          selected=[]
+          for code in fsas:
+              old=list(Path('original-target').glob('**/'+code+'.json'))
+              new=list(Path('previous-retry').glob('**/'+code+'.json'))
+              if len(old)>1 or len(new)>1:raise RuntimeError('Duplicate Google FSA evidence for '+code)
+              recent = json.loads(new[0].read_text()) if len(new)==1 else None
+              original = json.loads(old[0].read_text()) if len(old)==1 else None
+              if original and original.get('fsa')!=code:raise RuntimeError('Mismatched FSA source')
+              if recent and recent.get('fsa')!=code:raise RuntimeError('Mismatched retry FSA source')
+              verified = (recent and recent.get('status')=='verified_tile_feed') or (
+                  original and original.get('status')=='verified_tile_feed')
+              if not verified:
+                  selected.append(code)
+          print('fsas='+json.dumps(selected,separators=(',',':')))
+          print('count='+str(len(selected)))
+          PY
+  retry:
+    needs: select
+    if: needs.select.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 82
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        fsa: ${{ fromJSON(needs.select.outputs.fsas) }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CI: 'true'
+      PYTHONUNBUFFERED: '1'
+      SOURCE_RUN_ID: ${{ needs.select.outputs.target_run }}
+      PRIOR_RETRY_RUN_ID: ${{ needs.select.outputs.retry_run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore 498-area original population and observations
+        run: |
+          mkdir -p first-pass
+          gh run download 44952655975 --repo "$GITHUB_REPOSITORY" -n full-ontario-498-google-census-audit -D first-pass
+          test -s first-pass/google_all_ontario_498.csv
+      - name: Derive original 48-shard source FSA location
+        id: source-shard
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import csv,json
+          from pathlib import Path
+          with Path('first-pass/google_all_ontario_498.csv').open(newline='') as f:
+              original=list(csv.DictReader(f))
+          unfinished={r['fsa'] for r in original if r['status'] != 'confirmed_observed_feed'}
+          ordered=[r['fsa'] for r in json.loads(Path('research/ontario_all_populated_fsa_2021.json').read_text())['areas'] if r['fsa'] in unfinished]
+          code='${{ matrix.fsa }}'
+          if len(ordered)!=241 or code not in ordered:raise RuntimeError('Invalid original FSA recovery')
+          print('shard='+str(ordered.index(code)%48))
+          PY
+      - name: Restore complete original 48-shard lower-bound evidence
+        run: |
+          mkdir -p recovery-seed
+          gh run download 45101079788 --repo "$GITHUB_REPOSITORY" -n "google-tile-recovery-${{ steps.source-shard.outputs.shard }}" -D recovery-seed
+          test "$(find recovery-seed -name '${{ matrix.fsa }}.json' | wc -l | tr -d ' ')" = 1
+      - name: Resume most recent 29-FSA local map source checkpoint
+        run: |
+          set -euo pipefail
+          mkdir -p targeted-google/${{ matrix.fsa }}
+          if gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" -n "targeted-google-${{ matrix.fsa }}" -D "targeted-google/${{ matrix.fsa }}"; then
+            test -s "targeted-google/${{ matrix.fsa }}/${{ matrix.fsa }}.json"
+          fi
+          if [ -n "$PRIOR_RETRY_RUN_ID" ]; then
+            mkdir -p saved-retry
+            if gh run download "$PRIOR_RETRY_RUN_ID" --repo "$GITHUB_REPOSITORY" -n "resumed-google-${{ matrix.fsa }}" -D saved-retry; then
+              python - <<'PY'
+          import json,shutil
+          from pathlib import Path
+          code='${{ matrix.fsa }}'
+          old=Path('targeted-google')/code/(code+'.json')
+          newer=Path('saved-retry')/(code+'.json')
+          if not newer.is_file():raise RuntimeError('Malformed rescue artifact')
+          now=json.loads(newer.read_text())
+          if now.get('fsa')!=code:raise RuntimeError('Rescue checkpoint identity mismatch')
+          prior=json.loads(old.read_text()) if old.is_file() else {}
+          if prior and not set(prior.get('complete_tiles',{})).issubset(set(now.get('complete_tiles',{}))):
+              raise RuntimeError('Prior successful Google source tiles lost')
+          if prior and int(prior.get('unique_observed_local_places') or 0)>int(now.get('unique_observed_local_places') or 0):
+              raise RuntimeError('Previously observed Google places lost')
+          shutil.copy2(newer,old)
+          print('REUSED_LATEST_GOOGLE_RESCUE',code,flush=True)
+          PY
+            fi
+          fi
+      - name: Verify source code, checkbox persistence and Firefox
+        run: |
+          python -m pip install -r requirements.txt
+          python -m unittest research.test_google_checkbox_state research.test_google_bounded_recovery -v
+          python -m playwright install --with-deps firefox
+      - name: Complete only genuinely missing saved local Google Maps tiles
+        timeout-minutes: 66
+        run: |
+          python -m research.recheck_google_contenders --fsa "${{ matrix.fsa }}" --seconds 3500
+      - name: Preserve every completed or incomplete retry checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resumed-google-${{ matrix.fsa }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            targeted-google/${{ matrix.fsa }}/${{ matrix.fsa }}.json
+            targeted-google/${{ matrix.fsa }}/evidence/
