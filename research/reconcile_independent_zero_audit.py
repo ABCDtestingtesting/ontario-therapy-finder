@@ -133,9 +133,9 @@ def review(baseline, checkpoints, destination):
                 and int(row.get('recovery_pending_queries') or 0)==0
                 and int(row.get('recovery_capped_base_queries') or 0)==0
                 and int(row.get('recovery_unresolved_coords') or 0)==0)
-            exact_native=(row.get('source_evidence_status') in (
-                'native_gridded_google_complete','native_gridded_google_empty_confirmed')
-                and str(row.get('independent_google_empty_log_verified')).lower()=='true')
+            exact_native=(row.get('source_evidence_status')=='native_gridded_google_complete'
+                or (row.get('source_evidence_status')=='native_gridded_google_empty_confirmed'
+                    and str(row.get('independent_google_empty_log_verified')).lower()=='true'))
             row['google_therapy_locations_used_in_score']=verified_lower
             row['completed_source_feed']=exact_local or exact_native
             row['source_evidence_status']=(
