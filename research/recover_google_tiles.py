@@ -201,7 +201,8 @@ def run_area(context, area, folder, max_seconds):
     code = area['fsa']
     centre = (area['lat'], area['lon'])
     record_path = folder / f'{code}.json'
-    if record_path.exists():
+    resuming_saved_checkpoint = record_path.exists()
+    if resuming_saved_checkpoint:
         doc = json.loads(record_path.read_text())
         if doc.get('fsa') != code:
             raise RuntimeError(f'Checkpoint FSA does not match {code}')
@@ -218,7 +219,9 @@ def run_area(context, area, folder, max_seconds):
     # Crucial: never restore the exponential pending queue from version 1.
     doc['pending'] = [task for task in required
                       if task_key(task) not in doc['complete_tiles']
-                      or doc['complete_tiles'][task_key(task)].get('status') == 'observed_partial']
+                      or doc['complete_tiles'][task_key(task)].get('status') == 'observed_partial'
+                      or (resuming_saved_checkpoint
+                          and doc['complete_tiles'][task_key(task)].get('capped'))]
     doc['recovery_plan'] = 'fixed_18_map_movement_v7_checkbox_verified'
     doc['discarded_recursive_pending'] = True
     record_path.write_text(json.dumps(doc, indent=2))
@@ -236,6 +239,19 @@ def run_area(context, area, folder, max_seconds):
         key = task_key(task)
         try:
             evidence = scan_tile(context, code, centre, *task, folder)
+            previous_tile = doc['complete_tiles'].get(key)
+            if previous_tile:
+                # Retain every previously observed local Google place and
+                # its distinct source evidence when retrying a capped tile.
+                # Only the refreshed map feed determines whether a cap
+                # remains; observed local listings are cumulative lower bounds.
+                doc.setdefault('superseded_tile_observations', {}).setdefault(key, []).append(
+                    previous_tile)
+                observed = {p['key']: p for p in previous_tile.get('places', [])}
+                observed.update({p['key']: p for p in evidence.get('places', [])})
+                evidence['places'] = list(observed.values())
+                evidence['prior_local_place_observations_retained'] = len(
+                    previous_tile.get('places', []))
             doc['complete_tiles'][key] = evidence
             doc['attempts'] += 1
             doc['pending'].pop(0)
