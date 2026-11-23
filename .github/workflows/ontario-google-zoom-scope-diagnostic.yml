@@ -1,0 +1,48 @@
+name: Diagnose Google Maps cap and local area scoping at higher zoom
+on:
+  push:
+    branches: [ontario-401-fsa-live-ranking-20261121]
+    paths: ['.github/workflows/ontario-google-zoom-scope-diagnostic.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - {fsa: P4N, zoom: 15, term: counselling}
+          - {fsa: P4N, zoom: 16, term: counselling}
+          - {fsa: K7L, zoom: 15, term: psychotherapy}
+          - {fsa: K7L, zoom: 16, term: psychotherapy}
+          - {fsa: L9E, zoom: 15, term: psychotherapy}
+          - {fsa: L9E, zoom: 16, term: psychotherapy}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install exact Google Maps browser and validate Python code
+        run: |
+          python -m compileall -q research/probe_google_scale.py
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps firefox
+      - name: Measure actual geographic scoping and enumerability
+        run: |
+          python -m research.probe_google_scale --fsa "${{ matrix.fsa }}" --zoom "${{ matrix.zoom }}" --term "${{ matrix.term }}" --out "zoom-scoping/${{ matrix.fsa }}-${{ matrix.zoom }}/report.json"
+      - name: Preserve source observation and diagnostic artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: google-zoom-scope-${{ matrix.fsa }}-${{ matrix.zoom }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            zoom-scoping/${{ matrix.fsa }}-${{ matrix.zoom }}/report.json
+            zoom-scoping/${{ matrix.fsa }}-${{ matrix.zoom }}/evidence/
