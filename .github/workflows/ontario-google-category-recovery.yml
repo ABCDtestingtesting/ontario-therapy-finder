@@ -1,0 +1,49 @@
+name: Classify unresolved Ontario Google Maps businesses from verified place categories
+on:
+  push:
+    paths: ['.github/workflows/ontario-google-category-recovery.yml']
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  categorize:
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        fsa: ['L9L','L0M','L4M','L7M','M9M','M3L','N6M','N5V','L1A','M1L','M1R','M9N','N1R']
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FSA: ${{ matrix.fsa }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check that Google business categories never invent clinical evidence
+        run: |
+          python -m pip install -r requirements.txt
+          python -m unittest research.test_google_category_evidence
+          python -m playwright install --with-deps chromium
+      - name: Restore original observed Google business evidence
+        run: |
+          mkdir -p category-enriched
+          gh run download 45078523814 -n "targeted-google-$FSA" -D category-enriched
+          test -s "category-enriched/$FSA.json"
+      - name: Verify unknown Google Maps categories against individual Google business detail pages
+        timeout-minutes: 60
+        run: |
+          python -m research.enrich_google_categories "category-enriched/$FSA.json" --seconds 2900
+      - name: Preserve every classification and unresolved category on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-google-categories-${{ matrix.fsa }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: category-enriched/${{ matrix.fsa }}.json
