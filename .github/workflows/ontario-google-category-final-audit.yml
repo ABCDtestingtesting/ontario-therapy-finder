@@ -7,6 +7,7 @@ on:
       - Classify unresolved Ontario Google Maps businesses from verified place categories
       - Recover all capped and incomplete Ontario Google Maps postal areas
       - Recheck remaining Ontario Google Maps ranking contenders
+      - Resume only incomplete Ontario Google Maps source tiles
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -28,6 +29,7 @@ jobs:
       CATEGORY_RUN_ID: ${{ inputs.category_run_id || '' }}
       RECOVERY_RUN_ID: ${{ github.event.workflow_run.name == 'Recover all capped and incomplete Ontario Google Maps postal areas' && github.event.workflow_run.id || '' }}
       TARGET_RUN_ID: ${{ github.event.workflow_run.name == 'Recheck remaining Ontario Google Maps ranking contenders' && github.event.workflow_run.id || '' }}
+      RETRY_RUN_ID: ${{ github.event.workflow_run.name == 'Resume only incomplete Ontario Google Maps source tiles' && github.event.workflow_run.id || '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -75,6 +77,51 @@ jobs:
           gh run download 45047774153 -p 'native-google-*' -D native-results
           test -s first-pass/google_all_ontario_498.csv
           test "$(find recovery-output -name '*.json' | wc -l | tr -d ' ')" = 241
+      - name: Overlay only evidence-preserving Google FSA retries
+        run: |
+          set -euo pipefail
+          if [ -z "$RETRY_RUN_ID" ]; then
+            RETRY_RUN_ID="$(gh run list --workflow ontario-google-tile-rescue.yml --status completed --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+          fi
+          if [ -n "$RETRY_RUN_ID" ] && gh run download "$RETRY_RUN_ID" -p 'resumed-google-*' -D retry-results; then
+            python - <<'PY'
+          import json,shutil
+          from pathlib import Path
+          original=Path('targeted-results')
+          repaired=Path('retry-results')
+          used=[]
+          ignored=[]
+          for p in repaired.glob('**/[A-Z][0-9][A-Z].json'):
+              code=p.stem
+              candidate=json.loads(p.read_text())
+              if candidate.get('fsa')!=code:
+                  raise RuntimeError('Rescue FSA identity mismatch '+code)
+              prior=list(original.glob('**/'+code+'.json'))
+              if len(prior)>1:
+                  raise RuntimeError('Duplicate targeted Google checkpoint '+code)
+              if prior:
+                  before=json.loads(prior[0].read_text())
+                  if not set(before.get('complete_tiles',{})).issubset(
+                        set(candidate.get('complete_tiles',{}))):
+                      ignored.append(code+':prior_queries_not_preserved')
+                      continue
+                  if int(candidate.get('unique_observed_local_places') or 0) < int(
+                        before.get('unique_observed_local_places') or 0):
+                      ignored.append(code+':prior_places_not_preserved')
+                      continue
+                  destination=prior[0]
+              else:
+                  destination=original/('targeted-google-'+code)/(code+'.json')
+                  destination.parent.mkdir(parents=True,exist_ok=True)
+              shutil.copy2(p,destination)
+              used.append(code)
+          report={'retry_run_id':'$RETRY_RUN_ID',
+                  'repaired_google_fsa':sorted(used),
+                  'rejected_incomplete_merges':ignored}
+          Path('google_retry_merge_report.json').write_text(json.dumps(report,indent=2))
+          print('GOOGLE_RETRY_MERGE',json.dumps(report),flush=True)
+          PY
+          fi
       - name: Load saved newer Google detail-page classifications
         run: |
           gh run download "$CATEGORY_RUN_ID" -p 'verified-google-categories-*' -D category-results
@@ -158,3 +205,4 @@ jobs:
           path: |
             audited-google-498/
             category_merge_audit.json
+            google_retry_merge_report.json
