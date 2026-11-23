@@ -46,7 +46,22 @@ def main():
     checkpoint = list(Path(args.seed_root).glob('**/' + args.fsa + '.json'))
     if len(checkpoint) != 1:
         raise RuntimeError(f'Expected one historical Google FSA checkpoint for {args.fsa}; found {len(checkpoint)}')
-    shutil.copy2(checkpoint[0], root / (args.fsa + '.json'))
+    saved = root / (args.fsa + '.json')
+    if saved.is_file():
+        previous = json.loads(checkpoint[0].read_text())
+        current = json.loads(saved.read_text())
+        if previous.get('fsa') != args.fsa or current.get('fsa') != args.fsa:
+            raise RuntimeError('Resumed Google source checkpoint has wrong FSA')
+        if not set(previous.get('complete_tiles', {})).issubset(
+                set(current.get('complete_tiles', {}))):
+            raise RuntimeError('Resumed Google checkpoint lost older source queries')
+        if int(current.get('unique_observed_local_places') or 0) < int(
+                previous.get('unique_observed_local_places') or 0):
+            raise RuntimeError('Resumed Google checkpoint lost previously observed places')
+        print('RESUMING_PREVIOUS_TARGETED_GOOGLE_EVIDENCE', args.fsa,
+              len(current.get('complete_tiles', {})), flush=True)
+    else:
+        shutil.copy2(checkpoint[0], saved)
     # Do all required tiles. Original early-dominance checks used unclassified
     # Google business titles and can wrongly dismiss clinical source gaps.
     enriched = dict(area,
