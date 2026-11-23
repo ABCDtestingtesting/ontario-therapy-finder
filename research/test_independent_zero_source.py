@@ -20,7 +20,13 @@ class IndependentZeroSourceTests(unittest.TestCase):
         self.assertEqual(clinical_title_classification({
             'name':'Zain Abideen Psychotherapy'}),'clinical')
         self.assertEqual(clinical_title_classification({
-            'name':'Lecuyer Counselling','google_business_category':'Counselor'}),'clinical')
+            'name':'Lecuyer Counselling','google_business_category':'Counselor'}),'ambiguous')
+        self.assertEqual(clinical_title_classification({
+            'name':'Lecuyer Counselling','google_business_category':'Psychotherapist'}),'clinical')
+        self.assertEqual(clinical_title_classification({
+            'name':'Lecuyer Counselling','google_business_category':'Credit counseling service'}),'nonclinical')
+        self.assertEqual(clinical_title_classification({
+            'name':'Lecuyer Counselling','google_business_category':'Mental health counselor'}),'clinical')
 
     def test_peer_support_or_mental_health_advocacy_is_not_proven_psychotherapy(self):
         self.assertEqual(clinical_title_classification({
