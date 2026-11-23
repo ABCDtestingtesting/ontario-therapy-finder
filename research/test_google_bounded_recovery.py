@@ -66,8 +66,11 @@ class BoundedRecoveryTests(unittest.TestCase):
         part = {'fsa': 'M3J', 'complete_tiles': {}, 'attempts': 0,
                 'status': 'coverage_incomplete', 'pending': list(tile_tasks())}
         for task in list(tile_tasks())[:12]:
-            part['complete_tiles'][task_key(task)] = self.evidence(
-                None, 'M3J', None, *task, None)
+            # A genuinely completed uncapped tile needs no new request.
+            # Capped tiles are retried separately and retain prior places.
+            tile = self.evidence(None, 'M3J', None, *task, None)
+            tile['capped'] = False
+            part['complete_tiles'][task_key(task)] = tile
         (self.folder / 'M3J.json').write_text(json.dumps(part))
         with patch('research.recover_google_tiles.scan_tile', side_effect=self.evidence) as scan:
             row = run_area(None, self.area, self.folder, 1000)
