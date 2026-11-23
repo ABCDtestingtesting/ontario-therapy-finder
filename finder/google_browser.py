@@ -64,9 +64,48 @@ def _snapshot(page,path):
     except Exception:pass
 
 
+def _refresh_map_area_results(page, lat, lon):
+    """Force Google Maps to use the actual displayed map instead of distant
+    search suggestions. Live Firefox tests showed unchecked 'Update results
+    when map moves' returned remote clinics for rural Ontario FSAs; checking
+    the visible control and panning made Google report genuine local results
+    or an explicit 'No results' message. Fail closed when UI changes.
+    """
+    control = page.get_by_text('Update results when map moves')
+    if not control.count() or not control.first.is_visible():
+        raise SourceUnavailable('Google location-scoped results control was not visible')
+    original_url = page.url
+    control.first.click(timeout=5000)
+    page.wait_for_timeout(500)
+    viewport = page.viewport_size or {'width':1400,'height':960}
+    x = int(viewport['width'] * .72)
+    y = int(viewport['height'] * .52)
+    # A reversible drag triggers Google's live 'update results when map moves'
+    # query while returning the map center to its original geographic tile.
+    for dx,dy in ((165,45),(-165,-45)):
+        page.mouse.move(x,y)
+        page.mouse.down()
+        page.mouse.move(x+dx,y+dy,steps=14)
+        page.mouse.up()
+        page.wait_for_timeout(1800)
+    refreshed_url=page.url
+    match=re.search(r'/@(-?\\d+(?:\\.\\d+)?),(-?\\d+(?:\\.\\d+)?),',refreshed_url)
+    if refreshed_url == original_url or not match:
+        raise SourceUnavailable('Google did not confirm map-area results refresh')
+    new_lat,new_lon=map(float,match.groups())
+    radians=math.pi/180
+    value=math.sin((new_lat-lat)*radians/2)**2+(
+        math.cos(lat*radians)*math.cos(new_lat*radians)
+        *math.sin((new_lon-lon)*radians/2)**2)
+    offset=12742*math.asin(min(1,math.sqrt(value)))
+    if offset > .70:
+        raise SourceUnavailable(f'Google map center drifted {offset:.2f} km from required local tile')
+    return {'refreshed_url':refreshed_url,'map_center_offset_km':round(offset,4)}
+
+
 def scan_one(context,query,lat,lon,diagnostics,timeout_seconds=90,max_scroll=35,
              interactive=False,verification_wait_seconds=None,zoom=16,
-             progress=lambda msg:None,cancel_requested=lambda:False):
+             force_map_refresh=False,progress=lambda msg:None,cancel_requested=lambda:False):
     """Scan one actual query. Returns a *complete* search only on verified end.
 
     Results with unresolved coordinates stay in the evidence for later manual
@@ -95,6 +134,15 @@ def scan_one(context,query,lat,lon,diagnostics,timeout_seconds=90,max_scroll=35,
         if code and code>=500:
             raise SourceUnavailable(f'Google Maps returned HTTP {code}; grid cell preserved')
         _maybe_consent(page)
+        if force_map_refresh:
+            # Do not silently treat the original broad FSA text search as a
+            # geofenced search. The checkbox and map URL recentering are
+            # required for the 5 km Ontario competition audit.
+            page.wait_for_timeout(1200)
+            scope = _refresh_map_area_results(page,lat,lon)
+            evidence.update(geographic_refresh_verified=True,
+                            geographic_refresh_url=scope['refreshed_url'],
+                            geographic_refresh_offset_km=scope['map_center_offset_km'])
         deadline=time.monotonic()+timeout_seconds
         links={}; stagnant=0; prev_length=-1; prev_height=-1
         while time.monotonic()<deadline:
