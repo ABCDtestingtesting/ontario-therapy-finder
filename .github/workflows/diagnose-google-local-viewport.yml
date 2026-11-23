@@ -1,0 +1,101 @@
+name: Diagnose restricted Google Maps local-result coverage
+on:
+  push:
+    branches: ['ontario-401-fsa-live-ranking-20261121']
+    paths: ['.github/workflows/diagnose-google-local-viewport.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    strategy:
+      fail-fast: false
+      matrix:
+        fsa: [P3P, L0M, N7M]
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps firefox
+      - name: Compare Google Maps result scoping and viewport actions
+        env:
+          FSA: ${{ matrix.fsa }}
+        run: |
+          python - <<'PY'
+          import json, math, os, time
+          from pathlib import Path
+          from urllib.parse import quote
+          from playwright.sync_api import sync_playwright
+          from finder.google_browser import place_coordinates
+          from research.scan_all_maps import distance_km
+          code=os.environ['FSA']
+          area=next(a for a in json.loads(Path('research/ontario_all_populated_fsa_2021.json').read_text())['areas'] if a['fsa']==code)
+          lat,lon=area['lat'],area['lon']
+          root=Path('viewport-probe')/code
+          root.mkdir(parents=True,exist_ok=True)
+          choices=['psychotherapist','counselling therapist',f'psychotherapist near {code} Ontario Canada',f'registered psychotherapist near {code} Ontario Canada',f'counselling services in {code} Ontario Canada']
+          findings=[]
+          with sync_playwright() as pw:
+            browser=pw.firefox.launch(headless=True)
+            ctx=browser.new_context(viewport={'width':1450,'height':980},locale='en-CA')
+            for query in choices:
+              page=ctx.new_page()
+              url=f'https://www.google.com/maps/search/{quote(query,safe="")}/@{lat:.6f},{lon:.6f},17z?hl=en'
+              item={'query':query,'url':url}
+              try:
+                response=page.goto(url,wait_until='domcontentloaded',timeout=40000)
+                page.wait_for_timeout(3000)
+                item['http']=response.status if response else None
+                item['loaded_url']=page.url
+                item['title']=page.title()
+                def snap(stage):
+                  anchors=page.locator('a[href*="/maps/place/"]').evaluate_all('els=>els.map(e=>({url:e.href,title:(e.getAttribute("aria-label")||e.innerText||"").trim()}))')
+                  points=[place_coordinates(a['url']) for a in anchors]
+                  ds=[distance_km((lat,lon),p) for p in points if p]
+                  return {'stage':stage,'links':len(anchors),'within_5km':sum(d<=5 for d in ds),'min_distance_km':round(min(ds),2) if ds else None,'max_distance_km':round(max(ds),2) if ds else None,'first_three':anchors[:3],'has_end':('end of the list' in page.locator('body').inner_text(timeout=10000).lower())}
+                item['initial']=snap('initial')
+                try:
+                  page.locator('[role="feed"]').first.evaluate('el=>el.scrollBy(0,100000)')
+                  page.wait_for_timeout(1500)
+                except Exception:pass
+                item['scrolled']=snap('scrolled')
+                try:
+                  labels=page.locator('button').evaluate_all('els=>els.map(e=>(e.innerText||e.getAttribute("aria-label")||"").trim()).filter(Boolean)')
+                  item['button_labels']=labels[:55]
+                  region=page.locator('[role="main"]')
+                  box=region.first.bounding_box() if region.count() else None
+                  if box:
+                    sx=box['x']+box['width']*.70;sy=box['y']+box['height']*.68
+                    page.mouse.move(sx,sy)
+                    page.mouse.down()
+                    page.mouse.move(sx+95,sy+90,steps=12)
+                    page.mouse.up()
+                    page.wait_for_timeout(1100)
+                    search=page.get_by_role('button',name='Search this area')
+                    item['search_area_visible']=search.count()>0 and search.first.is_visible()
+                    if item['search_area_visible']:
+                      search.first.click(timeout=4000)
+                      page.wait_for_timeout(3000)
+                      item['after_area_click']=snap('after_area_click')
+                      item['after_area_url']=page.url
+                except Exception as exc:item['pan_error']=repr(exc)
+                item['final']=snap('final')
+                page.screenshot(path=str(root/(str(choices.index(query))+'_screen.png')),full_page=False,timeout=12000)
+              except Exception as exc:item['error']=repr(exc)
+              findings.append(item)
+              print('MAP_PROBE',json.dumps({k:v for k,v in item.items() if k!='button_labels'}),flush=True)
+              page.close()
+            browser.close()
+          (root/'probe.json').write_text(json.dumps(findings,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: google-viewport-probe-${{ matrix.fsa }}
+          path: viewport-probe/${{ matrix.fsa }}/
+          retention-days: 7
