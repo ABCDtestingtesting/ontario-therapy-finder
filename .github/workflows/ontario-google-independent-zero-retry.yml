@@ -30,7 +30,7 @@ jobs:
           set -euo pipefail
           test -n "$SOURCE_RUN"
           mkdir -p previous-zeros
-          gh run download "$SOURCE_RUN" -p 'independent-zero-*' -D previous-zeros || true
+          gh run download "$SOURCE_RUN" -R "$GITHUB_REPOSITORY" -p 'independent-zero-*' -D previous-zeros
           echo "source_run=$SOURCE_RUN" >> "$GITHUB_OUTPUT"
           python - <<'PY' >> "$GITHUB_OUTPUT"
           import json
@@ -38,6 +38,9 @@ jobs:
           all_fsas='L9E L7C K7L N7M L9W N4N L9L P4N L0B L0M N2Z N0B K8A K7G P3L K0A P3P N0E P3E L0A N0L N0J P9A K0C K0K K7V K0B N0G P8N K0G N0H K0L K0H P7A P0N P0C K0J P0G P0P P7G P7L P0J P0H P0R P0Y P0K P0M P0S P0W P0X P0T P0L P0V'.split()
           if len(all_fsas)!=53 or len(set(all_fsas))!=53:
               raise RuntimeError('FSA candidate plan changed')
+          saved=list(Path('previous-zeros').glob('**/[A-Z][0-9][A-Z].json'))
+          if len(saved)!=53 or {p.stem for p in saved}!=set(all_fsas):
+              raise RuntimeError('Refusing retry without 53 original Google checkpoints; found '+str(len(saved)))
           chosen=[]
           for code in all_fsas:
               paths=list(Path('previous-zeros').glob('**/'+code+'.json'))
@@ -94,11 +97,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p first-pass
-          gh run download 45219618676 -n google-498-category-verified-full-audit -D first-pass
+          gh run download 45219618676 -R "$GITHUB_REPOSITORY" -n google-498-category-verified-full-audit -D first-pass
           test -s first-pass/audited-google-498/ontario_498_google_recovery_audit.csv
           mkdir -p independent-zero/${{ matrix.fsa }}
           mkdir -p saved
-          if gh run download "$SOURCE_RUN" -n 'independent-zero-${{ matrix.fsa }}' -D saved; then
+          if gh run download "$SOURCE_RUN" -R "$GITHUB_REPOSITORY" -n 'independent-zero-${{ matrix.fsa }}' -D saved; then
             test -s saved/${{ matrix.fsa }}.json
             cp saved/${{ matrix.fsa }}.json independent-zero/${{ matrix.fsa }}/${{ matrix.fsa }}.json
           fi
