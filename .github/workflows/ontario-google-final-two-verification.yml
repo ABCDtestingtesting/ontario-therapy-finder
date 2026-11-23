@@ -1,0 +1,43 @@
+name: Verify final two Google Maps source locations and capped tile
+on:
+  push:
+    branches: [ontario-401-fsa-live-ranking-20261121]
+    paths: ['.github/workflows/ontario-google-final-two-verification.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  google:
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        fsa: [L7M, K7G]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate exact source code
+        run: |
+          python -m compileall -q research/verify_final_google_locations.py
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps firefox
+      - name: Retrieve real Google geographic evidence
+        timeout-minutes: 14
+        run: |
+          python -m research.verify_final_google_locations --fsa "${{ matrix.fsa }}" --out "final-two/${{ matrix.fsa }}.json"
+      - name: Preserve place coordinates and tile evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-two-google-${{ matrix.fsa }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            final-two/${{ matrix.fsa }}.json
+            final-two/evidence/
