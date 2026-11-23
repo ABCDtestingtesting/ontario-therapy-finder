@@ -57,7 +57,9 @@ def clinical_title_classification(place):
         nonclinical_categories = ('physiotherap', 'chiropract', 'physical therap',
             'occupational therap', 'massage therap', 'acupunctur', 'life coach',
             'veterinar', 'church', 'wellness center', 'wellness centre',
-            'health food store', 'dentist', 'pharmacy', 'speech patholog',
+            'health food store', 'kennel', 'osteopath', 'industrial consultant',
+            'horse riding school', 'research institute', 'skin care clinic',
+            'dentist', 'pharmacy', 'speech patholog',
             'speech therap', 'naturopath', 'yoga studio')
         if any(term in category for term in clinical_categories):
             return 'clinical'
