@@ -28,7 +28,7 @@ jobs:
           set -euo pipefail
           mkdir -p zero-checkpoints
           gh run download 45232783797 -R "$GITHUB_REPOSITORY" -p 'independent-zero-*' -D zero-checkpoints
-          RETRY_RUN="$(gh run list -R "$GITHUB_REPOSITORY" --workflow ontario-google-independent-zero-retry.yml --status completed --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+          RETRY_RUN="$(gh run list -R "$GITHUB_REPOSITORY" --workflow ontario-google-independent-zero-retry.yml --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
           echo "retry_run=$RETRY_RUN" >> "$GITHUB_OUTPUT"
           if [ -n "$RETRY_RUN" ]; then
             mkdir -p retry-checkpoints
