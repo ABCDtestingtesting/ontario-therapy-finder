@@ -22,7 +22,10 @@ SOURCE_STATUS = 'confirmed_observed_feed'
 # even for a psychotherapist query. Names without an explicit mental-health
 # designation must not count towards a PROVEN clinical-location lower bound.
 CLINICAL_TITLE_TERMS = (
-    'psychotherap', 'psycholog', 'counsel', 'counsell', 'mental health',
+    # Generic 'counselling' can describe credit, career, debt or legal
+    # advice. Require an explicit mental-health qualification or a verified
+    # Google Maps clinical business category instead.
+    'psychotherap', 'psycholog', 'mental health',
     'social work', 'social worker', 'family therap', 'marriage therap',
     'behavioral therap', 'behavioural therap', 'registered therapist',
     'registered psychotherapist', 'msw', 'rsw',
@@ -33,6 +36,11 @@ NONCLINICAL_TITLE_TERMS = (
     'conservation area', 'dog ', 'pet ', 'fitness', 'acupuncture',
     'dental', 'dentist', 'sport injury', 'sports injury',
     'speech therapy', 'real estate',
+    'career counsel', 'career counsell', 'career guidance',
+    'credit counsel', 'credit counsell', 'debt counsel', 'debt counsell',
+    'financial counsel', 'financial counsell', 'financial planning',
+    'employment counsel', 'employment counsell', 'vocational counsel',
+    'academic counsel', 'academic counsell', 'career development',
 )
 
 
