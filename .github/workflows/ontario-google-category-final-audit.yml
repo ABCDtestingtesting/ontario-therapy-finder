@@ -73,7 +73,35 @@ jobs:
           fi
           TARGET_RUN_ID="${TARGET_RUN_ID:-45078523814}"
           echo "TARGETED_SOURCE_RUN=$TARGET_RUN_ID"
-          gh run download "$TARGET_RUN_ID" -p 'targeted-google-*' -D targeted-results
+          # Preserve all 29 checkpoint FSAs from the earlier verified local
+          # search. The latest run deliberately covers only 13; overwriting
+          # the full set with its subset had regressed 10 completed FSAs.
+          gh run download 45106178601 -p 'targeted-google-*' -D targeted-results
+          mkdir -p newer-targeted
+          gh run download "$TARGET_RUN_ID" -p 'targeted-google-*' -D newer-targeted || true
+          python - <<'PY'
+          import json,shutil
+          from pathlib import Path
+          old_root=Path('targeted-results')
+          for new_path in Path('newer-targeted').glob('**/[A-Z][0-9][A-Z].json'):
+              code=new_path.stem
+              prior=list(old_root.glob('**/'+code+'.json'))
+              if len(prior)!=1:
+                  raise RuntimeError('Missing unique preserved Google checkpoint '+code)
+              old=json.loads(prior[0].read_text())
+              new=json.loads(new_path.read_text())
+              if old.get('fsa')!=code or new.get('fsa')!=code:
+                  raise RuntimeError('Mismatched Google checkpoint identity')
+              if (set(old.get('complete_tiles',{})).issubset(set(new.get('complete_tiles',{}))) and
+                  int(old.get('unique_observed_local_places') or 0)<=
+                  int(new.get('unique_observed_local_places') or 0) and
+                  not (old.get('status')=='verified_tile_feed' and
+                       new.get('status')!='verified_tile_feed')):
+                  shutil.copy2(new_path,prior[0])
+                  print('PRESERVED_STRONGER_NEW_GOOGLE_SOURCE',code,flush=True)
+              else:
+                  print('KEPT_STRONGER_OLD_GOOGLE_SOURCE',code,flush=True)
+          PY
           gh run download 45047774153 -p 'native-google-*' -D native-results
           test -s first-pass/google_all_ontario_498.csv
           test "$(find recovery-output -name '*.json' | wc -l | tr -d ' ')" = 241
