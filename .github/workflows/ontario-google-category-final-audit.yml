@@ -3,6 +3,7 @@ on:
   workflow_run:
     workflows:
       - Classify unresolved Ontario Google Maps businesses from verified place categories
+      - Recover all capped and incomplete Ontario Google Maps postal areas
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -21,7 +22,8 @@ jobs:
     timeout-minutes: 45
     env:
       GH_TOKEN: ${{ github.token }}
-      CATEGORY_RUN_ID: ${{ inputs.category_run_id || github.event.workflow_run.id || '' }}
+      CATEGORY_RUN_ID: ${{ inputs.category_run_id || '' }}
+      RECOVERY_RUN_ID: ${{ github.event.workflow_run.name == 'Recover all capped and incomplete Ontario Google Maps postal areas' && github.event.workflow_run.id || '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,15 +42,30 @@ jobs:
           fi
           echo "CATEGORY_RUN_ID=$CATEGORY_RUN_ID" >> "$GITHUB_ENV"
           echo "CATEGORY_SOURCE_RUN=$CATEGORY_RUN_ID"
-      - name: Restore complete original evidence and census estimate
+      - name: Restore latest successful 48-shard source and census, preserving historical checkpoints
         run: |
+          set -euo pipefail
           mkdir -p first-pass recovery-output category-results targeted-results native-results
           gh run download 44952655975 -n full-ontario-498-google-census-audit -D first-pass
-          gh run download 45033015174 -p 'google-tile-recovery-*' -D recovery-output
+          # Newest complete successful run, otherwise the known 48-artifact
+          # historical checkpoint run. Never replace source with a cancelled
+          # or partial recovery run.
+          if [ -z "$RECOVERY_RUN_ID" ]; then
+            RECOVERY_RUN_ID="$(gh run list --workflow ontario-google-tile-recovery.yml --branch ontario-401-fsa-live-ranking-20261121 --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+          fi
+          RECOVERY_RUN_ID="${RECOVERY_RUN_ID:-45070243739}"
+          echo "RECOVERY_SOURCE_RUN=$RECOVERY_RUN_ID"
+          gh run download "$RECOVERY_RUN_ID" -p 'google-tile-recovery-*' -D recovery-output
+          if [ "$(find recovery-output -name '*.json' | wc -l | tr -d ' ')" -ne 241 ]; then
+            echo 'Newest recovery run incomplete; revert to proven full 48-shard checkpoint' >&2
+            rm -rf recovery-output
+            mkdir -p recovery-output
+            gh run download 45070243739 -p 'google-tile-recovery-*' -D recovery-output
+          fi
           gh run download 45078523814 -p 'targeted-google-*' -D targeted-results
           gh run download 45047774153 -p 'native-google-*' -D native-results
           test -s first-pass/google_all_ontario_498.csv
-          test "$(find recovery-output -name '*.json' | wc -l | tr -d ' ')" -ge 29
+          test "$(find recovery-output -name '*.json' | wc -l | tr -d ' ')" = 241
       - name: Load saved newer Google detail-page classifications
         run: |
           gh run download "$CATEGORY_RUN_ID" -p 'verified-google-categories-*' -D category-results
@@ -92,9 +109,10 @@ jobs:
                   raise RuntimeError('Category source mismatch')
               old_places = {p['key']:p for p in present.get('local_places',[])}
               classified_places = {p['key']:p for p in category_doc.get('local_places',[])}
-              if not set(old_places).issubset(classified_places):
-                  rejected.append(code+':classified_source_missing_old_places')
-                  continue
+              # Newer full recovery scans may contain additional real Google
+              # places absent from older category artifacts. Retain these
+              # as unclassified evidence; match only canonical place keys.
+              unmatched_new_places = len(set(old_places)-set(classified_places))
               additions = 0
               for key,place in old_places.items():
                   update = classified_places[key]
