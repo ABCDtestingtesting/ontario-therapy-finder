@@ -57,7 +57,8 @@ def scan_tile(context, code, center, north, east, level, term, root):
     try:
         evidence = scan_one(
             context, query, lat, lon, diagnostic, timeout_seconds=55,
-            max_scroll=22, zoom=17 if level else 15
+            max_scroll=22, zoom=16 if level else 14,
+            force_map_refresh=True
         )
     except HumanVerificationRequired:
         # Restricted sources are still blocked. Do not interpret their visible
@@ -73,6 +74,7 @@ def scan_tile(context, code, center, north, east, level, term, root):
             raise
         evidence = json.loads(saved.read_text())
         if (evidence.get('query') != query
+            or evidence.get('geographic_refresh_verified') is not True
             or evidence.get('status') == 'verification_required'
             or not evidence.get('place_links')
             or not evidence.get('search_url', '').startswith('https://www.google.com/maps/search/')):
@@ -99,7 +101,8 @@ def scan_tile(context, code, center, north, east, level, term, root):
                            'lon': xy[1], 'source_url': link.get('url'), 'key': key}
     return {
         'code': code, 'north_km': north, 'east_km': east, 'level': level,
-        'term': term, 'source_url': evidence['search_url'],
+        'term': term, 'source_url': evidence.get('geographic_refresh_url') or evidence['search_url'],
+        'map_area_search_verified': evidence.get('geographic_refresh_verified') is True,
         'visible_links': len(links), 'capped': partial or len(links) >= 120,
         'reason': evidence.get('completion_reason'), 'places': list(inside.values()),
         'unresolved': unresolved, 'status': 'observed_partial' if partial else 'observed',
@@ -125,7 +128,10 @@ def children(task):
 
 
 def task_key(task):
-    return '|'.join(map(str, task))
+    # Never reuse old broad FSA-text searches as evidence of geographically
+    # scoped Google Maps results. All 18 base queries must be repeated with
+    # the actual visible map's 'update results when map moves' feature on.
+    return 'map_movement_v4|' + '|'.join(map(str, task))
 
 
 
@@ -213,7 +219,7 @@ def run_area(context, area, folder, max_seconds):
     doc['pending'] = [task for task in required
                       if task_key(task) not in doc['complete_tiles']
                       or doc['complete_tiles'][task_key(task)].get('status') == 'observed_partial']
-    doc['recovery_plan'] = 'fixed_18_local_queries_v3_fsa_localized'
+    doc['recovery_plan'] = 'fixed_18_map_movement_v4_geographically_scoped'
     doc['discarded_recursive_pending'] = True
     record_path.write_text(json.dumps(doc, indent=2))
     started = time.monotonic()
