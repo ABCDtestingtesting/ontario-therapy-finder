@@ -6,8 +6,19 @@ geographically unverified refreshed search.
 """
 from copy import deepcopy
 from research.merge_google_checkpoints import required_base_tile_keys
-from research.recheck_l7m_capped_zoom import CAPPED_TILES
-from research.recover_google_tiles import task_key
+CAPPED_TILES = (
+    (-3.4,0.0,0,'psychotherapist'),
+    (-3.4,3.4,0,'psychotherapist'),
+    (0.0,0.0,0,'psychotherapist'),
+    (0.0,3.4,0,'psychotherapist'),
+    (0.0,3.4,0,'psychologist'),
+    (3.4,3.4,0,'psychologist'),
+    (-3.4,0.0,0,'psychologist'),
+    (3.4,0.0,0,'psychotherapist'),
+)
+
+def task_key(task):
+    return 'map_movement_v7_checkbox_on|'+'|'.join(map(str,task))
 
 def merge_l7m_rechecks(doc, rows):
     if doc.get('fsa')!='L7M':
