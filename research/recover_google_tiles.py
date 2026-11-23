@@ -131,7 +131,7 @@ def task_key(task):
     # Never reuse old broad FSA-text searches as evidence of geographically
     # scoped Google Maps results. All 18 base queries must be repeated with
     # the actual visible map's 'update results when map moves' feature on.
-    return 'map_movement_v6_category_only|' + '|'.join(map(str, task))
+    return 'map_movement_v7_checkbox_on|' + '|'.join(map(str, task))
 
 
 
@@ -219,7 +219,7 @@ def run_area(context, area, folder, max_seconds):
     doc['pending'] = [task for task in required
                       if task_key(task) not in doc['complete_tiles']
                       or doc['complete_tiles'][task_key(task)].get('status') == 'observed_partial']
-    doc['recovery_plan'] = 'fixed_18_map_movement_v6_categories_geographically_scoped'
+    doc['recovery_plan'] = 'fixed_18_map_movement_v7_checkbox_verified'
     doc['discarded_recursive_pending'] = True
     record_path.write_text(json.dumps(doc, indent=2))
     started = time.monotonic()
