@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       max-parallel: 6
       matrix:
-        fsa: ['N7M','L9L','L0B','L0M','K7G','P3P','L0A','N0L','K0K','K0B','N0G','N0H','K0L','P0C','P0G','P0R','P0M','P0S','L4M','L7M','M9M','M3L','N6M','N5V','L1A','M1L','M1R','M9N','N1R']
+        fsa: ['N7M','L9L','L0M','K7G','N0L','K0B','N0G','K0L','P0G','L7M','M9M','M3L','N6M','N5V','L1A']
     runs-on: ubuntu-latest
     timeout-minutes: 75
     env:
@@ -47,7 +47,38 @@ jobs:
             exit 1
           fi
           echo "CATEGORY_ACTUAL_TARGETED_SOURCE=$TARGET_RUN_ID FSA=$FSA"
-          gh run download "$TARGET_RUN_ID" -n "targeted-google-$FSA" -D category-enriched
+          # A newer targeted run may legitimately omit completed areas or
+          # produce no artifact when its preflight fails. Reuse the preserved
+          # 29-area source instead of classifying a missing/empty file.
+          if ! gh run download "$TARGET_RUN_ID" -n "targeted-google-$FSA" -D category-enriched; then
+            echo "No new checkpoint for $FSA; checking preserved prior source"
+          fi
+          mkdir -p previous-source
+          if gh run download 45106178601 -n "targeted-google-$FSA" -D previous-source; then
+            test -s "previous-source/$FSA.json"
+          fi
+          python - <<'PY'
+          import json,shutil
+          from pathlib import Path
+          code='${{ matrix.fsa }}'
+          newest=Path('category-enriched')/(code+'.json')
+          prior=Path('previous-source')/(code+'.json')
+          if not newest.is_file() and not prior.is_file():
+              raise RuntimeError('No preserved Google source for '+code)
+          old=json.loads(prior.read_text()) if prior.is_file() else None
+          new=json.loads(newest.read_text()) if newest.is_file() else None
+          for record in (old,new):
+              if record and record.get('fsa')!=code:
+                  raise RuntimeError('Google source identity mismatch '+code)
+          if old and (not new or
+                     not set(old.get('complete_tiles',{})).issubset(set(new.get('complete_tiles',{}))) or
+                     int(new.get('unique_observed_local_places') or 0) <
+                     int(old.get('unique_observed_local_places') or 0)):
+              shutil.copy2(prior,newest)
+              print('CATEGORY_REUSING_STRONGER_PRESERVED_SOURCE',code,flush=True)
+          else:
+              print('CATEGORY_REUSING_NEW_SOURCE' if new else 'CATEGORY_REUSING_PREVIOUS_SOURCE',code,flush=True)
+          PY
           test -s "category-enriched/$FSA.json"
       - name: Verify unknown Google Maps categories against individual Google business detail pages
         timeout-minutes: 60
