@@ -52,7 +52,7 @@ class BoundedRecoveryTests(unittest.TestCase):
         self.assertIn('legacy-tile', row['complete_tiles'])
         self.assertEqual(row['status'], 'observed_capped')
         self.assertEqual(row['unique_observed_local_places'], 1)
-        self.assertEqual(row['recovery_plan'], 'fixed_18_local_queries_v3_fsa_localized')
+        self.assertEqual(row['recovery_plan'], 'fixed_18_map_movement_v4_geographically_scoped')
 
     def test_failed_source_is_never_zero_competitors(self):
         with patch('research.recover_google_tiles.scan_tile', side_effect=RuntimeError('source unavailable')) as scan:
