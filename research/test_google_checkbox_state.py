@@ -47,6 +47,24 @@ class Page:
         return 'https://www.google.com/maps/search/psychotherapist/@44.281883,-79.954015,14z?hl=en&entry=ttu'
 
 
+class DriftedPage(Page):
+    def __init__(self, checked=True):
+        super().__init__(checked)
+        self.recentered = False
+        self.recenter_calls = 0
+    @property
+    def url(self):
+        self.reads += 1
+        if self.reads == 1:
+            return 'https://www.google.com/maps/search/psychotherapist/@44.281874,-79.954025,14z?hl=en'
+        if not self.recentered:
+            return 'https://www.google.com/maps/search/psychotherapist/@44.298974,-79.954025,14z?hl=en&entry=ttu'
+        return 'https://www.google.com/maps/search/psychotherapist/@44.281982,-79.954010,14z?hl=en&entry=ttu'
+    def goto(self,url,wait_until='domcontentloaded',timeout=35000):
+        self.recenter_calls += 1
+        self.recentered = True
+
+
 class GoogleToggleRegression(unittest.TestCase):
     def test_unchecked_is_enabled(self):
         p = Page(False)
@@ -59,6 +77,14 @@ class GoogleToggleRegression(unittest.TestCase):
         p = Page(True)
         _refresh_map_area_results(p, 44.281874, -79.954025)
         self.assertEqual(p.control.clicks, 0)
+        self.assertTrue(p.control.checked)
+
+    def test_map_drift_recovery_researches_original_tile(self):
+        p = DriftedPage()
+        evidence = _refresh_map_area_results(p,44.281874,-79.954025)
+        self.assertEqual(p.recenter_calls,1)
+        self.assertLess(evidence['map_center_offset_km'], .7)
+        self.assertEqual(p.control.clicks,0)
         self.assertTrue(p.control.checked)
 
     def test_repeating_enabled_scans_never_toggles_off(self):
