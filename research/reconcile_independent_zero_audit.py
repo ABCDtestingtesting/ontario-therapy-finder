@@ -78,6 +78,15 @@ def review(baseline, checkpoints, destination):
         code=row['fsa']
         pop=int(row['population_5km_estimate_2021'])
         prior_count=int(row['google_therapy_locations_used_in_score'])
+        # The historical first-pass keyword result count was never item-level
+        # confirmed as an actual psychotherapy or psychology practice. It
+        # cannot establish a clinical competitor LOWER BOUND and must not
+        # mathematically dominate a potentially stronger postal area.
+        verified_recovery=int(row.get('recovery_title_confirmed_clinical_count') or 0)
+        native_clinical=int(row.get('independent_google_clinical_places') or 0)
+        verified_lower=max(verified_recovery,native_clinical)
+        row['historical_keyword_observed_google_proxy_count']=prior_count
+        row['historical_keyword_proxies_used_as_clinical_lower_bound']=False
         candidate=found.get(code)
         if code in zeros:
             row['prior_google_observed_therapy_locations']=prior_count
@@ -88,7 +97,7 @@ def review(baseline, checkpoints, destination):
             row['independent_nonclinical_places']=candidate['categories']['nonclinical'] if candidate else 0
             row['independent_all_local_businesses']=len(candidate['businesses']) if candidate else 0
             row['independent_searches_completed']=len(candidate['doc']['observations']) if candidate else 0
-            row['google_therapy_locations_used_in_score']=max(prior_count,row['independent_clinical_places'])
+            row['google_therapy_locations_used_in_score']=max(verified_lower,row['independent_clinical_places'])
             # New source evidence can overturn the previous misleading
             # complete=true. Unfinished geography or unknown clinical
             # classification must remain eligible ranking uncertainty.
@@ -116,6 +125,23 @@ def review(baseline, checkpoints, destination):
                 'independent_nonclinical_places':'',
                 'independent_all_local_businesses':'',
                 'independent_searches_completed':''})
+            # The only locally audited clinical rows are complete Google
+            # business tile sources with no unknown business specialties.
+            # A numeric one-keyword Google result is a query proxy.
+            exact_local=(row.get('source_evidence_status')=='local_tiled_complete'
+                and str(row.get('recovery_all_local_names_clinically_classified')).lower()=='true'
+                and int(row.get('recovery_pending_queries') or 0)==0
+                and int(row.get('recovery_capped_base_queries') or 0)==0
+                and int(row.get('recovery_unresolved_coords') or 0)==0)
+            exact_native=(row.get('source_evidence_status') in (
+                'native_gridded_google_complete','native_gridded_google_empty_confirmed')
+                and str(row.get('independent_google_empty_log_verified')).lower()=='true')
+            row['google_therapy_locations_used_in_score']=verified_lower
+            row['completed_source_feed']=exact_local or exact_native
+            row['source_evidence_status']=(
+                'clinically_audited_local_google_tiles' if exact_local else (
+                'clinically_audited_native_google_grid' if exact_native else
+                'keyword_proxy_or_incomplete_clinical_evidence'))
         count=int(row['google_therapy_locations_used_in_score'])
         row['google_listings_per_10000_residents_or_lower_bound']=round(count*10000/pop,8)
         row['residents_per_google_listing_or_upper_bound']=round(pop/count,2) if count else ''
@@ -157,12 +183,15 @@ def review(baseline, checkpoints, destination):
         'total_independently_confirmed_clinical_businesses':sum(
             x['categories']['clinical'] for x in found.values()),
         'independently_reviewed_zero_locations_claimed':False,
+        'historical_keyword_proxies_accepted_as_clinical_evidence':False,
+        'clinically_audited_complete_eligible_source_count':len(done),
+        'fewer_than_60_clinically_audited_complete_sources':len(done)<60,
         'currently_eligible_uncertified_fsa_count':len(unresolved),
         'top_60_cutoff_observed_listings_per_10000':cutoff,
         'independent_53_zero_checks_complete':complete53,
         'google_60_independently_certified_within_observation_model':certified,
         'historical_source_certification_not_reused_as_independent_validation':True,
-        'warning':'Even 27 completed Google Maps queries per area do not establish an exhaustive list of every local clinician. Baseline nonzero FSA sources use different search coverage.',
+        'warning':'Historical first-pass Google Maps keyword counts are unclassified proxies and are excluded from confirmed therapist counts. Even 27 completed Google Maps queries do not prove an exhaustive absence of local clinicians.',
         'checked_at_utc':datetime.now(timezone.utc).isoformat(),
     }
     (destination/'Ontario_Google_Independent_Review_Report.json').write_text(json.dumps(report,indent=2))
