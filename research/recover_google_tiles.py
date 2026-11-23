@@ -21,7 +21,7 @@ from finder.common import HumanVerificationRequired, SourceUnavailable
 from research.scan_all_maps import distance_km, global_place_coordinates
 
 RADIUS_KM = 5.0
-SEARCHES = ('psychotherapist near {FSA}', 'registered psychotherapist near {FSA}')
+SEARCHES = ('psychotherapist', 'psychologist')
 # 3.4 km grid supplies 9 overlapping centres; capped tiles subdivide.
 BASE_OFFSETS_KM = (-3.4, 0.0, 3.4)
 SUB_OFFSETS_KM = (-1.15, 0.0, 1.15)
@@ -50,7 +50,7 @@ def scan_tile(context, code, center, north, east, level, term, root):
     lat, lon = tile_coords(center, north, east)
     # Google may surface off-centre places even for a centred search. Filter by
     # actual PLACE coordinates after collection, never by map-viewport coords.
-    query = term.replace('{FSA}', f'{code} Ontario Canada')  # Local FSA text plus geographic map centre
+    query = term  # Actual local coverage is proved by map movement and tile coordinates, not FSA text
     token = hashlib.sha256(f'{code}|{north:.3f}|{east:.3f}|{level}|{term}'.encode()).hexdigest()[:16]
     diagnostic = root / 'evidence' / code / token
     partial = False
@@ -131,7 +131,7 @@ def task_key(task):
     # Never reuse old broad FSA-text searches as evidence of geographically
     # scoped Google Maps results. All 18 base queries must be repeated with
     # the actual visible map's 'update results when map moves' feature on.
-    return 'map_movement_v4|' + '|'.join(map(str, task))
+    return 'map_movement_v6_category_only|' + '|'.join(map(str, task))
 
 
 
@@ -219,7 +219,7 @@ def run_area(context, area, folder, max_seconds):
     doc['pending'] = [task for task in required
                       if task_key(task) not in doc['complete_tiles']
                       or doc['complete_tiles'][task_key(task)].get('status') == 'observed_partial']
-    doc['recovery_plan'] = 'fixed_18_map_movement_v4_geographically_scoped'
+    doc['recovery_plan'] = 'fixed_18_map_movement_v6_categories_geographically_scoped'
     doc['discarded_recursive_pending'] = True
     record_path.write_text(json.dumps(doc, indent=2))
     started = time.monotonic()
