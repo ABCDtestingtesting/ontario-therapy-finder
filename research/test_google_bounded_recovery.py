@@ -97,6 +97,36 @@ class BoundedRecoveryTests(unittest.TestCase):
         self.assertEqual(scan.call_count, 18)
         self.assertFalse(row['rank_dominated_by_verified_cutoff'])
 
+    def test_resumed_capped_tiles_retry_without_losing_prior_locations(self):
+        completed = {}
+        for i, task in enumerate(tile_tasks()):
+            old = self.evidence(None,'M3J',None,*task,None)
+            old['capped'] = i < 3
+            old['places'] = [{
+                'key': 'old_source_' + str(i),
+                'name': 'Verified prior psychotherapy clinic',
+                'lat':43.76,'lon':-79.48,
+                'source_url':'https://www.google.com/maps/place/clinic',
+            }]
+            completed[task_key(task)] = old
+        (self.folder/'M3J.json').write_text(json.dumps({
+            'fsa':'M3J','status':'observed_capped','complete_tiles':completed,
+            'attempts':18,'pending':[],'local_places':[p for e in completed.values()
+                                                        for p in e['places']],
+            'unique_observed_local_places':18,
+        }))
+        def uncapped(*args):
+            result = self.evidence(*args)
+            result['capped'] = False
+            return result
+        with patch('research.recover_google_tiles.scan_tile',side_effect=uncapped) as scanner:
+            doc = run_area(None,self.area,self.folder,200)
+        self.assertEqual(scanner.call_count,3)
+        self.assertEqual(doc['status'],'verified_tile_feed')
+        self.assertEqual(doc['capped_leaf_tiles'],0)
+        self.assertEqual(doc['unique_observed_local_places'],19)
+        self.assertEqual(len(doc['superseded_tile_observations']),3)
+
     def test_uncapped_complete_has_distinct_verified_status(self):
         def no_cap(*args):
             e = self.evidence(*args)
