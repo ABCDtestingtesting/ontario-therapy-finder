@@ -1,0 +1,44 @@
+name: Verify individual Google clinical categories among first detected false-zero areas
+on:
+  push:
+    branches: [ontario-401-fsa-live-ranking-20261121]
+    paths: ['.github/workflows/ontario-google-independent-category-diagnostic.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  categorize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 28
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Recover all seven true Google business place IDs around L9E
+        run: |
+          mkdir -p observed
+          gh run download 45232783797 -n independent-zero-L9E -D observed
+          test -s observed/L9E.json
+      - name: Install browser and verify categories individually
+        run: |
+          python -m compileall -q research/enrich_independent_google_places.py
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+      - name: Check actual mental-health or unrelated counseling business categories
+        timeout-minutes: 17
+        run: |
+          python -m research.enrich_independent_google_places --checkpoint observed/L9E.json --out categories/L9E.json --seconds 840
+      - name: Preserve every categorized/ambiguous Google business and original source
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: independent-category-L9E
+          retention-days: 30
+          if-no-files-found: warn
+          path: categories/L9E.json
