@@ -2,6 +2,10 @@ name: Classify unresolved Ontario Google Maps businesses from verified place cat
 on:
   push:
     paths: ['.github/workflows/ontario-google-category-recovery.yml']
+  workflow_run:
+    workflows:
+      - Recheck remaining Ontario Google Maps ranking contenders
+    types: [completed]
   workflow_dispatch:
 permissions:
   actions: read
@@ -12,12 +16,13 @@ jobs:
       fail-fast: false
       max-parallel: 6
       matrix:
-        fsa: ['L9L','L0M','L4M','L7M','M9M','M3L','N6M','N5V','L1A','M1L','M1R','M9N','N1R']
+        fsa: ['N7M','L9L','L0B','L0M','K7G','P3P','L0A','N0L','K0K','K0B','N0G','N0H','K0L','P0C','P0G','P0R','P0M','P0S','L4M','L7M','M9M','M3L','N6M','N5V','L1A','M1L','M1R','M9N','N1R']
     runs-on: ubuntu-latest
     timeout-minutes: 75
     env:
       GH_TOKEN: ${{ github.token }}
       FSA: ${{ matrix.fsa }}
+      TARGET_RUN_ID: ${{ github.event.workflow_run.id || '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,8 +37,17 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Restore original observed Google business evidence
         run: |
+          set -euo pipefail
           mkdir -p category-enriched
-          gh run download 45078523814 -n "targeted-google-$FSA" -D category-enriched
+          if [ -z "$TARGET_RUN_ID" ]; then
+            TARGET_RUN_ID="$(gh run list --workflow ontario-google-31-targeted-recovery.yml --branch ontario-401-fsa-live-ranking-20261121 --status completed --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+          fi
+          if [ -z "$TARGET_RUN_ID" ]; then
+            echo 'No complete recent Google FSA source run; refuse to manufacture listings' >&2
+            exit 1
+          fi
+          echo "CATEGORY_ACTUAL_TARGETED_SOURCE=$TARGET_RUN_ID FSA=$FSA"
+          gh run download "$TARGET_RUN_ID" -n "targeted-google-$FSA" -D category-enriched
           test -s "category-enriched/$FSA.json"
       - name: Verify unknown Google Maps categories against individual Google business detail pages
         timeout-minutes: 60
