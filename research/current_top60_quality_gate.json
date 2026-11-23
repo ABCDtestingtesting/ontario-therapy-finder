@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "status": "REVALIDATION_REQUIRED",
+  "ready_for_database": false,
+  "obsolete_preliminary_source_run": 45219618676,
+  "obsolete_preliminary_artifact": "Ontario_Google_Best_60_Across_498.csv",
+  "reason": "The preliminary Google source-model ranking contains 53 zero-count FSAs. Independent 27-query crosschecks found actual within-5km clinical businesses in at least one FSA previously counted zero (L9E). Many 27-query feeds remain capped or incomplete. The previous positive source-model certification does not independently verify scarcity.",
+  "independent_source_run": 45232783797,
+  "blocking_conditions": [
+    "All potential top-60 FSA source evidence must be clinically audited",
+    "Missing/capped/unlocated search results must not count as provider absence",
+    "Final ranking must recompute across 498 FSAs with population within 5 km and verified lower bounds",
+    "Do not certify unless 60 ranking is provably stable against unresolved contenders"
+  ],
+  "certified_final_60_ready": false
+}
