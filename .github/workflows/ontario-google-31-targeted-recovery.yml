@@ -55,7 +55,7 @@ jobs:
       - name: Reuse only the matching Google Maps checkpoint artifact
         run: |
           mkdir -p recovery-seed
-          gh run download 45033015174 -n "google-tile-recovery-${{ steps.source-shard.outputs.shard }}" -D recovery-seed
+          gh run download 45101079788 -n "google-tile-recovery-${{ steps.source-shard.outputs.shard }}" -D recovery-seed
           python - <<'PY'
           from pathlib import Path
           code = '${{ matrix.fsa }}'
@@ -75,6 +75,7 @@ jobs:
           from research.recover_google_tiles import SEARCHES, tile_tasks, task_key
           assert len(list(tile_tasks())) == 18
           assert all('{FSA}' in term for term in SEARCHES)
+          assert all(task_key(t).startswith('map_movement_v4|') for t in tile_tasks())
           assert '0.0|0.0|0|psychotherapist' not in {task_key(t) for t in tile_tasks()}
           print('GOOGLE_LOCAL_SEARCH_PLAN', SEARCHES)
           PY
