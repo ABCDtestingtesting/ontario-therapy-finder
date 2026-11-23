@@ -1,8 +1,7 @@
 """Regressions for monotonic geographic Google source merging."""
 import unittest
 
-from research.merge_google_checkpoints import combine_google_checkpoints
-from research.recover_google_tiles import tile_tasks, task_key
+from research.merge_google_checkpoints import combine_google_checkpoints, required_base_tile_keys
 
 
 def place(key):
@@ -11,10 +10,10 @@ def place(key):
 
 def verified():
     tiles = {
-        task_key(t): {
+        k: {
             'places': [], 'status': 'observed',
             'capped': False, 'unresolved': [], 'map_area_search_verified': True,
-        } for t in tile_tasks()
+        } for k in required_base_tile_keys()
     }
     return {
         'fsa': 'L4M', 'status': 'verified_tile_feed',
@@ -59,7 +58,7 @@ class CheckpointMergeTests(unittest.TestCase):
             'local_places': [], 'unique_observed_local_places': 0
         }
         new = verified()
-        first = task_key(next(iter(tile_tasks())))
+        first = next(iter(required_base_tile_keys()))
         new['complete_tiles'][first]['map_area_search_verified'] = False
         result, why = combine_google_checkpoints(old, new)
         self.assertEqual(why, 'new_checkpoint_lost_source_evidence')
