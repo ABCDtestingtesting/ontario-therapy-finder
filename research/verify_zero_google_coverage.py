@@ -96,6 +96,20 @@ def summarize(doc):
     return doc
 
 
+def needs_new_map_observation(past):
+    """Do not repeat a geographically observed, capped Google query at the same
+    search scope. Its 120-result limit needs a DIFFERENT map scope to recover
+    unseen locations; the original feed stays explicitly uncertified.
+    """
+    if not past:
+        return True
+    if past.get('map_area_search_verified') is not True:
+        return True
+    if past.get('capped') and past.get('status') in ('observed', 'observed_partial'):
+        return False
+    return bool(past.get('unresolved') or past.get('status') != 'observed')
+
+
 def run(code, baseline, out, budget):
     if not (60 <= budget <= 2500):
         raise RuntimeError('Invalid bounded source collection time')
@@ -123,9 +137,7 @@ def run(code, baseline, out, budget):
                     for term in SEARCH_TERMS:
                         key=f'independent_3term_map_grid_v1|{north}|{east}|{term}'
                         past=doc['observations'].get(key)
-                        if past and (not past.get('capped') and not past.get('unresolved')
-                                     and past.get('status')=='observed'
-                                     and past.get('map_area_search_verified') is True):
+                        if not needs_new_map_observation(past):
                             continue
                         if time.monotonic()-started >= budget:
                             summarize(doc)
