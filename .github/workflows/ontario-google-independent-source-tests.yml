@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/ontario-google-independent-source-tests.yml'
       - 'research/test_independent_zero_source.py'
+      - 'research/test_independent_rank_dominance.py'
       - 'research/reconcile_independent_zero_audit.py'
       - 'research/verify_zero_google_coverage.py'
       - 'research/finalize_full_google_498.py'
@@ -30,4 +31,4 @@ jobs:
           python -m compileall -q research/verify_zero_google_coverage.py research/reconcile_independent_zero_audit.py research/enrich_independent_google_places.py research/finalize_full_google_498.py
       - name: Verify independent Google clinical evidence and zero-cap safeguards
         run: |
-          python -m unittest research.test_independent_zero_source research.test_google_category_evidence research.test_google_bounded_recovery research.test_google_partial_lower_bounds -v
+          python -m unittest research.test_independent_zero_source research.test_independent_rank_dominance research.test_google_category_evidence research.test_google_bounded_recovery research.test_google_partial_lower_bounds -v
