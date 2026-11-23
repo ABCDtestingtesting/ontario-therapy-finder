@@ -172,7 +172,7 @@ jobs:
       - name: Merge without dropping historical source observations
         run: |
           python -m compileall -q research/merge_google_checkpoints.py research/test_google_checkpoint_merge.py research/finalize_full_google_498.py
-          python -m unittest research.test_google_checkpoint_merge research.test_google_category_evidence -v
+          python -m unittest research.test_google_checkpoint_merge research.test_google_category_evidence research.test_google_exterior_place -v
           python - <<'PY'
           import json
           from pathlib import Path
@@ -255,6 +255,22 @@ jobs:
           print('GOOGLE_CATEGORY_MERGE_AUDIT',json.dumps(report),flush=True)
           if rejected:
               raise RuntimeError('Source evidence reconciliation failures; full audit preserved')
+          PY
+      - name: Verify external office location of one locationless Google Maps place
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from research.review_google_exterior_place import adjudicate_n0l
+          paths=list(Path('recovery-output').glob('**/N0L.json'))
+          if len(paths)!=1:
+              raise RuntimeError('Expected unique N0L source checkpoint')
+          doc=json.loads(paths[0].read_text())
+          adjudicate_n0l(doc)
+          if doc.get('externally_verified_exterior_links'):
+              print('N0L_PRIMARY_LOCATION_EXTERNALLY_VERIFIED_OUTSIDE_RADIUS',
+                    doc['externally_verified_exterior_links'][0]['office_address'],flush=True)
+              paths[0].write_text(json.dumps(doc,indent=2))
           PY
       - name: Audit all 498 and certify only if outstanding areas cannot outrank 60th
         run: |
