@@ -1,0 +1,51 @@
+name: Recheck eight remaining capped L7M Google Maps tiles at higher zoom
+on:
+  push:
+    branches: [ontario-401-fsa-live-ranking-20261121]
+    paths: ['.github/workflows/ontario-google-l7m-zoom-recheck.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify-tile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 28
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        index: [0,1,2,3,4,5,6,7]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore strongest existing L7M source observations
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p source
+          gh run download 45214972702 -n four-probe-google-L7M -D source
+          test -s source/L7M.json
+      - name: Install Google Maps collection runtime
+        run: |
+          python -m compileall -q research/recheck_l7m_capped_zoom.py
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps firefox
+      - name: Check exactly one previously capped map tile
+        timeout-minutes: 16
+        run: |
+          python -m research.recheck_l7m_capped_zoom --index "${{ matrix.index }}" --source source/L7M.json --out "zoom-tiles/${{ matrix.index }}/result.json"
+      - name: Preserve full original and refreshed tile observations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: l7m-zoom-tile-${{ matrix.index }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            zoom-tiles/${{ matrix.index }}/result.json
+            zoom-tiles/${{ matrix.index }}/evidence/
