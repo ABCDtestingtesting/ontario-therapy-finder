@@ -3,6 +3,7 @@ on:
   workflow_run:
     workflows:
       - Independently verify all 53 zero-count Ontario Google Maps FSAs
+      - Retry only incomplete independent Ontario Google zero-area checks
     types: [completed]
   workflow_dispatch:
 permissions:
@@ -37,7 +38,42 @@ jobs:
           test -n "$SOURCE_RUN_ID"
           echo "INDEPENDENT_GOOGLE_RECHECK_SOURCE=$SOURCE_RUN_ID"
           mkdir -p independent-rechecks
-          gh run download "$SOURCE_RUN_ID" -p 'independent-zero-*' -D independent-rechecks || true
+          # Always restore first-run source. A retry run contains only missing
+          # or incomplete FSAs and must never replace all 53 observations.
+          gh run download 45232783797 -p 'independent-zero-*' -D independent-rechecks || true
+          if [ "$SOURCE_RUN_ID" != 45232783797 ]; then
+            mkdir -p retries
+            if gh run download "$SOURCE_RUN_ID" -p 'independent-zero-retry-*' -D retries; then
+              python - <<'PY'
+          import json,shutil
+          from pathlib import Path
+          dest=Path('independent-rechecks')
+          for p in Path('retries').glob('**/[A-Z][0-9][A-Z].json'):
+              code=p.stem
+              original=list(dest.glob('**/'+code+'.json'))
+              if len(original)>1:raise RuntimeError('Duplicate historical Google FSA '+code)
+              later=json.loads(p.read_text())
+              if later.get('fsa')!=code:raise RuntimeError('Retry source identity mismatch')
+              if original:
+                  first=json.loads(original[0].read_text())
+                  if not set(first.get('observations',{})).issubset(
+                      set(later.get('observations',{}))):
+                      print('REJECT_INCOMPLETE_GOOGLE_RETRY',code,flush=True)
+                      continue
+                  original_places={x['key'] for x in first.get('local_google_places',[])}
+                  newer_places={x['key'] for x in later.get('local_google_places',[])}
+                  if not original_places.issubset(newer_places):
+                      print('REJECT_GOOGLE_RETRY_LOST_PROVIDERS',code,flush=True)
+                      continue
+                  shutil.copy2(p,original[0])
+              else:
+                  target=dest/('independent-zero-retry-'+code)/(code+'.json')
+                  target.parent.mkdir(parents=True,exist_ok=True)
+                  shutil.copy2(p,target)
+              print('ACCEPTED_STRONGER_INDEPENDENT_GOOGLE_RECHECK',code,flush=True)
+          PY
+            fi
+          fi
       - name: Re-evaluate all 498 and certify only genuinely resolved source uncertainty
         run: |
           python -m compileall -q research/reconcile_independent_zero_audit.py
