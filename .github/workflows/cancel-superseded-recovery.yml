@@ -15,7 +15,7 @@ jobs:
       - name: Cancel only exact known superseded 48-shard searches
         run: |
           set -euo pipefail
-          for run in 45105890062; do
+          for run in 45107007933 45107032995; do
             status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" --jq '.status')"
             if [ "$status" = "queued" ] || [ "$status" = "in_progress" ] || [ "$status" = "waiting" ]; then
               gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$run/cancel" >/dev/null
@@ -24,4 +24,4 @@ jobs:
               echo "SKIP_COMPLETED_GOOGLE_RUN=$run"
             fi
           done
-          echo 'CURRENT_CHECKBOX_VERIFIED_LOCAL_RUN=45106178601'
+          echo 'CURRENT_TARGETED_SOURCE_RUN=45106178601_AND_AUTOMATIC_RESCUE_ON_COMPLETION'
