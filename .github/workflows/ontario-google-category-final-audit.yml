@@ -118,8 +118,8 @@ jobs:
               unmatched_new_places = len(set(old_places)-set(classified_places))
               additions = 0
               for key,place in old_places.items():
-                  update = classified_places[key]
-                  if update.get('google_business_category') and update.get('google_category_evidence_url'):
+                  update = classified_places.get(key)
+                  if update and update.get('google_business_category') and update.get('google_category_evidence_url'):
                       for k in ('google_business_category','google_category_evidence_url','google_category_checked_at'):
                           place[k] = update.get(k)
                       additions += 1
