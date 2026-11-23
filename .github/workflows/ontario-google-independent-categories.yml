@@ -3,6 +3,7 @@ on:
   workflow_run:
     workflows:
       - Independently verify all 53 zero-count Ontario Google Maps FSAs
+      - Retry only incomplete independent Ontario Google zero-area checks
     types: [completed]
   push:
     branches: [main]
@@ -17,6 +18,7 @@ jobs:
     outputs:
       fsas: ${{ steps.choose.outputs.fsas }}
       count: ${{ steps.choose.outputs.count }}
+      retry_run: ${{ steps.choose.outputs.retry_run }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -26,6 +28,12 @@ jobs:
           set -euo pipefail
           mkdir -p zero-checkpoints
           gh run download 45232783797 -R "$GITHUB_REPOSITORY" -p 'independent-zero-*' -D zero-checkpoints
+          RETRY_RUN="$(gh run list -R "$GITHUB_REPOSITORY" --workflow ontario-google-independent-zero-retry.yml --status completed --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+          echo "retry_run=$RETRY_RUN" >> "$GITHUB_OUTPUT"
+          if [ -n "$RETRY_RUN" ]; then
+            mkdir -p retry-checkpoints
+            gh run download "$RETRY_RUN" -R "$GITHUB_REPOSITORY" -p 'independent-zero-retry-*' -D retry-checkpoints || echo 'No completed retry artifacts available yet'
+          fi
           python - <<'PY' >> "$GITHUB_OUTPUT"
           import json
           from pathlib import Path
@@ -33,11 +41,26 @@ jobs:
           saved=list(Path('zero-checkpoints').glob('**/[A-Z][0-9][A-Z].json'))
           if len(saved)!=53 or len({p.stem for p in saved})!=53:
               raise RuntimeError('Independent Google sources missing: expected 53 unique FSA checkpoints, received '+str(len(saved)))
+          original={}
           for p in saved:
               data=json.loads(p.read_text())
               if data.get('fsa')!=p.stem:raise RuntimeError('Mismatched FSA business checkpoint')
+              original[p.stem]=data
+          latest=dict(original)
+          for p in Path('retry-checkpoints').glob('**/[A-Z][0-9][A-Z].json'):
+              data=json.loads(p.read_text())
+              code=p.stem
+              if code not in original or data.get('fsa')!=code:
+                  raise RuntimeError('Unknown retry Google FSA: '+code)
+              first=original[code]
+              old_ids={x['key'] for x in first.get('local_google_places',[])}
+              new_ids={x['key'] for x in data.get('local_google_places',[])}
+              if (set(first.get('observations',{})).issubset(data.get('observations',{}))
+                  and old_ids.issubset(new_ids)):
+                  latest[code]=data
+          for code,data in latest.items():
               if data.get('unique_local_google_businesses',0)>0:
-                  chosen.append(p.stem)
+                  chosen.append(code)
           print('fsas='+json.dumps(sorted(chosen),separators=(',',':')))
           print('count='+str(len(chosen)))
           PY
@@ -54,6 +77,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       CI: 'true'
+      RETRY_RUN: ${{ needs.select.outputs.retry_run }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -64,8 +88,34 @@ jobs:
       - name: Restore unique geographic Google business IDs from source
         run: |
           mkdir -p source
-          gh run download 45232783797 -n "independent-zero-${{ matrix.fsa }}" -D source
+          gh run download 45232783797 -R "$GITHUB_REPOSITORY" -n "independent-zero-${{ matrix.fsa }}" -D source
           test -s "source/${{ matrix.fsa }}.json"
+          if [ -n "$RETRY_RUN" ]; then
+            mkdir -p retry-source
+            if gh run download "$RETRY_RUN" -R "$GITHUB_REPOSITORY" -n "independent-zero-retry-${{ matrix.fsa }}" -D retry-source; then
+              python - <<'PY'
+          import json, shutil
+          from pathlib import Path
+          code='${{ matrix.fsa }}'
+          old=Path('source')/(code+'.json')
+          new=Path('retry-source')/(code+'.json')
+          if not new.is_file():
+              raise RuntimeError('Successful Google retry artifact missing checkpoint '+code)
+          before=json.loads(old.read_text())
+          after=json.loads(new.read_text())
+          if before.get('fsa')!=code or after.get('fsa')!=code:
+              raise RuntimeError('Google retry identity changed '+code)
+          original_ids={p['key'] for p in before.get('local_google_places',[])}
+          updated_ids={p['key'] for p in after.get('local_google_places',[])}
+          if (set(before.get('observations',{})).issubset(after.get('observations',{}))
+              and original_ids.issubset(updated_ids)):
+              shutil.copy2(new,old)
+              print('CLASSIFY_LATEST_STRONGER_GOOGLE_RETRY',code,flush=True)
+          else:
+              print('CLASSIFY_ORIGINAL_GOOGLE_CHECKPOINT_RETRY_LOST_EVIDENCE',code,flush=True)
+          PY
+            fi
+          fi
       - name: Install source-based clinical category verification
         run: |
           python -m pip install -r requirements.txt
