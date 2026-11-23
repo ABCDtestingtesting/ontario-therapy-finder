@@ -1,0 +1,131 @@
+name: Recalculate Ontario Google 498 after live business-category recovery
+on:
+  workflow_run:
+    workflows:
+      - Classify unresolved Ontario Google Maps businesses from verified place categories
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      category_run_id:
+        description: Completed Google place category verification run
+        type: string
+        required: true
+  schedule:
+    - cron: '37 */3 * * *'
+permissions:
+  actions: read
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CATEGORY_RUN_ID: ${{ inputs.category_run_id || github.event.workflow_run.id || '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Locate latest completed Google primary-category inspection
+        run: |
+          if [ -z "$CATEGORY_RUN_ID" ]; then
+            CATEGORY_RUN_ID="$(gh run list --workflow ontario-google-category-recovery.yml --status completed --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+          fi
+          if [ -z "$CATEGORY_RUN_ID" ]; then
+            echo 'Google category scan has not completed; do not certify' >&2
+            exit 1
+          fi
+          echo "CATEGORY_RUN_ID=$CATEGORY_RUN_ID" >> "$GITHUB_ENV"
+          echo "CATEGORY_SOURCE_RUN=$CATEGORY_RUN_ID"
+      - name: Restore complete original evidence and census estimate
+        run: |
+          mkdir -p first-pass recovery-output category-results targeted-results native-results
+          gh run download 44952655975 -n full-ontario-498-google-census-audit -D first-pass
+          gh run download 45033015174 -p 'google-tile-recovery-*' -D recovery-output
+          gh run download 45078523814 -p 'targeted-google-*' -D targeted-results
+          gh run download 45047774153 -p 'native-google-*' -D native-results
+          test -s first-pass/google_all_ontario_498.csv
+          test "$(find recovery-output -name '*.json' | wc -l | tr -d ' ')" -ge 29
+      - name: Load saved newer Google detail-page classifications
+        run: |
+          gh run download "$CATEGORY_RUN_ID" -p 'verified-google-categories-*' -D category-results
+      - name: Merge without dropping historical source observations
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          source = Path('recovery-output')
+          targeted = Path('targeted-results')
+          categories = Path('category-results')
+          original = list(source.glob('**/[A-Z][0-9][A-Z].json'))
+          if len(original) != 241 or len({p.stem for p in original}) != 241:
+              raise RuntimeError(f'Expected all 241 original checkpoint locations; found {len(original)}')
+          current = {p.stem:p for p in original}
+          latest = {}
+          rejected = []
+          for f in targeted.glob('**/[A-Z][0-9][A-Z].json'):
+              if f.stem not in current:
+                  raise RuntimeError('Unexpected FSA in updated Google checkpoint: '+f.stem)
+              old = json.loads(current[f.stem].read_text())
+              new = json.loads(f.read_text())
+              if new.get('fsa') != f.stem or old.get('fsa') != f.stem:
+                  raise RuntimeError('Mismatched source FSA identity')
+              if not set(old.get('complete_tiles',{})).issubset(set(new.get('complete_tiles',{}))):
+                  rejected.append(f.stem+':lost_old_tiles')
+                  continue
+              if int(new.get('unique_observed_local_places') or 0) < int(old.get('unique_observed_local_places') or 0):
+                  rejected.append(f.stem+':lost_observed_businesses')
+                  continue
+              latest[f.stem] = new
+              current[f.stem].write_text(json.dumps(new,indent=2))
+          enriched = {}
+          for f in categories.glob('**/[A-Z][0-9][A-Z].json'):
+              code = f.stem
+              if code not in current:
+                  raise RuntimeError('Unknown classified FSA: '+code)
+              category_doc = json.loads(f.read_text())
+              present = json.loads(current[code].read_text())
+              if category_doc.get('fsa') != code or present.get('fsa') != code:
+                  raise RuntimeError('Category source mismatch')
+              old_places = {p['key']:p for p in present.get('local_places',[])}
+              classified_places = {p['key']:p for p in category_doc.get('local_places',[])}
+              if not set(old_places).issubset(classified_places):
+                  rejected.append(code+':classified_source_missing_old_places')
+                  continue
+              additions = 0
+              for key,place in old_places.items():
+                  update = classified_places[key]
+                  if update.get('google_business_category') and update.get('google_category_evidence_url'):
+                      for k in ('google_business_category','google_category_evidence_url','google_category_checked_at'):
+                          place[k] = update.get(k)
+                      additions += 1
+              present['category_enrichment_report'] = category_doc.get('category_enrichment_report',{})
+              present['local_places'] = list(old_places.values())
+              current[code].write_text(json.dumps(present,indent=2))
+              enriched[code] = additions
+          report={'original_recovery_checkpoints':len(original),
+                  'targeted_checkpoint_merges':len(latest),
+                  'classified_fsa':len(enriched),
+                  'places_with_google_business_categories_by_fsa':enriched,
+                  'rejected_merges':rejected}
+          Path('category_merge_audit.json').write_text(json.dumps(report,indent=2))
+          print('GOOGLE_CATEGORY_MERGE_AUDIT',json.dumps(report),flush=True)
+          if rejected:
+              raise RuntimeError('Source evidence reconciliation failures; full audit preserved')
+          PY
+      - name: Audit all 498 and certify only if outstanding areas cannot outrank 60th
+        run: |
+          python -m research.finalize_full_google_498 first-pass/google_all_ontario_498.csv recovery-output audited-google-498 --native-root native-results
+      - name: Preserve complete 498 audit, provisional 60, unresolved areas and certification status
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: google-498-category-verified-full-audit
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            audited-google-498/
+            category_merge_audit.json
