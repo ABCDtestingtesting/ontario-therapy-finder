@@ -155,9 +155,11 @@ jobs:
           gh run download "$CATEGORY_RUN_ID" -p 'verified-google-categories-*' -D category-results
       - name: Merge without dropping historical source observations
         run: |
+          python -m unittest research.test_google_checkpoint_merge research.test_google_category_evidence -v
           python - <<'PY'
           import json
           from pathlib import Path
+          from research.merge_google_checkpoints import combine_google_checkpoints
           source = Path('recovery-output')
           targeted = Path('targeted-results')
           categories = Path('category-results')
@@ -175,14 +177,12 @@ jobs:
               new = json.loads(f.read_text())
               if new.get('fsa') != f.stem or old.get('fsa') != f.stem:
                   raise RuntimeError('Mismatched source FSA identity')
-              if not set(old.get('complete_tiles',{})).issubset(set(new.get('complete_tiles',{}))):
-                  skipped_superseded.append(f.stem+':newer_recovery_contains_different_tiles')
+              merged, reason = combine_google_checkpoints(old, new)
+              if merged is old:
+                  skipped_superseded.append(f.stem+':'+reason)
                   continue
-              if int(new.get('unique_observed_local_places') or 0) < int(old.get('unique_observed_local_places') or 0):
-                  skipped_superseded.append(f.stem+':newer_recovery_has_more_businesses')
-                  continue
-              latest[f.stem] = new
-              current[f.stem].write_text(json.dumps(new,indent=2))
+              latest[f.stem] = merged
+              current[f.stem].write_text(json.dumps(merged,indent=2))
           enriched = {}
           for f in categories.glob('**/[A-Z][0-9][A-Z].json'):
               code = f.stem
