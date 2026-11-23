@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 from finder.google_browser import scan_one, resolve_place_coordinates
-from finder.common import HumanVerificationRequired
+from finder.common import HumanVerificationRequired, SourceUnavailable
 from research.scan_all_maps import distance_km, global_place_coordinates
 
 RADIUS_KM = 5.0
@@ -53,11 +53,33 @@ def scan_tile(context, code, center, north, east, level, term, root):
     query = term.replace('{FSA}', f'{code} Ontario Canada')  # Local FSA text plus geographic map centre
     token = hashlib.sha256(f'{code}|{north:.3f}|{east:.3f}|{level}|{term}'.encode()).hexdigest()[:16]
     diagnostic = root / 'evidence' / code / token
-    evidence = scan_one(
-        context, query, lat, lon, diagnostic, timeout_seconds=55,
-        max_scroll=22, zoom=17 if level else 15
-    )
-    if not evidence.get('completed') or evidence.get('completion_reason') not in COMPLETE:
+    partial = False
+    try:
+        evidence = scan_one(
+            context, query, lat, lon, diagnostic, timeout_seconds=55,
+            max_scroll=22, zoom=17 if level else 15
+        )
+    except HumanVerificationRequired:
+        # Restricted sources are still blocked. Do not interpret their visible
+        # screen, challenge, or lack of listings as clinical search coverage.
+        raise
+    except SourceUnavailable:
+        # scan_one persists source URL, exact query and any real place links
+        # before raising when a Google feed lacks a verified ending. Save
+        # those businesses as a LOWER BOUND and requeue the unfinished query.
+        # Previously these real findings were silently lost.
+        saved = diagnostic / 'search_evidence.json'
+        if not saved.is_file():
+            raise
+        evidence = json.loads(saved.read_text())
+        if (evidence.get('query') != query
+            or evidence.get('status') == 'verification_required'
+            or not evidence.get('place_links')
+            or not evidence.get('search_url', '').startswith('https://www.google.com/maps/search/')):
+            raise
+        partial = True
+    if not partial and (not evidence.get('completed') or
+                        evidence.get('completion_reason') not in COMPLETE):
         raise RuntimeError('No evidenced Google Maps end-of-feed marker')
     links = evidence.get('place_links', [])
     inside, unresolved = {}, []
@@ -78,9 +100,9 @@ def scan_tile(context, code, center, north, east, level, term, root):
     return {
         'code': code, 'north_km': north, 'east_km': east, 'level': level,
         'term': term, 'source_url': evidence['search_url'],
-        'visible_links': len(links), 'capped': len(links) >= 120,
-        'reason': evidence['completion_reason'], 'places': list(inside.values()),
-        'unresolved': unresolved, 'status': 'observed',
+        'visible_links': len(links), 'capped': partial or len(links) >= 120,
+        'reason': evidence.get('completion_reason'), 'places': list(inside.values()),
+        'unresolved': unresolved, 'status': 'observed_partial' if partial else 'observed',
         'observed_at': datetime.now(timezone.utc).isoformat(),
     }
 
@@ -189,7 +211,8 @@ def run_area(context, area, folder, max_seconds):
         raise RuntimeError('Bounded Google query plan must contain 18 unique tiles')
     # Crucial: never restore the exponential pending queue from version 1.
     doc['pending'] = [task for task in required
-                      if task_key(task) not in doc['complete_tiles']]
+                      if task_key(task) not in doc['complete_tiles']
+                      or doc['complete_tiles'][task_key(task)].get('status') == 'observed_partial']
     doc['recovery_plan'] = 'fixed_18_local_queries_v3_fsa_localized'
     doc['discarded_recursive_pending'] = True
     record_path.write_text(json.dumps(doc, indent=2))
@@ -233,7 +256,8 @@ def run_area(context, area, folder, max_seconds):
     # Every missing base query stays pending for the next run. Legacy completed
     # results stay as lower-bound evidence; changed query keys require fresh local searches.
     doc['pending'] = [task for task in required
-                      if task_key(task) not in doc['complete_tiles']]
+                      if task_key(task) not in doc['complete_tiles']
+                      or doc['complete_tiles'][task_key(task)].get('status') == 'observed_partial']
     # Detail-page categories from later verified lookups are part of the
     # durable source evidence. A resumed tile search must not erase them.
     previously_classified = {
