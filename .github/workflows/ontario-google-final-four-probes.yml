@@ -1,0 +1,76 @@
+name: Probe final four Ontario Google ranking contenders with bounded local search
+on:
+  push:
+    branches:
+      - ontario-401-fsa-live-ranking-20261121
+    paths:
+      - '.github/workflows/ontario-google-final-four-probes.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        fsa: ['K7G', 'N0L', 'L7M', 'N6M']
+    runs-on: ubuntu-latest
+    timeout-minutes: 34
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PYTHONUNBUFFERED: '1'
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore validated Google primary source checkpoint
+        run: |
+          set -euo pipefail
+          code="${{ matrix.fsa }}"
+          mkdir -p source checkpoint/"$code"
+          gh run download 45106178601 -n "targeted-google-$code" -D source
+          test -s "source/$code.json"
+          cp "source/$code.json" "checkpoint/$code/$code.json"
+          mkdir -p newer
+          if gh run download 45204249362 -n "targeted-google-$code" -D newer; then
+            python - <<'PY'
+          import json,shutil
+          from pathlib import Path
+          code='${{ matrix.fsa }}'
+          old=Path('source')/(code+'.json')
+          new=Path('newer')/(code+'.json')
+          a=json.loads(old.read_text())
+          b=json.loads(new.read_text())
+          if b.get('fsa')!=code or not set(a['complete_tiles']).issubset(set(b['complete_tiles'])):
+              raise RuntimeError('Rescue FSA identity or source regression')
+          if int(b.get('unique_observed_local_places') or 0)<int(a.get('unique_observed_local_places') or 0):
+              raise RuntimeError('Rescue checkpoint lost prior places')
+          shutil.copy2(new,Path('checkpoint')/code/(code+'.json'))
+          PY
+          fi
+      - name: Install runtime and verify resume safety
+        run: |
+          python -m pip install -r requirements.txt
+          python -m compileall -q research/probe_remaining_google_contenders.py
+          python -m unittest research.test_google_checkbox_state research.test_google_bounded_recovery -v
+          python -m playwright install --with-deps firefox
+      - name: Probe only missing local competition and preserve all source observations
+        timeout-minutes: 26
+        run: |
+          python -m research.probe_remaining_google_contenders --fsa "${{ matrix.fsa }}" --checkpoint "checkpoint/${{ matrix.fsa }}/${{ matrix.fsa }}.json" --seed "source/${{ matrix.fsa }}.json" --seconds 1150
+      - name: Upload real Google Maps sources including incomplete diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: four-probe-google-${{ matrix.fsa }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            checkpoint/${{ matrix.fsa }}/${{ matrix.fsa }}.json
+            checkpoint/${{ matrix.fsa }}/evidence/
