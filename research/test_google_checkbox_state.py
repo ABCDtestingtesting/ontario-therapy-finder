@@ -10,6 +10,8 @@ class Toggle:
     def __init__(self, checked):
         self.checked = checked
         self.clicks = 0
+    @property
+    def first(self): return self
     def count(self): return 1
     def is_visible(self): return True
     def get_attribute(self, name):
