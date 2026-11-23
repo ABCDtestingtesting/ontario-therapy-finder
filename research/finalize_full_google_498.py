@@ -268,10 +268,26 @@ def combine(first_pass, recovery_root, output, native_root=None):
         # Distinct Google searches cannot be summed without place-level
         # deduplication. The maximum of two observed counts is a safe minimum.
         base_ok = source_complete(old)
-        recovered_ok = bool(source and source.get('status') == 'verified_tile_feed'
+        # Some Google links omit their coordinates. A uniquely identified
+        # business may be excluded from the study radius when its independent
+        # PRIMARY office location is verifiably in a distant town. The
+        # original Google URL and uncertainty remain in the audit record.
+        exterior_verified = bool(
+            source and code == 'N0L'
+            and source.get('status') == 'verified_local_tiles_with_exterior_exception'
+            and len(source.get('externally_verified_exterior_links', [])) == 1
+            and source['externally_verified_exterior_links'][0].get(
+                'outside_region_from_primary_office_evidence') is True
+            and source['externally_verified_exterior_links'][0].get(
+                'google_place_key') == '0x131ec0f0e46a697:0x99076c9617b15499'
+            and int(source.get('unresolved_leaf_links') or 0) == 1)
+        recovered_ok = bool(source and source.get('status') in (
+                                'verified_tile_feed',
+                                'verified_local_tiles_with_exterior_exception')
                             and not source.get('pending')
                             and not source.get('capped_leaf_tiles')
-                            and not source.get('unresolved_leaf_links')
+                            and (not source.get('unresolved_leaf_links')
+                                 or exterior_verified)
                             and recovery_clinically_classified(source))
         native_ok = bool(independent
                          and independent.get('status') == 'grid_observed_complete'
@@ -339,6 +355,7 @@ def combine(first_pass, recovery_root, output, native_root=None):
             'recovery_pending_queries': len(source.get('pending', [])) if source else None,
             'recovery_capped_base_queries': source.get('capped_leaf_tiles') if source else None,
             'recovery_unresolved_coords': source.get('unresolved_leaf_links') if source else None,
+            'recovery_exterior_place_manual_reviews': len(source.get('externally_verified_exterior_links', [])) if source else 0,
             'independent_google_grid_status': independent.get('status') if independent else '',
             'independent_google_raw_rows': independent.get('raw_rows') if independent else None,
             'independent_google_clinical_places': independent_observed,
