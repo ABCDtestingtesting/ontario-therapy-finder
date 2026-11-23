@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/ontario-google-independent-source-tests.yml'
       - 'research/test_independent_zero_source.py'
+      - 'research/test_google_category_evidence.py'
       - 'research/test_independent_rank_dominance.py'
       - 'research/reconcile_independent_zero_audit.py'
       - 'research/verify_zero_google_coverage.py'
