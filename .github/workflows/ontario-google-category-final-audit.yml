@@ -85,6 +85,7 @@ jobs:
           current = {p.stem:p for p in original}
           latest = {}
           rejected = []
+          skipped_superseded = []
           for f in targeted.glob('**/[A-Z][0-9][A-Z].json'):
               if f.stem not in current:
                   raise RuntimeError('Unexpected FSA in updated Google checkpoint: '+f.stem)
@@ -93,10 +94,10 @@ jobs:
               if new.get('fsa') != f.stem or old.get('fsa') != f.stem:
                   raise RuntimeError('Mismatched source FSA identity')
               if not set(old.get('complete_tiles',{})).issubset(set(new.get('complete_tiles',{}))):
-                  rejected.append(f.stem+':lost_old_tiles')
+                  skipped_superseded.append(f.stem+':newer_recovery_contains_different_tiles')
                   continue
               if int(new.get('unique_observed_local_places') or 0) < int(old.get('unique_observed_local_places') or 0):
-                  rejected.append(f.stem+':lost_observed_businesses')
+                  skipped_superseded.append(f.stem+':newer_recovery_has_more_businesses')
                   continue
               latest[f.stem] = new
               current[f.stem].write_text(json.dumps(new,indent=2))
@@ -130,6 +131,7 @@ jobs:
                   'targeted_checkpoint_merges':len(latest),
                   'classified_fsa':len(enriched),
                   'places_with_google_business_categories_by_fsa':enriched,
+                  'superseded_targeted_checkpoints':skipped_superseded,
                   'rejected_merges':rejected}
           Path('category_merge_audit.json').write_text(json.dumps(report,indent=2))
           print('GOOGLE_CATEGORY_MERGE_AUDIT',json.dumps(report),flush=True)
