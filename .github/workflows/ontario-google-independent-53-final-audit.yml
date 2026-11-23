@@ -43,9 +43,10 @@ jobs:
           # or incomplete FSAs and must never replace all 53 observations.
           gh run download 45232783797 -R "$GITHUB_REPOSITORY" -p 'independent-zero-*' -D independent-rechecks
           test "$(find independent-rechecks -name '[A-Z][0-9][A-Z].json' -type f | wc -l | tr -d ' ')" -eq 53
-          if [ "$SOURCE_RUN_ID" != 45232783797 ]; then
+          LATEST_RETRY_RUN="$(gh run list -R "$GITHUB_REPOSITORY" --workflow ontario-google-independent-zero-retry.yml --status completed --limit 1 --json databaseId --jq '.[0].databaseId // empty")"
+          if [ -n "$LATEST_RETRY_RUN" ]; then
             mkdir -p retries
-            if gh run download "$SOURCE_RUN_ID" -R "$GITHUB_REPOSITORY" -p 'independent-zero-retry-*' -D retries; then
+            if gh run download "$LATEST_RETRY_RUN" -R "$GITHUB_REPOSITORY" -p 'independent-zero-retry-*' -D retries; then
               python - <<'PY'
           import json,shutil
           from pathlib import Path
