@@ -112,6 +112,18 @@ jobs:
                           if seen.get(field):
                               element[field]=seen[field]
                               count+=1
+              # The certification algorithm reconstructs unique Google
+              # businesses from observation tiles, NOT from local_google_places.
+              # Propagate the verified categories into each underlying tile.
+              # Retain the original URL, coordinates, and full raw result.
+              for tile in current.get('observations',{}).values():
+                  for place in tile.get('places',[]):
+                      seen=updates.get(place.get('key'))
+                      if seen:
+                          for field in ('google_business_category','google_category_checked_at',
+                                        'google_category_evidence_url','google_category_error'):
+                              if seen.get(field):
+                                  place[field]=seen[field]
               current['category_enrichment_report']=newer.get('category_enrichment_report',{})
               originals[0].write_text(json.dumps(current,indent=2))
               print('INDEPENDENT_SOURCE_GOOGLE_CATEGORIES_MERGED',code,count,flush=True)
