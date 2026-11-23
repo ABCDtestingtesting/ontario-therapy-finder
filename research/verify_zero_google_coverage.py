@@ -56,8 +56,23 @@ def validate_source(code, csvpath):
 
 
 def summarize(doc):
-    values = {p['key']:p for tile in doc.get('observations',{}).values()
-              for p in tile.get('places',[]) if p.get('key')}
+    # Source retries often reobserve a business without its separately
+    # verified Google primary category. Never let last-wins dictionary
+    # deduplication erase richer evidence from an earlier saved observation.
+    values = {p['key']: dict(p) for p in doc.get('local_google_places',[])
+              if p.get('key')}
+    for tile in doc.get('observations',{}).values():
+        for place in tile.get('places',[]):
+            key = place.get('key')
+            if not key:
+                continue
+            old = values.get(key, {})
+            merged = dict(place)
+            for field in ('google_business_category', 'google_category_evidence_url',
+                          'google_category_checked_at', 'google_category_error'):
+                if not merged.get(field) and old.get(field):
+                    merged[field] = old[field]
+            values[key] = merged
     doc['unique_local_google_businesses'] = len(values)
     doc['local_google_places'] = list(values.values())
     doc['clinical_title_confirmed'] = sum(
