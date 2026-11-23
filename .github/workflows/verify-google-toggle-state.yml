@@ -21,3 +21,4 @@ jobs:
       - name: Verify local-map checkbox persistence and full source checkpoint logic
         run: |
           python -m unittest research.test_google_checkbox_state research.test_google_bounded_recovery research.test_google_partial_lower_bounds research.test_google_category_evidence -v
+          echo 'MAP_TOGGLE_AND_DRIFT_RECOVERY_REGRESSIONS_PASS'
