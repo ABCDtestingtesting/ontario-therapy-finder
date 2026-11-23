@@ -1,0 +1,52 @@
+name: Recalculate Ontario 60 after independent 53-area Google rechecks
+on:
+  workflow_run:
+    workflows:
+      - Independently verify all 53 zero-count Ontario Google Maps FSAs
+    types: [completed]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  recertify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN_ID: ${{ github.event.workflow_run.id || '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore complete historical 498 Ontario census and actual Google source evidence
+        run: |
+          set -euo pipefail
+          mkdir -p baseline
+          gh run download 45219618676 -n google-498-category-verified-full-audit -D baseline
+          test -s baseline/audited-google-498/ontario_498_google_recovery_audit.csv
+      - name: Collect each independently checked zero-area source
+        run: |
+          set -euo pipefail
+          if [ -z "$SOURCE_RUN_ID" ]; then
+            SOURCE_RUN_ID="$(gh run list --workflow ontario-google-independent-zero-check.yml --branch ontario-401-fsa-live-ranking-20261121 --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+          fi
+          test -n "$SOURCE_RUN_ID"
+          echo "INDEPENDENT_GOOGLE_RECHECK_SOURCE=$SOURCE_RUN_ID"
+          mkdir -p independent-rechecks
+          gh run download "$SOURCE_RUN_ID" -p 'independent-zero-*' -D independent-rechecks || true
+      - name: Re-evaluate all 498 and certify only genuinely resolved source uncertainty
+        run: |
+          python -m compileall -q research/reconcile_independent_zero_audit.py
+          python -m research.reconcile_independent_zero_audit --baseline baseline/audited-google-498/ontario_498_google_recovery_audit.csv --checkpoints independent-rechecks --out independently-reviewed-ontario-498
+      - name: Preserve complete evidence, all 53 crosscheck statuses, revised provisional 60 and uncertainty
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ontario-498-independently-rechecked-53-zero-fsas
+          retention-days: 30
+          if-no-files-found: error
+          path: independently-reviewed-ontario-498/
