@@ -26,6 +26,22 @@ class GoogleCategoryEvidenceTests(unittest.TestCase):
         self.assertEqual(clinical_title_classification({
             'name': 'Everbloom Outdoor Therapy',
             'google_business_category': 'Occupational therapist'}), 'nonclinical')
+    def test_only_exact_geographically_verified_settlements_are_nonclinical(self):
+        for label, lat, lon in (('Lisle', 44.2680104, -79.9774488),
+                                ('Craighurst', 44.529657, -79.725772)):
+            self.assertEqual(clinical_title_classification({
+                'name': label, 'lat': lat, 'lon': lon,
+                'source_url': 'https://www.google.com/maps/place/' + label
+            }), 'nonclinical')
+            self.assertEqual(clinical_title_classification({
+                'name': label, 'lat': 41.5, 'lon': -80.0,
+                'source_url': 'https://www.google.com/maps/place/' + label
+            }), 'ambiguous')
+            self.assertEqual(clinical_title_classification({
+                'name': label + ' Psychotherapy', 'lat': lat, 'lon': lon,
+                'source_url': 'https://www.google.com/maps/place/' + label
+            }), 'clinical')
+
     def test_positive_title_still_counts_without_category(self):
         self.assertEqual(clinical_title_classification({
             'name': 'Ontario Registered Psychotherapist'}), 'clinical')
