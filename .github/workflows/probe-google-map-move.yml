@@ -38,7 +38,7 @@ jobs:
           center=next(a for a in json.loads(Path('research/ontario_all_populated_fsa_2021.json').read_text())['areas'] if a['fsa']==code)
           lat,lon=center['lat'],center['lon']
           root=Path('map-move-evidence')/code;root.mkdir(parents=True,exist_ok=True)
-          url=f'https://www.google.com/maps/search/{quote("psychologist near "+code+" Ontario Canada",safe="")}/@{lat:.6f},{lon:.6f},14z?hl=en'
+          url=f'https://www.google.com/maps/search/{quote("psychologist",safe="")}/@{lat:.6f},{lon:.6f},14z?hl=en'
           with sync_playwright() as pw:
             browser=pw.firefox.launch(headless=True)
             page=browser.new_page(viewport={'width':1450,'height':980},locale='en-CA')
