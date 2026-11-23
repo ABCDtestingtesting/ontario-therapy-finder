@@ -57,10 +57,12 @@ jobs:
                   f'independent_3term_map_grid_v1|{n}|{e}|{term}'
                   for n in (-3.4,0.0,3.4) for e in (-3.4,0.0,3.4)
                   for term in ('counselling','psychotherapy','mental health clinic')}
-              retryable=any(key not in observed or
-                  observed[key].get('map_area_search_verified') is not True or
-                  observed[key].get('status')!='observed' or
-                  observed[key].get('unresolved')
+              retryable=any(
+                  key not in observed
+                  or observed[key].get('map_area_search_verified') is not True
+                  or (not observed[key].get('capped') and
+                      (observed[key].get('status')!='observed'
+                       or observed[key].get('unresolved')))
                   for key in all_queries)
               if retryable:chosen.append(code)
           print('fsas='+json.dumps(chosen,separators=(',',':')))
