@@ -79,7 +79,8 @@ def clinical_title_classification(place):
         # 'Mental health service' includes peer support and advocacy groups.
         # A generic social-work registration or NGO name does not prove the
         # organization offers psychotherapy or psychological treatment.
-        clinical_categories = ('psychotherap', 'psycholog', 'counsel', 'counsell',
+        clinical_categories = ('psychotherap', 'psycholog',
+            'mental health counsel', 'mental health counsell',
             'mental health clinic', 'family therap',
             'marriage or relationship counsel')
         nonclinical_categories = ('physiotherap', 'chiropract', 'physical therap',
@@ -95,10 +96,13 @@ def clinical_title_classification(place):
             'debt counseling', 'debt counselling',
             'financial advisor', 'financial consultant',
             'education consultant')
-        if any(term in category for term in clinical_categories):
-            return 'clinical'
+        # Google can categorize credit/debt/career advice as counselling.
+        # Reject an explicitly nonclinical category before matching any
+        # overlapping mental-health wording. "Counselor" alone is ambiguous.
         if any(term in category for term in nonclinical_categories):
             return 'nonclinical'
+        if any(term in category for term in clinical_categories):
+            return 'clinical'
     return 'ambiguous'
 
 
