@@ -70,6 +70,9 @@ jobs:
           python -m playwright install --with-deps firefox
           python -m compileall -q research/recheck_google_contenders.py research/recover_google_tiles.py finder/google_browser.py
           python -m unittest research.test_google_checkbox_state research.test_google_bounded_recovery research.test_google_partial_lower_bounds -v
+      # Independent live four-tab test proved the Google checkbox persists across
+      # tabs. The collector enables it only when aria-checked=false; preflight
+      # regression passed in GitHub Actions run 45106109602.
       - name: Verify localized query keys before resuming Google checkpoints
         run: |
           python - <<'PY'
