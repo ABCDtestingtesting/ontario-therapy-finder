@@ -22,6 +22,18 @@ class IndependentZeroSourceTests(unittest.TestCase):
         self.assertEqual(clinical_title_classification({
             'name':'Lecuyer Counselling','google_business_category':'Counselor'}),'clinical')
 
+    def test_peer_support_or_mental_health_advocacy_is_not_proven_psychotherapy(self):
+        self.assertEqual(clinical_title_classification({
+            'name':'Black Mental Health Canada'}),'ambiguous')
+        self.assertEqual(clinical_title_classification({
+            'name':'Boots on the Ground',
+            'google_business_category':'Mental health service'}),'ambiguous')
+        self.assertEqual(clinical_title_classification({
+            'name':'Caravan Therapy',
+            'google_business_category':'Psychotherapist'}),'clinical')
+        self.assertEqual(clinical_title_classification({
+            'name':'Registered Social Worker'}),'ambiguous')
+
     def sample(self):
         return {'fsa':'L9E','observations':{},'status':'in_progress'}
 
