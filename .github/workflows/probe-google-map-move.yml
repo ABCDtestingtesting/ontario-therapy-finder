@@ -1,0 +1,88 @@
+name: Verify Google Maps update-results-on-map-move local search filtering
+on:
+  push:
+    paths: ['.github/workflows/probe-google-map-move.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  map-movement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    strategy:
+      fail-fast: false
+      matrix:
+        fsa: [P3P, N7M, L0M]
+    env:
+      FSA: ${{ matrix.fsa }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps firefox
+      - name: Test Google Maps Update results when map moves checkbox
+        run: |
+          python - <<'PY'
+          import os,json,time,re
+          from pathlib import Path
+          from urllib.parse import quote
+          from playwright.sync_api import sync_playwright
+          from finder.google_browser import place_coordinates
+          from research.scan_all_maps import distance_km
+          code=os.environ['FSA']
+          center=next(a for a in json.loads(Path('research/ontario_all_populated_fsa_2021.json').read_text())['areas'] if a['fsa']==code)
+          lat,lon=center['lat'],center['lon']
+          root=Path('map-move-evidence')/code;root.mkdir(parents=True,exist_ok=True)
+          url=f'https://www.google.com/maps/search/{quote("psychotherapist near "+code+" Ontario Canada",safe="")}/@{lat:.6f},{lon:.6f},17z?hl=en'
+          with sync_playwright() as pw:
+            browser=pw.firefox.launch(headless=True)
+            page=browser.new_page(viewport={'width':1450,'height':980},locale='en-CA')
+            try:
+              response=page.goto(url,wait_until='domcontentloaded',timeout=40000)
+              page.wait_for_timeout(2000)
+              report={'fsa':code,'http':response.status if response else None,'initial_url':page.url}
+              def inspect():
+                links=page.locator('a[href*="/maps/place/"]').evaluate_all('els=>els.map(x=>({url:x.href,name:x.getAttribute("aria-label")||x.innerText||""}))')
+                ds=[distance_km((lat,lon),p) for p in [place_coordinates(x['url']) for x in links] if p]
+                txt=page.locator('body').inner_text(timeout=12000)
+                return {'count':len(links),'within_5km':sum(d<=5 for d in ds),'min_distance':round(min(ds),2) if ds else None,
+                  'feed_end':('end of the list' in txt.lower()),'no_results':('no results' in txt.lower()),
+                  'url':page.url,'first_names':[l['name'] for l in links[:6]]}
+              report['before']=inspect()
+              checks=page.locator('input[type="checkbox"]')
+              report['checkbox_count']=checks.count()
+              report['checkbox_labels']=page.locator('label').all_inner_texts()[:12]
+              report['update_text_count']=page.get_by_text('Update results when map moves').count()
+              page.screenshot(path=str(root/'before.png'),timeout=10000)
+              try:
+                label=page.get_by_text('Update results when map moves')
+                if label.count():label.first.click(timeout=4000)
+                elif checks.count():checks.first.check(force=True,timeout=4000)
+                page.wait_for_timeout(1000)
+                report['checkbox_checked']=page.locator('input[type="checkbox"]').first.is_checked() if checks.count() else None
+              except Exception as ex:report['checkbox_error']=str(ex)
+              # Move inside the map itself, beyond the left results pane.
+              for i,(dx,dy) in enumerate(((175,55),(-350,-95),(165,45))):
+                x,y=1050,510
+                page.mouse.move(x,y)
+                page.mouse.down()
+                page.mouse.move(x+dx,y+dy,steps=15)
+                page.mouse.up()
+                page.wait_for_timeout(2400)
+                report['after_drag_'+str(i+1)]=inspect()
+                page.screenshot(path=str(root/'after_'+str(i+1)+'.png'),timeout=10000)
+              print('MAP_MOVE_PROBE',json.dumps(report),flush=True)
+              (root/'probe.json').write_text(json.dumps(report,indent=2))
+            finally:browser.close()
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: google-map-movement-${{ matrix.fsa }}
+          path: map-move-evidence/${{ matrix.fsa }}/
+          retention-days: 7
