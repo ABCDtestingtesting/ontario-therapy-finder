@@ -75,7 +75,7 @@ jobs:
                 page.mouse.up()
                 page.wait_for_timeout(2400)
                 report['after_drag_'+str(i+1)]=inspect()
-                page.screenshot(path=str(root/'after_'+str(i+1)+'.png'),timeout=10000)
+                page.screenshot(path=str(root/('after_'+str(i+1)+'.png')),timeout=10000)
               print('MAP_MOVE_PROBE',json.dumps(report),flush=True)
               (root/'probe.json').write_text(json.dumps(report,indent=2))
             finally:browser.close()
