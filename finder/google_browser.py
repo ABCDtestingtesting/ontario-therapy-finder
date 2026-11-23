@@ -71,12 +71,22 @@ def _refresh_map_area_results(page, lat, lon):
     the visible control and panning made Google report genuine local results
     or an explicit 'No results' message. Fail closed when UI changes.
     """
-    control = page.get_by_text('Update results when map moves')
+    # This toggle is stored across tabs in Google Maps' persistent context.
+    # Live four-tab Firefox verification proved an unconditional click
+    # ALTERNATED true -> false -> true -> false, silently turning geographic
+    # scoping off for every second tile. Only click when it is explicitly off.
+    control = page.get_by_role('checkbox', name='Update results when map moves')
     if not control.count() or not control.first.is_visible():
-        raise SourceUnavailable('Google location-scoped results control was not visible')
+        raise SourceUnavailable('Google location-scoped results checkbox was not visible')
     original_url = page.url
-    control.first.click(timeout=5000)
-    page.wait_for_timeout(500)
+    state = control.first.get_attribute('aria-checked')
+    if state == 'false':
+        control.first.click(timeout=5000)
+        page.wait_for_timeout(500)
+    elif state != 'true':
+        raise SourceUnavailable('Google map-area checkbox has an unknown state')
+    if control.first.get_attribute('aria-checked') != 'true':
+        raise SourceUnavailable('Google map-area checkbox did not remain enabled')
     viewport = page.viewport_size or {'width':1400,'height':960}
     x = int(viewport['width'] * .72)
     y = int(viewport['height'] * .52)
@@ -88,6 +98,8 @@ def _refresh_map_area_results(page, lat, lon):
         page.mouse.move(x+dx,y+dy,steps=14)
         page.mouse.up()
         page.wait_for_timeout(1800)
+    if control.first.get_attribute('aria-checked') != 'true':
+        raise SourceUnavailable('Google map-area results toggle was disabled during search')
     refreshed_url=page.url
     match=re.search(r'/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),',refreshed_url)
     if refreshed_url == original_url or not match:
