@@ -47,8 +47,22 @@ jobs:
                   continue
               doc=json.loads(paths[0].read_text())
               if doc.get('fsa')!=code:raise RuntimeError('Google source FSA identity changed')
-              if doc.get('status')!='all_27_independent_google_feeds_observed':
-                  chosen.append(code)
+              # Repeating an evidenced 120-result Google feed at the
+              # same map scale wastes quota and does not remove censorship.
+              # Retry only missing, challenged or geographically invalid
+              # sources; capped-but-observed tiles need a different search
+              # scope and stay explicitly uncertified.
+              observed=doc.get('observations',{})
+              all_queries={
+                  f'independent_3term_map_grid_v1|{n}|{e}|{term}'
+                  for n in (-3.4,0.0,3.4) for e in (-3.4,0.0,3.4)
+                  for term in ('counselling','psychotherapy','mental health clinic')}
+              retryable=any(key not in observed or
+                  observed[key].get('map_area_search_verified') is not True or
+                  observed[key].get('status')!='observed' or
+                  observed[key].get('unresolved')
+                  for key in all_queries)
+              if retryable:chosen.append(code)
           print('fsas='+json.dumps(chosen,separators=(',',':')))
           print('count='+str(len(chosen)))
           PY
