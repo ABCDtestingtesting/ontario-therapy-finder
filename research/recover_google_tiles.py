@@ -234,10 +234,22 @@ def run_area(context, area, folder, max_seconds):
     # results stay as lower-bound evidence; changed query keys require fresh local searches.
     doc['pending'] = [task for task in required
                       if task_key(task) not in doc['complete_tiles']]
+    # Detail-page categories from later verified lookups are part of the
+    # durable source evidence. A resumed tile search must not erase them.
+    previously_classified = {
+        p['key']: p for p in doc.get('local_places', [])
+        if p.get('google_business_category')
+    }
     merged = {}
     for entry in doc['complete_tiles'].values():
         for p in entry.get('places', []):
             merged[p['key']] = p
+            old_detail = previously_classified.get(p['key'])
+            if old_detail:
+                for field in ('google_business_category', 'google_category_checked_at',
+                              'google_category_evidence_url'):
+                    if old_detail.get(field):
+                        merged[p['key']][field] = old_detail[field]
     base = [doc['complete_tiles'][key] for key in required_keys
             if key in doc['complete_tiles']]
     capped = sum(bool(entry.get('capped')) for entry in base)
