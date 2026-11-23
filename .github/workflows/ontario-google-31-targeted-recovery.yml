@@ -18,7 +18,7 @@ jobs:
       fail-fast: false
       max-parallel: 8
       matrix:
-        fsa: ['N7M', 'L9L', 'L0B', 'L0M', 'K7G', 'P3P', 'L0A', 'N0L', 'K0K', 'K0B', 'N0G', 'N0H', 'K0L', 'P0C', 'P0G', 'P0R', 'P0M', 'P0S', 'L4M', 'L7M', 'M9M', 'M3L', 'N6M', 'N5V', 'L1A', 'M1L', 'M1R', 'M9N', 'N1R']
+        fsa: ['N7M', 'L0M', 'K7G', 'N0L', 'K0B', 'N0G', 'K0L', 'P0G', 'L7M', 'M9M', 'M3L', 'N6M', 'N5V']
     env:
       GH_TOKEN: ${{ github.token }}
       PYTHONUNBUFFERED: '1'
@@ -64,11 +64,38 @@ jobs:
               raise RuntimeError(f'Expected one prior checkpoint for {code}, found {len(found)}')
           print('FOUND_ORIGINAL_GOOGLE_CHECKPOINT',code,found[0])
           PY
+      - name: Restore latest evidence-preserving targeted checkpoint
+        run: |
+          set -euo pipefail
+          code="${{ matrix.fsa }}"
+          mkdir -p "targeted-google/$code"
+          if gh run download 45106178601 -n "targeted-google-$code" -D "targeted-google/$code"; then
+            test -s "targeted-google/$code/$code.json"
+            python - <<'PY'
+          import json
+          from pathlib import Path
+          code='${{ matrix.fsa }}'
+          target=Path('targeted-google')/code/(code+'.json')
+          base=list(Path('recovery-seed').glob('**/'+code+'.json'))
+          if len(base)!=1:raise RuntimeError('Original recovery checkpoint not unique')
+          original=json.loads(base[0].read_text())
+          current=json.loads(target.read_text())
+          if current.get('fsa')!=code or original.get('fsa')!=code:
+              raise RuntimeError('Targeted checkpoint identity mismatch')
+          if not set(original.get('complete_tiles',{})).issubset(set(current.get('complete_tiles',{}))):
+              raise RuntimeError('Targeted checkpoint lost original completed searches')
+          if int(current.get('unique_observed_local_places') or 0)<int(original.get('unique_observed_local_places') or 0):
+              raise RuntimeError('Targeted checkpoint lost original locations')
+          print('REUSED_TARGETED_GOOGLE_CHECKPOINT',code,len(current.get('complete_tiles',{})),flush=True)
+          PY
+          else
+            echo "No targeted checkpoint for $code; using original shard evidence"
+          fi
       - name: Install and validate Google Maps browser collector
         run: |
           python -m pip install -r requirements.txt
           python -m playwright install --with-deps firefox
-          python -m compileall -q research/recheck_google_contenders.py research/recover_google_tiles.py finder/google_browser.py
+          python -m compileall -q research/recheck_google_contenders.py research/recover_google_tiles.py research/google_measured_recenter_runner.py finder/google_browser.py
           python -m unittest research.test_google_checkbox_state research.test_google_bounded_recovery research.test_google_partial_lower_bounds -v
       # Independent live four-tab test proved the Google checkbox persists across
       # tabs. The collector enables it only when aria-checked=false; preflight
