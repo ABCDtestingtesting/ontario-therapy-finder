@@ -4,6 +4,7 @@ on:
     workflows:
       - Independently verify all 53 zero-count Ontario Google Maps FSAs
       - Retry only incomplete independent Ontario Google zero-area checks
+      - Independently verify clinical categories for nonempty zero-area Google rechecks
     types: [completed]
   workflow_dispatch:
 permissions:
@@ -71,6 +72,49 @@ jobs:
                   target.parent.mkdir(parents=True,exist_ok=True)
                   shutil.copy2(p,target)
               print('ACCEPTED_STRONGER_INDEPENDENT_GOOGLE_RECHECK',code,flush=True)
+          PY
+            fi
+          fi
+      - name: Merge individual Google Maps clinical category evidence without discarding any providers
+        env:
+          CATEGORY_SOURCE_RUN: ${{ github.event.workflow_run.name == 'Independently verify clinical categories for nonempty zero-area Google rechecks' && github.event.workflow_run.id || '' }}
+        run: |
+          set -euo pipefail
+          if [ -z "$CATEGORY_SOURCE_RUN" ]; then
+            CATEGORY_SOURCE_RUN="$(gh run list --workflow ontario-google-independent-categories.yml --status completed --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+          fi
+          if [ -n "$CATEGORY_SOURCE_RUN" ]; then
+            mkdir -p categorized-sources
+            if gh run download "$CATEGORY_SOURCE_RUN" -p 'independent-categorized-*' -D categorized-sources; then
+              python - <<'PY'
+          import json
+          from pathlib import Path
+          for p in Path('categorized-sources').glob('**/[A-Z][0-9][A-Z].json'):
+              code=p.stem
+              originals=list(Path('independent-rechecks').glob('**/'+code+'.json'))
+              if len(originals)!=1:
+                  print('SKIP_MISSING_OR_AMBIGUOUS_GOOGLE_ORIGINAL',code,flush=True)
+                  continue
+              current=json.loads(originals[0].read_text())
+              newer=json.loads(p.read_text())
+              if newer.get('fsa')!=code or current.get('fsa')!=code:
+                  raise RuntimeError('Google source category identity mismatch')
+              ids={x['key'] for x in current.get('local_google_places',[])}
+              updates={x['key']:x for x in newer.get('local_google_places',[])}
+              if not set(updates).issubset(ids):
+                  raise RuntimeError('Unknown categories without geographic source confirmation')
+              count=0
+              for element in current.get('local_google_places',[]):
+                  seen=updates.get(element['key'])
+                  if seen:
+                      for field in ('google_business_category','google_category_checked_at',
+                                    'google_category_evidence_url','google_category_error'):
+                          if seen.get(field):
+                              element[field]=seen[field]
+                              count+=1
+              current['category_enrichment_report']=newer.get('category_enrichment_report',{})
+              originals[0].write_text(json.dumps(current,indent=2))
+              print('INDEPENDENT_SOURCE_GOOGLE_CATEGORIES_MERGED',code,count,flush=True)
           PY
             fi
           fi
