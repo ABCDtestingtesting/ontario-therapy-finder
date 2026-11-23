@@ -45,6 +45,24 @@ def clinical_title_classification(place):
         return 'nonclinical'
     if any(term in name for term in CLINICAL_TITLE_TERMS):
         return 'clinical'
+    # Exact Google Maps business-detail categories are stronger evidence than
+    # a vague business title. Unknown categories remain ambiguous; a scraped
+    # search term or a guessed business specialty never counts as evidence.
+    category = str(place.get('google_business_category') or '').casefold().strip()
+    if category:
+        clinical_categories = ('psychotherap', 'psycholog', 'counsel', 'counsell',
+            'mental health clinic', 'mental health service', 'social work',
+            'family therap', 'marriage or relationship counsel',
+            'addiction treatment center', 'addiction treatment centre')
+        nonclinical_categories = ('physiotherap', 'chiropract', 'physical therap',
+            'occupational therap', 'massage therap', 'acupunctur', 'life coach',
+            'veterinar', 'church', 'wellness center', 'wellness centre',
+            'health food store', 'dentist', 'pharmacy', 'speech patholog',
+            'speech therap', 'naturopath', 'yoga studio')
+        if any(term in category for term in clinical_categories):
+            return 'clinical'
+        if any(term in category for term in nonclinical_categories):
+            return 'nonclinical'
     return 'ambiguous'
 
 
