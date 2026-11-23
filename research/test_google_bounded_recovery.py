@@ -25,7 +25,7 @@ class BoundedRecoveryTests(unittest.TestCase):
         }
 
     def test_localized_queries_have_distinct_keys_from_legacy_generic_cells(self):
-        self.assertEqual(SEARCHES, ('psychotherapist near {FSA}', 'counselling therapy near {FSA}'))
+        self.assertEqual(SEARCHES, ('psychotherapist near {FSA}', 'registered psychotherapist near {FSA}'))
         self.assertEqual(len(list(tile_tasks())), 18)
         self.assertTrue(all('{FSA}' in task[3] for task in tile_tasks()))
         self.assertNotIn('-3.4|-3.4|0|psychotherapist', {task_key(t) for t in tile_tasks()})
