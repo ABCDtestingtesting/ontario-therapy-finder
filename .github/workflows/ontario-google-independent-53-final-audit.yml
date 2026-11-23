@@ -28,7 +28,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p baseline
-          gh run download 45219618676 -n google-498-category-verified-full-audit -D baseline
+          gh run download 45219618676 -R "$GITHUB_REPOSITORY" -n google-498-category-verified-full-audit -D baseline
           test -s baseline/audited-google-498/ontario_498_google_recovery_audit.csv
       - name: Collect each independently checked zero-area source
         run: |
@@ -41,10 +41,11 @@ jobs:
           mkdir -p independent-rechecks
           # Always restore first-run source. A retry run contains only missing
           # or incomplete FSAs and must never replace all 53 observations.
-          gh run download 45232783797 -p 'independent-zero-*' -D independent-rechecks || true
+          gh run download 45232783797 -R "$GITHUB_REPOSITORY" -p 'independent-zero-*' -D independent-rechecks
+          test "$(find independent-rechecks -name '[A-Z][0-9][A-Z].json' -type f | wc -l | tr -d ' ')" -eq 53
           if [ "$SOURCE_RUN_ID" != 45232783797 ]; then
             mkdir -p retries
-            if gh run download "$SOURCE_RUN_ID" -p 'independent-zero-retry-*' -D retries; then
+            if gh run download "$SOURCE_RUN_ID" -R "$GITHUB_REPOSITORY" -p 'independent-zero-retry-*' -D retries; then
               python - <<'PY'
           import json,shutil
           from pathlib import Path
@@ -85,7 +86,7 @@ jobs:
           fi
           if [ -n "$CATEGORY_SOURCE_RUN" ]; then
             mkdir -p categorized-sources
-            if gh run download "$CATEGORY_SOURCE_RUN" -p 'independent-categorized-*' -D categorized-sources; then
+            if gh run download "$CATEGORY_SOURCE_RUN" -R "$GITHUB_REPOSITORY" -p 'independent-categorized-*' -D categorized-sources; then
               python - <<'PY'
           import json
           from pathlib import Path
@@ -132,6 +133,7 @@ jobs:
           fi
       - name: Re-evaluate all 498 and certify only genuinely resolved source uncertainty
         run: |
+          test "$(find independent-rechecks -name '[A-Z][0-9][A-Z].json' -type f | wc -l | tr -d ' ')" -eq 53
           python -m compileall -q research/reconcile_independent_zero_audit.py
           python -m research.reconcile_independent_zero_audit --baseline baseline/audited-google-498/ontario_498_google_recovery_audit.csv --checkpoints independent-rechecks --out independently-reviewed-ontario-498
       - name: Preserve complete evidence, all 53 crosscheck statuses, revised provisional 60 and uncertainty
