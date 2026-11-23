@@ -85,7 +85,13 @@ def clinical_title_classification(place):
             'health food store', 'kennel', 'osteopath', 'industrial consultant',
             'horse riding school', 'research institute', 'skin care clinic',
             'dentist', 'pharmacy', 'speech patholog',
-            'speech therap', 'naturopath', 'yoga studio')
+            'speech therap', 'naturopath', 'yoga studio',
+            'career guidance', 'career counselor', 'career counsellor',
+            'employment center', 'employment centre',
+            'credit counseling', 'credit counselling',
+            'debt counseling', 'debt counselling',
+            'financial advisor', 'financial consultant',
+            'education consultant')
         if any(term in category for term in clinical_categories):
             return 'clinical'
         if any(term in category for term in nonclinical_categories):
