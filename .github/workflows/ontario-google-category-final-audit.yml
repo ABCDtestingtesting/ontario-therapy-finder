@@ -155,6 +155,7 @@ jobs:
           gh run download "$CATEGORY_RUN_ID" -p 'verified-google-categories-*' -D category-results
       - name: Merge without dropping historical source observations
         run: |
+          python -m compileall -q research/merge_google_checkpoints.py research/test_google_checkpoint_merge.py research/finalize_full_google_498.py
           python -m unittest research.test_google_checkpoint_merge research.test_google_category_evidence -v
           python - <<'PY'
           import json
