@@ -1,0 +1,83 @@
+name: Probe Google Maps place categories for ambiguous Ontario competitors
+on:
+  push:
+    paths: ['.github/workflows/probe-google-place-categories.yml']
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  sample:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - fsa: M9M
+            artifact: targeted-google-M9M
+          - fsa: M1L
+            artifact: targeted-google-M1L
+          - fsa: N1R
+            artifact: targeted-google-N1R
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FSA: ${{ matrix.fsa }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Download latest actual Google Maps place identity evidence
+        run: |
+          mkdir -p raw
+          gh run download 45078523814 -n "${{ matrix.artifact }}" -D raw
+          test -s "raw/$FSA.json"
+      - name: Inspect Google Maps place categories without inferring from names
+        run: |
+          python - <<'PY'
+          import os,json,re,time
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+          code=os.environ['FSA']
+          src=json.loads((Path('raw')/(code+'.json')).read_text())
+          pos=('psychotherap','psycholog','counsel','counsell','mental health','social work','social worker','family therap','marriage therap','behavioral therap','behavioural therap','registered therapist','msw','rsw')
+          neg=('physiotherap','physical therap','physio','chiropract','massage','naturopath','pharmacy','veterinar','animal shelter','conservation area','dog ','pet ','fitness','acupuncture','dental','dentist','sport injury','sports injury','speech therapy','real estate')
+          ambiguous=[p for p in src['local_places'] if not any(t in p['name'].casefold() for t in pos+neg)]
+          if code == 'M9M': ambiguous=ambiguous[:20]
+          elif code == 'M1L': ambiguous=ambiguous[:20]
+          else: ambiguous=ambiguous[:5]
+          results=[]
+          with sync_playwright() as pw:
+            browser=pw.chromium.launch(headless=True)
+            ctx=browser.new_context(viewport={'width':1366,'height':900},locale='en-CA')
+            for p in ambiguous:
+              tab=ctx.new_page()
+              info={'name':p['name'],'url':p['source_url']}
+              try:
+                response=tab.goto(p['source_url'],wait_until='domcontentloaded',timeout=35000)
+                tab.wait_for_timeout(1800)
+                info['http']=response.status if response else None
+                info['title']=tab.title()
+                info['h1']=tab.locator('h1').all_inner_texts()[:3]
+                info['buttons']=tab.locator('button').evaluate_all('els=>els.map(x=>({text:(x.innerText||"").trim(),aria:x.getAttribute("aria-label"),class:x.className})).filter(x=>x.text||x.aria).slice(0,35)')
+                info['category_dkea']=tab.locator('button.DkEaL').all_inner_texts()[:5]
+                info['body_excerpt']=tab.locator('body').inner_text(timeout=10000)[:500]
+              except Exception as exc: info['error']=str(exc)
+              results.append(info)
+              print('GOOGLE_CATEGORY_PROBE',json.dumps({k:v for k,v in info.items() if k not in ('buttons','body_excerpt')}),flush=True)
+              tab.close()
+            browser.close()
+          Path('categories.json').write_text(json.dumps(results,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: google-category-sample-${{ matrix.fsa }}
+          retention-days: 7
+          path: categories.json
