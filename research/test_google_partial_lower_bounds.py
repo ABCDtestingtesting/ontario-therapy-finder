@@ -39,7 +39,7 @@ class PartialSourceLowerBoundTests(unittest.TestCase):
         with patch('research.recover_google_tiles.scan_one',
                    side_effect=self.unverified_feed):
             result = scan_tile(None,'M9M',self.center,0.,0.,0.,
-                               'psychotherapist near {FSA}',self.root)
+                               'psychotherapist',self.root)
         self.assertEqual(result['status'], 'observed_partial')
         self.assertTrue(result['capped'])
         self.assertEqual(len(result['places']),1)
@@ -64,7 +64,7 @@ class PartialSourceLowerBoundTests(unittest.TestCase):
                    side_effect=HumanVerificationRequired('Google challenge')):
             with self.assertRaises(HumanVerificationRequired):
                 scan_tile(None,'M9M',self.center,0.,0.,0.,
-                          'psychotherapist near {FSA}',self.root)
+                          'psychotherapist',self.root)
 
 
 if __name__ == '__main__':
