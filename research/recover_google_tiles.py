@@ -21,7 +21,7 @@ from finder.common import HumanVerificationRequired, SourceUnavailable
 from research.scan_all_maps import distance_km, global_place_coordinates
 
 RADIUS_KM = 5.0
-SEARCHES = ('psychotherapist near {FSA}', 'counselling therapy near {FSA}')
+SEARCHES = ('psychotherapist near {FSA}', 'registered psychotherapist near {FSA}')
 # 3.4 km grid supplies 9 overlapping centres; capped tiles subdivide.
 BASE_OFFSETS_KM = (-3.4, 0.0, 3.4)
 SUB_OFFSETS_KM = (-1.15, 0.0, 1.15)
