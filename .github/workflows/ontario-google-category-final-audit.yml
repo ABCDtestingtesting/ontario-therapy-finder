@@ -172,7 +172,7 @@ jobs:
       - name: Merge without dropping historical source observations
         run: |
           python -m compileall -q research/merge_google_checkpoints.py research/test_google_checkpoint_merge.py research/finalize_full_google_498.py
-          python -m unittest research.test_google_checkpoint_merge research.test_google_category_evidence research.test_google_exterior_place -v
+          python -m unittest research.test_google_checkpoint_merge research.test_google_category_evidence research.test_google_exterior_place research.test_k7g_uncapped_zoom -v
           python - <<'PY'
           import json
           from pathlib import Path
@@ -271,6 +271,28 @@ jobs:
               print('N0L_PRIMARY_LOCATION_EXTERNALLY_VERIFIED_OUTSIDE_RADIUS',
                     doc['externally_verified_exterior_links'][0]['office_address'],flush=True)
               paths[0].write_text(json.dumps(doc,indent=2))
+          PY
+      - name: Reconcile K7G uncapped verified local-zoom Google source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p k7g-zoom
+          gh run download 45217828105 -n final-two-google-K7G -D k7g-zoom
+          test -s k7g-zoom/K7G.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from research.adjudicate_k7g_uncapped_zoom import replace_capped_tile_with_uncapped_local_recheck
+          found=list(Path('recovery-output').glob('**/K7G.json'))
+          if len(found)!=1:raise RuntimeError('Expected unique complete original K7G checkpoint')
+          before=json.loads(found[0].read_text())
+          probe=json.loads(Path('k7g-zoom/K7G.json').read_text())
+          reviewed=replace_capped_tile_with_uncapped_local_recheck(before,probe)
+          if reviewed['status']!='verified_tile_feed' or reviewed['capped_leaf_tiles']!=0:
+              raise RuntimeError('K7G local map source still incomplete')
+          found[0].write_text(json.dumps(reviewed,indent=2))
+          print('K7G_VERIFIED_ZOOM16_SOURCE_OLD_CAP_PRESERVED',flush=True)
           PY
       - name: Audit all 498 and certify only if outstanding areas cannot outrank 60th
         run: |
