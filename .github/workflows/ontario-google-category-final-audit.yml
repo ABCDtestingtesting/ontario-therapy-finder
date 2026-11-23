@@ -8,6 +8,7 @@ on:
       - Recover all capped and incomplete Ontario Google Maps postal areas
       - Recheck remaining Ontario Google Maps ranking contenders
       - Resume only incomplete Ontario Google Maps source tiles
+      - Probe final four Ontario Google ranking contenders with bounded local search
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -30,6 +31,7 @@ jobs:
       RECOVERY_RUN_ID: ${{ github.event.workflow_run.name == 'Recover all capped and incomplete Ontario Google Maps postal areas' && github.event.workflow_run.id || '' }}
       TARGET_RUN_ID: ${{ github.event.workflow_run.name == 'Recheck remaining Ontario Google Maps ranking contenders' && github.event.workflow_run.id || '' }}
       RETRY_RUN_ID: ${{ github.event.workflow_run.name == 'Resume only incomplete Ontario Google Maps source tiles' && github.event.workflow_run.id || '' }}
+      FINAL_FOUR_RUN_ID: ${{ github.event.workflow_run.name == 'Probe final four Ontario Google ranking contenders with bounded local search' && github.event.workflow_run.id || '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -150,6 +152,20 @@ jobs:
           print('GOOGLE_RETRY_MERGE',json.dumps(report),flush=True)
           PY
           fi
+      - name: Restore only complete final-four Google evidence artifacts
+        run: |
+          set -euo pipefail
+          if [ -z "$FINAL_FOUR_RUN_ID" ]; then
+            FINAL_FOUR_RUN_ID="$(gh run list --workflow ontario-google-final-four-probes.yml --branch ontario-401-fsa-live-ranking-20261121 --status completed --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+          fi
+          if [ -n "$FINAL_FOUR_RUN_ID" ]; then
+            mkdir -p final-four-results
+            if gh run download "$FINAL_FOUR_RUN_ID" -p 'four-probe-google-*' -D final-four-results; then
+              echo "FINAL_FOUR_SOURCE_RUN=$FINAL_FOUR_RUN_ID"
+            else
+              echo 'No complete final-four Google evidence yet; preserving previous evidence'
+            fi
+          fi
       - name: Load saved newer Google detail-page classifications
         run: |
           gh run download "$CATEGORY_RUN_ID" -p 'verified-google-categories-*' -D category-results
@@ -184,6 +200,25 @@ jobs:
                   continue
               latest[f.stem] = merged
               current[f.stem].write_text(json.dumps(merged,indent=2))
+          # Final-four probes augment the Google lower bound with actual
+          # geographically resolved place IDs. Never manufacture a verified
+          # end-of-feed when the underlying 18-query source remains capped.
+          final_four_used = []
+          for path in Path('final-four-results').glob('**/[A-Z][0-9][A-Z].json'):
+              code = path.stem
+              if code not in current:
+                  raise RuntimeError('Unknown final-four Google source '+code)
+              original = json.loads(current[code].read_text())
+              new = json.loads(path.read_text())
+              merged, reason = combine_google_checkpoints(original,new)
+              if merged is original:
+                  print('SKIP_WEAKER_FINAL_FOUR_SOURCE',code,reason,flush=True)
+                  continue
+              if not set(original.get('complete_tiles',{})).issubset(set(merged.get('complete_tiles',{}))):
+                  raise RuntimeError('Final-four merge lost source tiles '+code)
+              current[code].write_text(json.dumps(merged,indent=2))
+              final_four_used.append(code)
+          print('FINAL_FOUR_GOOGLE_EVIDENCE_MERGE',sorted(final_four_used),flush=True)
           enriched = {}
           for f in categories.glob('**/[A-Z][0-9][A-Z].json'):
               code = f.stem
