@@ -1,7 +1,7 @@
 """Fail-closed regressions for independently rechecked Google clinical ranking."""
 import unittest
 from research.finalize_full_google_498 import clinical_title_classification
-from research.verify_zero_google_coverage import summarize, EXPECTED_KEYS
+from research.verify_zero_google_coverage import summarize, EXPECTED_KEYS, needs_new_map_observation
 from research.merge_google_checkpoints import required_base_tile_keys
 
 
@@ -40,6 +40,20 @@ class IndependentZeroSourceTests(unittest.TestCase):
     def tile(self):
         return {'status':'observed','capped':False,'unresolved':[],
                 'map_area_search_verified':True,'places':[]}
+
+    def test_capped_observed_query_needs_changed_scope_not_identical_retry(self):
+        capped=self.tile()
+        capped['capped']=True
+        self.assertFalse(needs_new_map_observation(capped))
+        capped['status']='observed_partial'
+        self.assertFalse(needs_new_map_observation(capped))
+        capped['map_area_search_verified']=False
+        self.assertTrue(needs_new_map_observation(capped))
+        uncapped=self.tile()
+        self.assertFalse(needs_new_map_observation(uncapped))
+        uncapped['unresolved']=[{'url':'https://www.google.com/maps/place/test'}]
+        self.assertTrue(needs_new_map_observation(uncapped))
+        self.assertTrue(needs_new_map_observation(None))
 
     def test_cap_never_certifies_empty_area(self):
         doc=self.sample()
