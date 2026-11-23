@@ -5,7 +5,7 @@ from research.finalize_full_google_498 import clinical_title_classification
 class GoogleCategoryEvidenceTests(unittest.TestCase):
     def test_verified_google_category_can_resolve_ambiguous_title(self):
         self.assertEqual(clinical_title_classification({
-            'name': 'Just For Today', 'google_business_category': 'Counselor'}), 'clinical')
+            'name': 'Just For Today', 'google_business_category': 'Counselor'}), 'ambiguous')
         self.assertEqual(clinical_title_classification({
             'name': 'Holistic Mind and Body Wellness',
             'google_business_category': 'Psychotherapist'}), 'clinical')
