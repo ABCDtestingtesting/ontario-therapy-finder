@@ -6,6 +6,7 @@ on:
     workflows:
       - Classify unresolved Ontario Google Maps businesses from verified place categories
       - Recover all capped and incomplete Ontario Google Maps postal areas
+      - Recheck remaining Ontario Google Maps ranking contenders
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -26,6 +27,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       CATEGORY_RUN_ID: ${{ inputs.category_run_id || '' }}
       RECOVERY_RUN_ID: ${{ github.event.workflow_run.name == 'Recover all capped and incomplete Ontario Google Maps postal areas' && github.event.workflow_run.id || '' }}
+      TARGET_RUN_ID: ${{ github.event.workflow_run.name == 'Recheck remaining Ontario Google Maps ranking contenders' && github.event.workflow_run.id || '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -64,7 +66,12 @@ jobs:
             mkdir -p recovery-output
             gh run download 45070243739 -p 'google-tile-recovery-*' -D recovery-output
           fi
-          gh run download 45078523814 -p 'targeted-google-*' -D targeted-results
+          if [ -z "$TARGET_RUN_ID" ]; then
+            TARGET_RUN_ID="$(gh run list --workflow ontario-google-31-targeted-recovery.yml --branch ontario-401-fsa-live-ranking-20261121 --status completed --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+          fi
+          TARGET_RUN_ID="${TARGET_RUN_ID:-45078523814}"
+          echo "TARGETED_SOURCE_RUN=$TARGET_RUN_ID"
+          gh run download "$TARGET_RUN_ID" -p 'targeted-google-*' -D targeted-results
           gh run download 45047774153 -p 'native-google-*' -D native-results
           test -s first-pass/google_all_ontario_498.csv
           test "$(find recovery-output -name '*.json' | wc -l | tr -d ' ')" = 241
