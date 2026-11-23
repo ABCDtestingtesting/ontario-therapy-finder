@@ -1,7 +1,14 @@
 """Merge historical and current Google observations without losing locations."""
 from copy import deepcopy
 
-from research.recover_google_tiles import tile_tasks, task_key
+def required_base_tile_keys():
+    positions = (-3.4, 0.0, 3.4)
+    terms = ('psychotherapist', 'psychologist')
+    return {
+        'map_movement_v7_checkbox_on|' +
+        '|'.join(map(str, (north, east, 0, term)))
+        for north in positions for east in positions for term in terms
+    }
 
 
 def combine_google_checkpoints(old, new):
@@ -20,7 +27,7 @@ def combine_google_checkpoints(old, new):
     if (len(old_places) != int(old.get('unique_observed_local_places') or 0) or
             len(new_places) != int(new.get('unique_observed_local_places') or 0)):
         raise RuntimeError('Google checkpoint local place count inconsistent')
-    required = {task_key(task) for task in tile_tasks()}
+    required = required_base_tile_keys()
     current_complete = (
         new.get('status') == 'verified_tile_feed'
         and required <= set(new_tiles)
