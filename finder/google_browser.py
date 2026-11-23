@@ -104,14 +104,47 @@ def _refresh_map_area_results(page, lat, lon):
     match=re.search(r'/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),',refreshed_url)
     if refreshed_url == original_url or not match:
         raise SourceUnavailable('Google did not confirm map-area results refresh')
-    new_lat,new_lon=map(float,match.groups())
-    radians=math.pi/180
-    value=math.sin((new_lat-lat)*radians/2)**2+(
-        math.cos(lat*radians)*math.cos(new_lat*radians)
-        *math.sin((new_lon-lon)*radians/2)**2)
-    offset=12742*math.asin(min(1,math.sqrt(value)))
+    def map_offset(url):
+        match=re.search(r'/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),',url)
+        if not match:
+            raise SourceUnavailable('Google refreshed URL has no geographic center')
+        new_lat,new_lon=map(float,match.groups())
+        radians=math.pi/180
+        value=math.sin((new_lat-lat)*radians/2)**2+(
+            math.cos(lat*radians)*math.cos(new_lat*radians)
+            *math.sin((new_lon-lon)*radians/2)**2)
+        return 12742*math.asin(min(1,math.sqrt(value)))
+    offset=map_offset(refreshed_url)
     if offset > .70:
-        raise SourceUnavailable(f'Google map center drifted {offset:.2f} km from required local tile')
+        # Google occasionally retains only one of the two inverse map drags,
+        # drifting 1.8-1.9 km. Navigate to the exact original tile and trigger
+        # a fresh checked-map refresh with a short drag. The final source URL
+        # must still prove the intended geographic center, never a guessed one.
+        for attempt in range(2):
+            page.goto(original_url,wait_until='domcontentloaded',timeout=35000)
+            page.wait_for_timeout(1000)
+            checkbox=page.get_by_role('checkbox',name='Update results when map moves')
+            if not checkbox.count() or not checkbox.first.is_visible():
+                raise SourceUnavailable('Google map-area checkbox missing on recenter')
+            checked=checkbox.first.get_attribute('aria-checked')
+            if checked == 'false':
+                checkbox.first.click(timeout=5000)
+                page.wait_for_timeout(500)
+            elif checked != 'true':
+                raise SourceUnavailable('Google map-area checkbox unknown on recenter')
+            page.mouse.move(x,y)
+            page.mouse.down()
+            page.mouse.move(x+22,y+7,steps=8)
+            page.mouse.up()
+            page.wait_for_timeout(2100)
+            refreshed_url=page.url
+            if checkbox.first.get_attribute('aria-checked') != 'true':
+                raise SourceUnavailable('Google map-area checkbox disabled on recenter')
+            offset=map_offset(refreshed_url)
+            if offset <= .70 and refreshed_url != original_url:
+                break
+        if offset > .70:
+            raise SourceUnavailable(f'Google map center drifted {offset:.2f} km after correction')
     return {'refreshed_url':refreshed_url,'map_center_offset_km':round(offset,4)}
 
 
