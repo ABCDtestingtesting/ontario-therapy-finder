@@ -57,13 +57,16 @@ jobs:
                   if len(old)!=1:raise RuntimeError('Original source checkpoint missing '+code)
                   before=json.loads(old[0].read_text())
                   latest=json.loads(newest[0].read_text())
-                  if (latest.get('fsa')!=code or
-                      not set(before.get('complete_tiles',{})).issubset(set(latest.get('complete_tiles',{}))) or
-                      int(before.get('unique_observed_local_places') or 0)>
+                  if (latest.get('fsa')==code and
+                      set(before.get('complete_tiles',{})).issubset(set(latest.get('complete_tiles',{}))) and
+                      int(before.get('unique_observed_local_places') or 0)<=
                       int(latest.get('unique_observed_local_places') or 0)):
-                      print('SKIP_WEAKER_NEWER_GOOGLE_CHECKPOINT',code,flush=True)
-                  else:
-                      new=newest
+                      previous=json.loads(new[0].read_text()) if len(new)==1 else None
+                      if (previous is None or
+                          (set(previous.get('complete_tiles',{})).issubset(set(latest.get('complete_tiles',{}))) and
+                           int(previous.get('unique_observed_local_places') or 0)<=
+                           int(latest.get('unique_observed_local_places') or 0))):
+                          new=newest
               if len(old)>1 or len(new)>1:raise RuntimeError('Duplicate Google FSA evidence for '+code)
               recent = json.loads(new[0].read_text()) if len(new)==1 else None
               original = json.loads(old[0].read_text()) if len(old)==1 else None
