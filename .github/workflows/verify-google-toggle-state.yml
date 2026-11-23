@@ -1,0 +1,23 @@
+name: Verify Google map scoping toggle and source-coverage regression
+on:
+  push:
+    paths: ['.github/workflows/verify-google-toggle-state.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install source test dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Verify local-map checkbox persistence and full source checkpoint logic
+        run: |
+          python -m unittest research.test_google_checkbox_state research.test_google_bounded_recovery research.test_google_partial_lower_bounds research.test_google_category_evidence -v
