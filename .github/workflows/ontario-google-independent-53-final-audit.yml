@@ -6,6 +6,9 @@ on:
       - Retry only incomplete independent Ontario Google zero-area checks
       - Independently verify clinical categories for nonempty zero-area Google rechecks
     types: [completed]
+  push:
+    branches: [main]
+    paths: ['.github/workflows/ontario-google-independent-53-final-audit.yml']
   workflow_dispatch:
 permissions:
   contents: read
