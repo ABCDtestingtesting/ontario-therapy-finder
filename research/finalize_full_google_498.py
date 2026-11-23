@@ -41,6 +41,23 @@ def clinical_title_classification(place):
     name = str(place.get('name') or '').casefold().strip()
     if not name:
         return 'ambiguous'
+    # Google Maps sometimes returns a named settlement as a business.
+    # These exact positions are corroborated by official Canadian place
+    # records (Lisle, Ontario and Craighurst, Ontario). Match the settlement
+    # itself at its known coordinates, never a clinic named after the town.
+    geographic_places = {
+        'lisle': (44.268, -79.977),
+        'craighurst': (44.52914, -79.72567),
+    }
+    if name in geographic_places:
+        place_lat, place_lon = geographic_places[name]
+        try:
+            if (abs(float(place.get('lat')) - place_lat) < .002 and
+                    abs(float(place.get('lon')) - place_lon) < .002 and
+                    '/maps/place/' in str(place.get('source_url') or '')):
+                return 'nonclinical'
+        except (TypeError, ValueError):
+            pass
     if any(term in name for term in NONCLINICAL_TITLE_TERMS):
         return 'nonclinical'
     if any(term in name for term in CLINICAL_TITLE_TERMS):
