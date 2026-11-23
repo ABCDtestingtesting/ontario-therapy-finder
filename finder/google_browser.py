@@ -89,7 +89,7 @@ def _refresh_map_area_results(page, lat, lon):
         page.mouse.up()
         page.wait_for_timeout(1800)
     refreshed_url=page.url
-    match=re.search(r'/@(-?\\d+(?:\\.\\d+)?),(-?\\d+(?:\\.\\d+)?),',refreshed_url)
+    match=re.search(r'/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),',refreshed_url)
     if refreshed_url == original_url or not match:
         raise SourceUnavailable('Google did not confirm map-area results refresh')
     new_lat,new_lon=map(float,match.groups())
