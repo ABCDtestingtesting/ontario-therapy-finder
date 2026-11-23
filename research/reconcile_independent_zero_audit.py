@@ -184,7 +184,9 @@ def review(baseline, checkpoints, destination):
     headers=list(updated[0].keys())
     export(destination/'Ontario_Google_498_Independently_Reviewed.csv',updated,headers)
     export(destination/'Ontario_Google_53_Zero_Crosscheck.csv',reports,list(reports[0].keys()))
-    export(destination/'Ontario_Google_60_New_Provisional.csv',
+    # An audit with fewer than 60 verified sources must never emit a file
+    # whose name falsely suggests that it contains a full ranked top 60.
+    export(destination/'Ontario_Google_Clinically_Checked_Provisional.csv',
            [dict(rank=i,**r) for i,r in enumerate(done[:60],1)],['rank']+headers)
     export(destination/'Ontario_Google_Unresolved_Independent_Contenders.csv',
            unresolved,headers)
