@@ -32,7 +32,11 @@ jobs:
           fi
           test -n "$TARGET_RUN_ID"
           mkdir -p original-target previous-retry
-          gh run download "$TARGET_RUN_ID" --repo "$GITHUB_REPOSITORY" -p 'targeted-google-*' -D original-target
+          # Restore the authoritative 29-area saved evidence first. Newer
+          # partial runs may omit verified areas or fail preflight entirely.
+          gh run download 45106178601 --repo "$GITHUB_REPOSITORY" -p 'targeted-google-*' -D original-target
+          mkdir -p newer-target
+          gh run download "$TARGET_RUN_ID" --repo "$GITHUB_REPOSITORY" -p 'targeted-google-*' -D newer-target || true
           RETRY_RUN_ID="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ontario-google-tile-rescue.yml --status completed --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
           if [ -n "$RETRY_RUN_ID" ] && [ "$RETRY_RUN_ID" != "$GITHUB_RUN_ID" ]; then
             gh run download "$RETRY_RUN_ID" --repo "$GITHUB_REPOSITORY" -p 'resumed-google-*' -D previous-retry || true
@@ -42,11 +46,24 @@ jobs:
           python - <<'PY' >> "$GITHUB_OUTPUT"
           import json
           from pathlib import Path
-          fsas='N7M L9L L0B L0M K7G P3P L0A N0L K0K K0B N0G N0H K0L P0C P0G P0R P0M P0S L4M L7M M9M M3L N6M N5V L1A M1L M1R M9N N1R'.split()
+          fsas='N7M L0M K7G N0L K0B N0G K0L P0G L7M M9M M3L N6M N5V'.split()
           selected=[]
           for code in fsas:
               old=list(Path('original-target').glob('**/'+code+'.json'))
               new=list(Path('previous-retry').glob('**/'+code+'.json'))
+              newest=list(Path('newer-target').glob('**/'+code+'.json'))
+              if len(newest)>1:raise RuntimeError('Duplicate newest source evidence for '+code)
+              if newest:
+                  if len(old)!=1:raise RuntimeError('Original source checkpoint missing '+code)
+                  before=json.loads(old[0].read_text())
+                  latest=json.loads(newest[0].read_text())
+                  if (latest.get('fsa')!=code or
+                      not set(before.get('complete_tiles',{})).issubset(set(latest.get('complete_tiles',{}))) or
+                      int(before.get('unique_observed_local_places') or 0)>
+                      int(latest.get('unique_observed_local_places') or 0)):
+                      print('SKIP_WEAKER_NEWER_GOOGLE_CHECKPOINT',code,flush=True)
+                  else:
+                      new=newest
               if len(old)>1 or len(new)>1:raise RuntimeError('Duplicate Google FSA evidence for '+code)
               recent = json.loads(new[0].read_text()) if len(new)==1 else None
               original = json.loads(old[0].read_text()) if len(old)==1 else None
@@ -110,8 +127,28 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p targeted-google/${{ matrix.fsa }}
-          if gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" -n "targeted-google-${{ matrix.fsa }}" -D "targeted-google/${{ matrix.fsa }}"; then
-            test -s "targeted-google/${{ matrix.fsa }}/${{ matrix.fsa }}.json"
+          # Preserve the strong original checkpoint even when the newest
+          # matrix job emitted no artifact due to a failed test.
+          gh run download 45106178601 --repo "$GITHUB_REPOSITORY" -n "targeted-google-${{ matrix.fsa }}" -D "targeted-google/${{ matrix.fsa }}"
+          test -s "targeted-google/${{ matrix.fsa }}/${{ matrix.fsa }}.json"
+          mkdir -p newer-source
+          if gh run download "$SOURCE_RUN_ID" --repo "$GITHUB_REPOSITORY" -n "targeted-google-${{ matrix.fsa }}" -D newer-source; then
+            python - <<'PY'
+          import json,shutil
+          from pathlib import Path
+          code='${{ matrix.fsa }}'
+          old=Path('targeted-google')/code/(code+'.json')
+          new=Path('newer-source')/(code+'.json')
+          prior=json.loads(old.read_text())
+          latest=json.loads(new.read_text())
+          if (latest.get('fsa')==code and
+              set(prior.get('complete_tiles',{})).issubset(set(latest.get('complete_tiles',{}))) and
+              int(latest.get('unique_observed_local_places') or 0)>=int(prior.get('unique_observed_local_places') or 0)):
+              shutil.copy2(new,old)
+              print('RESUMING_STRONGER_TARGETED_CHECKPOINT',code,flush=True)
+          else:
+              print('PRESERVING_ORIGINAL_TARGETED_CHECKPOINT',code,flush=True)
+          PY
           fi
           if [ -n "$PRIOR_RETRY_RUN_ID" ]; then
             mkdir -p saved-retry
@@ -143,7 +180,7 @@ jobs:
       - name: Complete only genuinely missing saved local Google Maps tiles
         timeout-minutes: 66
         run: |
-          python -m research.recheck_google_contenders --fsa "${{ matrix.fsa }}" --seconds 3500
+          python -m research.google_measured_recenter_runner --fsa "${{ matrix.fsa }}" --seconds 3500
       - name: Preserve every completed or incomplete retry checkpoint
         if: always()
         uses: actions/upload-artifact@v4
