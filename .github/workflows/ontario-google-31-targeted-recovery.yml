@@ -74,9 +74,9 @@ jobs:
           python - <<'PY'
           from research.recover_google_tiles import SEARCHES, tile_tasks, task_key
           assert len(list(tile_tasks())) == 18
-          assert SEARCHES == ('psychotherapist near {FSA}', 'registered psychotherapist near {FSA}')
-          assert all('{FSA}' in term for term in SEARCHES)
-          assert all(task_key(t).startswith('map_movement_v4|') for t in tile_tasks())
+          assert SEARCHES == ('psychotherapist', 'psychologist')
+          assert all('{FSA}' not in term for term in SEARCHES)
+          assert all(task_key(t).startswith('map_movement_v6_category_only|') for t in tile_tasks())
           assert '0.0|0.0|0|psychotherapist' not in {task_key(t) for t in tile_tasks()}
           print('GOOGLE_LOCAL_SEARCH_PLAN', SEARCHES)
           PY
