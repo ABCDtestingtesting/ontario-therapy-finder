@@ -4,6 +4,9 @@ on:
     workflows:
       - Independently verify all 53 zero-count Ontario Google Maps FSAs
     types: [completed]
+  push:
+    branches: [main]
+    paths: ['.github/workflows/ontario-google-independent-categories.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,13 +23,17 @@ jobs:
       - name: Identify Google areas with locally observed provider businesses
         id: choose
         run: |
+          set -euo pipefail
           mkdir -p zero-checkpoints
-          gh run download 45232783797 -p 'independent-zero-*' -D zero-checkpoints || true
+          gh run download 45232783797 -R "$GITHUB_REPOSITORY" -p 'independent-zero-*' -D zero-checkpoints
           python - <<'PY' >> "$GITHUB_OUTPUT"
           import json
           from pathlib import Path
           chosen=[]
-          for p in Path('zero-checkpoints').glob('**/[A-Z][0-9][A-Z].json'):
+          saved=list(Path('zero-checkpoints').glob('**/[A-Z][0-9][A-Z].json'))
+          if len(saved)!=53 or len({p.stem for p in saved})!=53:
+              raise RuntimeError('Independent Google sources missing: expected 53 unique FSA checkpoints, received '+str(len(saved)))
+          for p in saved:
               data=json.loads(p.read_text())
               if data.get('fsa')!=p.stem:raise RuntimeError('Mismatched FSA business checkpoint')
               if data.get('unique_local_google_businesses',0)>0:
