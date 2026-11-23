@@ -25,10 +25,10 @@ CLINICAL_TITLE_TERMS = (
     # Generic 'counselling' can describe credit, career, debt or legal
     # advice. Require an explicit mental-health qualification or a verified
     # Google Maps clinical business category instead.
-    'psychotherap', 'psycholog', 'mental health',
-    'social work', 'social worker', 'family therap', 'marriage therap',
-    'behavioral therap', 'behavioural therap', 'registered therapist',
-    'registered psychotherapist', 'msw', 'rsw',
+    'psychotherap', 'psycholog', 'family therap', 'marriage therap',
+    'mental health counsel', 'mental health counsell',
+    'mental health therap', 'clinical social work',
+    'registered psychotherapist',
 )
 NONCLINICAL_TITLE_TERMS = (
     'physiotherap', 'physical therap', 'physio', 'chiropract', 'massage',
@@ -75,10 +75,12 @@ def clinical_title_classification(place):
     # search term or a guessed business specialty never counts as evidence.
     category = str(place.get('google_business_category') or '').casefold().strip()
     if category:
+        # 'Mental health service' includes peer support and advocacy groups.
+        # A generic social-work registration or NGO name does not prove the
+        # organization offers psychotherapy or psychological treatment.
         clinical_categories = ('psychotherap', 'psycholog', 'counsel', 'counsell',
-            'mental health clinic', 'mental health service', 'social work',
-            'family therap', 'marriage or relationship counsel',
-            'addiction treatment center', 'addiction treatment centre')
+            'mental health clinic', 'family therap',
+            'marriage or relationship counsel')
         nonclinical_categories = ('physiotherap', 'chiropract', 'physical therap',
             'occupational therap', 'massage therap', 'acupunctur', 'life coach',
             'veterinar', 'church', 'wellness center', 'wellness centre',
