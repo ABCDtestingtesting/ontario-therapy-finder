@@ -28,6 +28,7 @@ class PartialSourceLowerBoundTests(unittest.TestCase):
                 'coordinates': [43.711, -79.570],
             }],
             'completed': False,
+            'geographic_refresh_verified': True,
             'completion_reason': None,
             'failure': 'Missing verified Google end-of-list marker',
         }
