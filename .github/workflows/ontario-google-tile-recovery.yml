@@ -12,7 +12,7 @@ on:
       resume_run_id:
         description: 'Prior recovery run containing saved FSA checkpoints'
         required: false
-        default: '45026069774'
+        default: '45070243739'
         type: string
 permissions:
   contents: read
@@ -45,7 +45,7 @@ jobs:
           test -s first-pass/google_all_ontario_498.csv
       - name: Restore previous FSA checkpoints before searching
         env:
-          RESUME_RUN_ID: ${{ inputs.resume_run_id || '45026069774' }}
+          RESUME_RUN_ID: ${{ inputs.resume_run_id || '45070243739' }}
           SHARD: ${{ matrix.shard }}
         run: |
           mkdir -p "recovery-output/shard-$SHARD"
@@ -55,7 +55,7 @@ jobs:
           python -m pip install -r requirements.txt
           python -m playwright install --with-deps firefox
           python -m compileall -q research/recover_google_tiles.py finder/google_browser.py
-          python -m unittest research.test_google_pipeline research.test_google_bounded_recovery -v
+          python -m unittest research.test_google_pipeline research.test_google_bounded_recovery research.test_google_partial_lower_bounds research.test_google_category_evidence -v
       - name: Recover capped, missing-coordinate, and incomplete Google areas
         timeout-minutes: 108
         run: |
