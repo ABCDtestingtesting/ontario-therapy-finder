@@ -27,6 +27,7 @@ CLINICAL_TITLE_TERMS = (
     # Google Maps clinical business category instead.
     'psychotherap', 'psycholog', 'family therap', 'marriage therap',
     'mental health counsel', 'mental health counsell',
+    'counselling and mental health centre',
     'mental health therap', 'clinical social work',
     'registered psychotherapist',
 )
