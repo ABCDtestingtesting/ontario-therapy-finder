@@ -292,9 +292,15 @@ jobs:
           found[0].write_text(json.dumps(reviewed,indent=2))
           print('K7G_VERIFIED_LATEST_UNCAPPED_SOURCE_OLD_CAP_PRESERVED',flush=True)
           PY
+      - name: Restore original item-level clinical evidence across all 498 FSAs
+        run: |
+          set -euo pipefail
+          mkdir -p original-clinical-source
+          gh run download 45317051215 -R "$GITHUB_REPOSITORY" -n ontario-498-original-google-clinical-business-evidence -D original-clinical-source
+          test -s original-clinical-source/Ontario_498_Firstpass_Verified_Clinical_Lower_Bounds.csv
       - name: Audit all 498 with clinically verified businesses only; certify only if every competitor is bounded
         run: |
-          python -m research.finalize_full_google_498 first-pass/google_all_ontario_498.csv recovery-output audited-google-498 --native-root native-results
+          python -m research.finalize_full_google_498 first-pass/google_all_ontario_498.csv recovery-output audited-google-498 --native-root native-results --original-clinical-audit original-clinical-source/Ontario_498_Firstpass_Verified_Clinical_Lower_Bounds.csv
       - name: Preserve complete 498 audit, provisional 60, unresolved areas and certification status
         if: always()
         uses: actions/upload-artifact@v4
