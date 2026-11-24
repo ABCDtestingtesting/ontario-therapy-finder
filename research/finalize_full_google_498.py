@@ -288,7 +288,9 @@ def combine(first_pass, recovery_root, output, native_root=None):
         independent_observed = int(independent.get('unique_clinical_local_places') or 0) if independent else 0
         # Never add counts from distinct searches: overlaps cannot be assumed
         # disjoint without canonical Google place IDs. Max is a valid bound.
-        lower = max(baseline, observed_recovered, independent_observed)
+        # Keyword-only Google counts are not clinically verified and cannot
+        # be used as a lower bound on psychotherapists or psychologists.
+        lower = max(observed_recovered, independent_observed)
         # Distinct Google searches cannot be summed without place-level
         # deduplication. The maximum of two observed counts is a safe minimum.
         base_ok = source_complete(old)
@@ -321,13 +323,7 @@ def combine(first_pass, recovery_root, output, native_root=None):
                          and independent_grid_searches_complete(independent,native_paths[code]))
         native_empty_ok = bool(independent
                                and independent_grid_empty_evidenced(independent, native_paths[code]))
-        if base_ok and lower == baseline:
-            # Complete single-query baseline is an observed-directory count,
-            # not an exhaustive tally of therapists or clinics.
-            count = baseline
-            exact = True
-            status = 'first_pass_complete'
-        elif native_ok or native_empty_ok:
+        if native_ok or native_empty_ok:
             # Complete the bounded Google source observation, including proven
             # empty output. This never claims all therapists were enumerated.
             # Different source searches may omit otherwise visible local
@@ -356,6 +352,9 @@ def combine(first_pass, recovery_root, output, native_root=None):
             'fsa': code,
             'population_5km_estimate_2021': pop,
             'google_observed_therapy_locations_lower_bound': lower,
+            'historical_keyword_observed_google_proxy_count': baseline,
+            'historical_keyword_proxies_used_as_clinical_lower_bound': False,
+            'historical_keyword_feed_complete': base_ok,
             'google_therapy_locations_used_in_score': count,
             'google_listings_per_10000_residents_or_lower_bound': round(observed_density, 8),
             'residents_per_google_listing_or_upper_bound': residents_per_listing,
@@ -391,18 +390,18 @@ def combine(first_pass, recovery_root, output, native_root=None):
                        and not r['excluded_last_90_days']),
                       key=lambda r: (r['google_listings_per_10000_residents_or_lower_bound'],
                                      -r['population_5km_estimate_2021'], r['fsa']))
-    if len(verified) < 60:
-        raise RuntimeError('Fewer than 60 completed Google source feeds')
-    cutoff = verified[59]['google_listings_per_10000_residents_or_lower_bound']
+    cutoff = (verified[59]['google_listings_per_10000_residents_or_lower_bound']
+              if len(verified) >= 60 else None)
     contenders = sorted((r for r in rows if not r['completed_source_feed']
                          and not r['excluded_last_90_days']
-                         and r['google_listings_per_10000_residents_or_lower_bound'] <= cutoff),
+                         and (cutoff is None or r['google_listings_per_10000_residents_or_lower_bound'] <= cutoff)),
                         key=lambda r: (r['google_listings_per_10000_residents_or_lower_bound'],
                                        -r['population_5km_estimate_2021'], r['fsa']))
     safe_to_exclude = [r for r in rows if not r['completed_source_feed']
                        and not r['excluded_last_90_days']
+                       and cutoff is not None
                        and r['google_listings_per_10000_residents_or_lower_bound'] > cutoff]
-    certified = not contenders
+    certified = cutoff is not None and not contenders
     out = Path(output)
     out.mkdir(parents=True, exist_ok=True)
 
@@ -415,14 +414,18 @@ def combine(first_pass, recovery_root, output, native_root=None):
                 writer.writerow({'rank': i, **row} if rank else row)
 
     write_csv('ontario_498_google_recovery_audit.csv', rows)
-    write_csv('Ontario_Google_Top60_Completed_Feeds_Provisional.csv', verified[:60], rank=True)
+    write_csv('Ontario_Google_Clinically_Completed_Source_Subset.csv', verified, rank=True)
+    if len(verified) >= 60:
+        write_csv('Ontario_Google_Top60_Completed_Feeds_Provisional.csv', verified[:60], rank=True)
     write_csv('Ontario_Google_Unresolved_Ranking_Contenders.csv', contenders)
     if certified:
         write_csv('Ontario_Google_Best_60_Across_498.csv', verified[:60], rank=True)
 
     report = {
         'total_ontario_fsa': len(rows),
-        'first_pass_complete': quality['first_pass_complete'],
+        'first_pass_complete': 0,
+        'historical_complete_keyword_only_business_feeds': sum(source_complete(old) for old in originals),
+        'clinically_completed_eligible_fsa': len(verified),
         'recovery_source_complete': quality['local_tiled_complete'],
         'independent_google_grid_source_complete': quality['native_gridded_google_complete'],
         'independent_google_grid_empty_confirmed': quality['native_gridded_google_empty_confirmed'],
@@ -432,7 +435,7 @@ def combine(first_pass, recovery_root, output, native_root=None):
         'top_60_cutoff_observed_google_listings_per_10000_residents': cutoff,
         'google_60_certified_within_source_observation_model': certified,
         'certification_rule': 'All incomplete source LOWER BOUNDS on Google listings per 10,000 must exceed the 60th completed-source observed density; zero lower bound is always a contender at a positive cutoff',
-        'note': 'Completed Google search feed means the configured search finished, not exhaustive clinician coverage. Native source_failed zero-byte CSVs cannot prove zero; recovery names not clearly counselling or psychology are excluded from confirmed clinical counts. First-pass numeric Google keyword results have no item-level clinical audit and remain directory-search proxies; a final ranking must not be mistaken for proven therapist counts.',
+        'note': 'Google keyword business counts are excluded from clinical lower bounds and completion. Completed Google search feed means the configured search finished, not exhaustive clinician coverage. Native source_failed zero-byte CSVs cannot prove zero; recovery names not clearly counselling or psychology are excluded from confirmed clinical counts. First-pass numeric Google keyword results have no item-level clinical audit and remain directory-search proxies; a final ranking must not be mistaken for proven therapist counts.',
         'psychology_today_used': False,
         '2021_population_source': 'Statistics Canada',
         'checked_at_utc': datetime.now(timezone.utc).isoformat()
