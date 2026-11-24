@@ -1,0 +1,70 @@
+name: Reconcile 30 freshly recovered Ontario Google FSA sources against all 498
+on:
+  workflow_run:
+    workflows:
+      - Recover 30 highest-ranked incomplete Ontario Google FSA search grids
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      source_run:
+        description: Live 30-FSA Google search grids source workflow ID
+        required: false
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  conservative-merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN: ${{ inputs.source_run || github.event.workflow_run.id || '45421150683' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore verified original 498-FSA competition ratios and all available live search checkpoints
+        run: |
+          set -euo pipefail
+          mkdir -p original-grid recovered checkpoint-check
+          gh run download 45420439600 -R "$GITHUB_REPOSITORY" -n ontario-498-strict-5km-clinical-source-crossaudit -D original-grid
+          gh run download "$SOURCE_RUN" -R "$GITHUB_REPOSITORY" -n top30-incomplete-google-verified-sources -D checkpoint-check
+          gh run download "$SOURCE_RUN" -R "$GITHUB_REPOSITORY" -p 'priority-ontario-google-source-*' -D recovered
+          test -s original-grid/Ontario_498_Strict_5km_Google_Clinical_Crossaudit.csv
+          test -s checkpoint-check/plan.json
+          test "$(find recovered -type f -name '[A-Z][0-9][A-Z].json' | wc -l | tr -d ' ')" -ge 1
+      - name: Install clinical source classifier and run audit regression tests
+        run: |
+          python -m pip install -r requirements.txt
+          python -m compileall -q research/reconcile_priority_google_rechecks.py
+          python -m unittest research.test_native_full_rank research.test_google_category_evidence -v
+      - name: Count newly verified clinical business locations; keep capped and ambiguous source uncertainty
+        run: |
+          python -m research.reconcile_priority_google_rechecks --audit original-grid/Ontario_498_Strict_5km_Google_Clinical_Crossaudit.csv --checkpoints recovered --out recovered-ontario-498
+      - name: Verify all 498 remained in cohort and require a separate certification predicate for final 60
+        run: |
+          python - <<'PY'
+          import csv,json
+          from pathlib import Path
+          root=Path('recovered-ontario-498')
+          report=json.loads((root/'Ontario_Google_Source_Recheck_Report.json').read_text())
+          with (root/'Ontario_498_With_New_Google_Source_Rechecks.csv').open() as f:
+              data=list(csv.DictReader(f))
+          assert len(data)==498 and len({r['fsa'] for r in data})==498
+          assert report['fsa_total']==498 and report['recovered_fsa_checkpoints']>=1
+          assert (root/'Ontario_60_Certified_Within_Observed_Google_Model.csv').is_file()==report['observed_google_source_model_60_verified']
+          assert not report['all_real_therapists_enumerated']
+          print('VERIFIED_GOOGLE_498_RECHECK_STATUS',report,flush=True)
+          PY
+      - name: Preserve exact Google source evidence, ranking changes and remaining source defects
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ontario-498-after-top30-google-source-recheck
+          retention-days: 30
+          if-no-files-found: warn
+          path: recovered-ontario-498/
