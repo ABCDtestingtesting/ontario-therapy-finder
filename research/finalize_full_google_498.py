@@ -340,14 +340,17 @@ def combine(first_pass, recovery_root, output, native_root=None, original_clinic
                             and not source.get('capped_leaf_tiles')
                             and (not source.get('unresolved_leaf_links')
                                  or exterior_verified)
-                            and recovery_clinically_classified(source))
+                            and recovery_clinically_classified(source)
+                            and observed_recovered >= original_clinical))
         native_ok = bool(independent
                          and independent.get('status') == 'grid_observed_complete'
                          and independent.get('process_returncode') == 0
                          and independent.get('raw_rows', 0) > 0
                          and not independent.get('bad_coordinates')
+                         and independent_observed >= original_clinical
                          and independent_grid_searches_complete(independent,native_paths[code]))
         native_empty_ok = bool(independent
+                               and original_clinical == 0
                                and independent_grid_empty_evidenced(independent, native_paths[code]))
         if native_ok or native_empty_ok:
             # Complete the bounded Google source observation, including proven
