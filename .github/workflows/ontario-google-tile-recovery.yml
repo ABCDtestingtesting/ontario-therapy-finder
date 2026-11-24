@@ -1,12 +1,5 @@
 name: Recover all capped and incomplete Ontario Google Maps postal areas
 on:
-  push:
-    branches:
-      - ontario-401-fsa-live-ranking-20261121
-    paths:
-      - '.github/workflows/ontario-google-tile-recovery.yml'
-      - 'research/recover_google_tiles.py'
-      - 'research/test_google_bounded_recovery.py'
   workflow_dispatch:
     inputs:
       resume_run_id:
@@ -20,6 +13,7 @@ permissions:
 jobs:
   tile-recovery:
     name: Recover Google postal zones shard ${{ matrix.shard }}
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
