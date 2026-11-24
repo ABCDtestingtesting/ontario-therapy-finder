@@ -28,13 +28,21 @@
   "original_google_fsa_with_one_or_more_confirmed_clinical_titles": 373,
   "fsas_where_independent_competitor_lower_bound_increased_after_firstpass_place_audit": 180,
   "final_rank_source_certification_status": "BLOCKED_481_ELIGIBLE_FSA_UNCERTAINTIES",
-  "latest_full_498_clinical_audit_run": 45323419282,
-  "latest_full_498_clinical_audit_utc": "2026-11-24T04:02:19Z",
+  "latest_full_498_clinical_audit_run": 45396129585,
+  "latest_full_498_clinical_audit_utc": "2026-11-24T12:43:46Z",
   "clinically_audited_complete_eligible_source_count": 22,
   "eligible_uncertified_fsa_count": 468,
   "original_item_level_clinical_source_fsa_count": 498,
   "original_item_level_clinical_lower_bound_total": 6751,
   "strict_source_model_60_certified": false,
   "latest_full_498_clinical_audit_verified_real_live": true,
-  "full_source_validation_status": "PASSED; CLINICAL TOP60 CERTIFICATION BLOCKED BY 468 INCOMPLETE ELIGIBLE FSAS"
+  "full_source_validation_status": "COMPLETE_498_FSA_AUDIT_OK_AND_FINAL_60_PROPERLY_BLOCKED",
+  "latest_full_498_clinical_audit_status": "SUCCESS",
+  "latest_round2_category_scan_run": 45396558001,
+  "latest_round2_498_integrated_audit_run": 45396899158,
+  "newly_identified_therapy_clinic_lower_bound_from_round2": 3,
+  "new_top60_candidates_after_round2": [
+    "P2A",
+    "P8N"
+  ]
 }
