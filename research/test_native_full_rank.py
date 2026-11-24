@@ -102,6 +102,37 @@ class CompleteOntarioRankingTests(unittest.TestCase):
         self.assertEqual(result['historical_complete_keyword_only_business_feeds'],60)
         self.assertIsNone(result['top_60_cutoff_observed_google_listings_per_10000_residents'])
 
+    def test_original_real_places_raise_lower_bound_but_do_not_complete_source(self):
+        verified_csv=self.root/'original_google_verified.csv'
+        fields=['fsa','firstpass_clinical_title_lower_bound','firstpass_ambiguous_titles',
+                'firstpass_nonclinical_titles','original_google_located_businesses',
+                'firstpass_source_shard_sha256']
+        with verified_csv.open('w',newline='') as fh:
+            wr=csv.DictWriter(fh,fieldnames=fields);wr.writeheader()
+            for code in self.codes:
+                count=3 if code==self.codes[100] else 0
+                wr.writerow({'fsa':code,'firstpass_clinical_title_lower_bound':count,
+                    'firstpass_ambiguous_titles':0,'firstpass_nonclinical_titles':0,
+                    'original_google_located_businesses':count,
+                    'firstpass_source_shard_sha256':'a'*64})
+        with self.assertRaisesRegex(RuntimeError,'incompletely observed'):
+            combine(self.audit,self.recovery,self.out,self.native,verified_csv)
+        with (self.out/'ontario_498_google_recovery_audit.csv').open() as fh:
+            results={r['fsa']:r for r in csv.DictReader(fh)}
+        self.assertEqual(results[self.codes[100]]['google_observed_therapy_locations_lower_bound'],'3')
+        self.assertEqual(results[self.codes[100]]['original_google_clinical_title_lower_bound'],'3')
+        self.assertEqual(results[self.codes[100]]['completed_source_feed'],'False')
+        summary=json.loads((self.out/'google_498_recovery_report.json').read_text())
+        self.assertEqual(summary['original_item_level_clinical_source_fsa_count'],498)
+        self.assertEqual(summary['original_item_level_clinical_lower_bound_total'],3)
+        self.assertFalse(summary['google_60_certified_within_source_observation_model'])
+
+    def test_duplicate_or_incomplete_original_clinical_sources_fail_closed(self):
+        source=self.root/'broken.csv'
+        source.write_text('fsa,firstpass_clinical_title_lower_bound\\nK0A,1\\n')
+        with self.assertRaisesRegex(RuntimeError,'498 distinct'):
+            combine(self.audit,self.recovery,self.out,self.native,source)
+
     def test_partial_native_scan_is_not_certification(self):
         self.make_nine('partial_native')
         with self.assertRaisesRegex(RuntimeError,'incompletely observed'):
