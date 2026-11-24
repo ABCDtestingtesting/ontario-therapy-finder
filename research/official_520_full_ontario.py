@@ -1,4 +1,4 @@
-"""Ontario-wide source-completeness audit: all 520 populated 2021 FSA areas.
+"""Ontario-wide source-completeness audit: all 521 nonzero-population Ontario 2021 FSA codes.
 
 Earlier 498-FSA research omitted Hamilton's 22 codes. Restore them with
 authoritative Statistics Canada 2021 population while explicitly marking
@@ -31,12 +31,12 @@ def audit(original,official,out):
                 if code in pop:
                     raise RuntimeError('Duplicate official Ontario FSA population '+code)
                 pop[code]=count
-    if len(pop)!=520 or not set(original_by).issubset(pop):
-        raise RuntimeError('Full provincewide 520-FSA population source missing or mismatched')
+    if len(pop)!=521 or not set(original_by).issubset(pop):
+        raise RuntimeError('Full provincewide 521-code FSA population source missing or mismatched')
     missing=sorted(set(pop)-set(original_by))
-    if len(missing)!=22 or missing!=sorted(
-        'L0R L8B L8E L8G L8H L8J L8K L8L L8M L8N L8P L8R L8S L8T L8V L8W L9A L9B L9C L9G L9H L9K'.split()):
-        raise RuntimeError('Hamilton 22-code exclusion identity unexpected')
+    if len(missing)!=23 or missing!=sorted(
+        'L0R L8B L8E L8G L8H L8J L8K L8L L8M L8N L8P L8R L8S L8T L8V L8W L9A L9B L9C L9G L9H L9K M7A'.split()):
+        raise RuntimeError('Missing 22 Hamilton codes plus unpolygoned M7A identity unexpected')
     rows=[]
     for code in sorted(pop):
         source=original_by.get(code)
@@ -79,14 +79,16 @@ def audit(original,official,out):
             w.writeheader()
             for i,row in enumerate(source,1):
                 w.writerow({'provisional_rank':i,**row} if rank else row)
-    write('Ontario_ALL_520_FSAs_Census_Google_Source_Audit.csv',rows)
+    write('Ontario_ALL_521_Populated_FSA_Codes_Census_Google_Source_Audit.csv',rows)
     write('Ontario_60_Observed_Google_Lower_Bounds_NOT_CERTIFIED.csv',ranked[:60],True)
     write('Ontario_60_Geographically_Screened_Source_Leads_NOT_CERTIFIED.csv',screened[:60],True)
     report={
-        'official_Ontario_FSA_population_areas':len(pop),
+        'official_Ontario_nonzero_population_FSA_codes':len(pop),
         'original_clinically_screened_FSA_sources':len(original_by),
-        'unsearched_Hamilton_FSA_sources':missing,
+        'unsearched_Hamilton_FSA_sources':[code for code in missing if code!='M7A'],
+        'unpolygoned_but_populated_special_fsa':'M7A',
         'unsearched_FSA_count':len(missing),
+        '2021_geographic_boundary_polygons_available':520,
         'Ontario_2021_official_population':sum(pop.values()),
         'observed_explicit_clinical_Google_offices_lower_bound_in_scanned_areas':sum(
             r['observed_unique_explicitly_clinical_Google_offices_lower_bound'] for r in rows),
@@ -98,11 +100,11 @@ def audit(original,official,out):
         'previously_excluded_FSA_sources_restored_to_ranking':8,
         'proves_all_registered_therapists_counted':False,
         'certified_lowest_60_per_capita_therapist_FSAs':False,
-        'sampling_limitation':'Google offices, not individual therapist headcounts. No exhaustive source. 22 Hamilton FSA source searches absent; previous geographic collection covered just the original 5-km disc unions.',
+        'sampling_limitation':'Google offices, not individual therapist headcounts. No exhaustive source. 22 Hamilton FSA source searches absent, plus M7A (5 residents; no FSA boundary polygon); previous geographic collection covered just the original 5-km disc unions.',
         'verified_at_utc':datetime.now(timezone.utc).isoformat(),
     }
-    (out/'Ontario_520_Provincial_Research_Completeness.json').write_text(json.dumps(report,indent=2))
-    print('OFFICIAL_ALL_520_ONTARIO_FSA_RECONCILIATION',json.dumps(report),flush=True)
+    (out/'Ontario_521_Provincial_Research_Completeness.json').write_text(json.dumps(report,indent=2))
+    print('OFFICIAL_ALL_521_ONTARIO_FSA_CODES_RECONCILIATION',json.dumps(report),flush=True)
     return report
 
 if __name__=='__main__':
