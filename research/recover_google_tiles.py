@@ -204,6 +204,21 @@ def is_rank_dominated(area, observed_places):
     return people / max(1, baseline, observed_places) < cutoff
 
 
+def unverified_tile_geographic_result_scope(tile):
+    """Do not certify legacy feeds with visible remote Google places but zero
+    local findings. A map-centre check alone proves nothing about result scope.
+    """
+    if not tile:
+        return True
+    if tile.get('status')!='observed' or not tile.get('map_area_search_verified'):
+        return True
+    if tile.get('geographic_result_scope_verified') is False:
+        return True
+    if int(tile.get('visible_links') or 0)>0 and not tile.get('places'):
+        return True
+    return False
+
+
 def run_area(context, area, folder, max_seconds):
     """Finish a bounded 18-search local coverage plan, reusing legacy evidence.
 
@@ -233,7 +248,7 @@ def run_area(context, area, folder, max_seconds):
     # Crucial: never restore the exponential pending queue from version 1.
     doc['pending'] = [task for task in required
                       if task_key(task) not in doc['complete_tiles']
-                      or doc['complete_tiles'][task_key(task)].get('status') == 'observed_partial'
+                      or unverified_tile_geographic_result_scope(doc['complete_tiles'].get(task_key(task)))
                       or (resuming_saved_checkpoint
                           and doc['complete_tiles'][task_key(task)].get('capped'))]
     doc['recovery_plan'] = 'fixed_18_map_movement_v7_checkbox_verified'
@@ -293,7 +308,7 @@ def run_area(context, area, folder, max_seconds):
     # results stay as lower-bound evidence; changed query keys require fresh local searches.
     doc['pending'] = [task for task in required
                       if task_key(task) not in doc['complete_tiles']
-                      or doc['complete_tiles'][task_key(task)].get('status') == 'observed_partial']
+                      or unverified_tile_geographic_result_scope(doc['complete_tiles'].get(task_key(task)))]
     # Detail-page categories from later verified lookups are part of the
     # durable source evidence. A resumed tile search must not erase them.
     previously_classified = {
@@ -322,6 +337,8 @@ def run_area(context, area, folder, max_seconds):
     doc['completed_coverage_tiles'] = len(base)
     doc['total_coverage_tiles'] = len(required)
     doc['source_caps_present'] = capped > 0
+    doc['tiles_with_unverified_geographic_results'] = sum(
+        unverified_tile_geographic_result_scope(entry) for entry in base)
     doc['failed_tiles_this_run'] = len(failed_this_run)
     doc['rank_dominated_by_verified_cutoff'] = early_dominated
     if early_dominated:
