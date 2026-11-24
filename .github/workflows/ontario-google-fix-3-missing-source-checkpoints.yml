@@ -1,0 +1,65 @@
+name: Recover three missing Ontario Google FSA source checkpoints from original top30 run
+on:
+  push:
+    branches: [ontario-401-fsa-live-ranking-20261121]
+    paths:
+      - '.github/workflows/ontario-google-fix-3-missing-source-checkpoints.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        entry:
+          - {index: 7, fsa: N8M}
+          - {index: 17, fsa: K6T}
+          - {index: 27, fsa: N8A}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PYTHONUNBUFFERED: '1'
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore original live Google 498-source roster and precisely indexed missing-area plan
+        run: |
+          set -euo pipefail
+          mkdir -p selected
+          gh run download 45421150683 -R "$GITHUB_REPOSITORY" -n top30-incomplete-google-verified-sources -D selected
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          plan=json.loads(Path('selected/plan.json').read_text())
+          assert len(plan['fsas'])==30 and len(set(plan['fsas']))==30
+          assert plan['fsas'][${{ matrix.entry.index }}]=='${{ matrix.entry.fsa }}'
+          print('VERIFIED_MISSING_FSA_PLAN',plan['fsas'][${{ matrix.entry.index }}])
+          PY
+      - name: Install live free Google Maps source collector and test geographic fail-closed policy
+        run: |
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps firefox
+          python -m unittest research.test_google_bounded_recovery research.test_reconcile_priority_google_rechecks -v
+      - name: Recheck actual geographic evidence for one genuinely missing FSA
+        timeout-minutes: 10
+        run: |
+          python -m research.continue_priority_google_areas --audit selected/full-498.csv --seeds selected/seeds --shard ${{ matrix.entry.index }} --shards 30 --cohort 30 --seconds 420 --out "repaired-${{ matrix.entry.fsa }}"
+      - name: Preserve positive Google clinic evidence or source-failure details
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recovery-missing-ontario-fsa-${{ matrix.entry.fsa }}
+          retention-days: 90
+          if-no-files-found: warn
+          path: |
+            repaired-${{ matrix.entry.fsa }}/checkpoints/
+            repaired-${{ matrix.entry.fsa }}/progress.json
+            repaired-${{ matrix.entry.fsa }}/result.json
