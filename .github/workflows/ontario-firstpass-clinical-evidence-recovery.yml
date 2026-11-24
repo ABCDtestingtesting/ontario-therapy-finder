@@ -1,0 +1,50 @@
+name: Recover true original Google business evidence across all 498 Ontario FSAs
+on:
+  push:
+    branches: [ontario-401-fsa-live-ranking-20261121]
+    paths:
+      - '.github/workflows/ontario-firstpass-clinical-evidence-recovery.yml'
+      - 'research/validate_firstpass_place_evidence.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  recover-actual-places:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download original source evidence from both actual geographic collection runs
+        run: |
+          set -euo pipefail
+          mkdir -p original-google baseline
+          gh run download 44949320059 -R "$GITHUB_REPOSITORY" -p 'resolved-large-*' -D original-google
+          gh run download 44949323771 -R "$GITHUB_REPOSITORY" -p 'resolved-small-*' -D original-google
+          gh run download 45219618676 -R "$GITHUB_REPOSITORY" -n google-498-category-verified-full-audit -D baseline
+          test -s baseline/audited-google-498/ontario_498_google_recovery_audit.csv
+          test "$(find original-google -type f -name results.json | wc -l | tr -d ' ')" -eq 44
+      - name: Install source classification dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m compileall -q research/validate_firstpass_place_evidence.py research/finalize_full_google_498.py
+          python -m unittest research.test_independent_zero_source research.test_google_category_evidence -v
+      - name: Verify 498 distinct original FSA business datasets and retain strictly clinical title-confirmed lower bounds
+        run: |
+          python -m research.validate_firstpass_place_evidence --sources original-google --baseline baseline/audited-google-498/ontario_498_google_recovery_audit.csv --out firstpass-verified-clinical-evidence
+      - name: Preserve verified per-business evidence and all source uncertainty
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ontario-498-original-google-clinical-business-evidence
+          retention-days: 30
+          if-no-files-found: warn
+          path: firstpass-verified-clinical-evidence/
