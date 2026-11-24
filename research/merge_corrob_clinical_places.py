@@ -35,7 +35,8 @@ def run(prior:Path,raw:Path,out:Path):
         changed=observed>original_count
         previous_complete=row['merged_google_observation_source_complete']=='True'
         row['cross_source_clinical_office_lower_bound']=str(observed)
-        row['merged_google_observation_source_complete']=str(previous_complete and not changed)
+        row['legacy_observed_source_completed_without_geographic_verification']=str(previous_complete)
+        row['merged_google_observation_source_complete']='False'
         pop=int(row['population_within_5km_2021_estimate'])
         if pop<=0:raise RuntimeError('Missing census catchment '+code)
         row['observed_clinical_offices_per_10000_lower_bound']=str(round(10000*observed/pop,9))
@@ -75,6 +76,9 @@ def run(prior:Path,raw:Path,out:Path):
       'clinic_lower_bound_increase':sum(x['increase'] for x in report),
       'remaining_rank_contenders':len(unresolved),
       'clinically_complete_eligible_sources':len(completed),
+      'legacy_google_source_completion_flags_revoked':
+          sum(row['legacy_observed_source_completed_without_geographic_verification']=='True'
+              for row in data),
       'final60_source_model_certified':ready,
       'source_clinic_adjudications':report,
       'individual_clinician_headcounts_proven':False,
