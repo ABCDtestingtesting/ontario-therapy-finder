@@ -19,6 +19,7 @@ class CompleteOntarioRankingTests(unittest.TestCase):
                 for c in range(65,91)]
         codes = list(NINE)+[x for x in fsas if x not in NINE][:489]
         self.assertEqual(len(codes),498)
+        self.codes = codes
         self.audit=self.root/'first.csv'
         fields=['fsa','status','feed_capped','unlocated_links',
                 'population_5km_estimate','google_observed_5km',
@@ -52,17 +53,54 @@ class CompleteOntarioRankingTests(unittest.TestCase):
                     'raw_csv_sha256':'0123456789abcdef'}
             (root/'native_evidence.json').write_text(json.dumps(record))
 
+    def make_sixty_real_clinical_source_feeds(self):
+        # Exact completed feeds are permitted only with actual clinical
+        # business evidence. Other 429 sources have a sufficiently strong
+        # clinical lower bound to be rank dominated despite incomplete feeds.
+        for i,code in enumerate(self.codes):
+            if i < 9:
+                continue
+            number = 1 if i < 69 else 10
+            row = {
+                'fsa':code,
+                'status':'verified_tile_feed' if i < 69 else 'observed_capped',
+                'unique_observed_local_places':number,
+                'local_places':[{'key':f'{code}-source-{j}',
+                    'name':f'Example {j} Psychotherapy',
+                    'lat':44.0,'lon':-79.0,
+                    'source_url':'https://www.google.com/maps/place/example'} for j in range(number)],
+                'capped_leaf_tiles':0 if i < 69 else 1,
+                'pending':[],'unresolved_leaf_links':0
+            }
+            (self.recovery/(code+'.json')).write_text(json.dumps(row))
+
     def test_exact_498_and_complete_native_coverage_certifies_top_60(self):
         self.make_nine()
+        self.make_sixty_real_clinical_source_feeds()
         with patch('research.finalize_full_google_498.independent_grid_searches_complete',return_value=True):
             report=combine(self.audit,self.recovery,self.out,self.native)
         self.assertTrue(report['google_60_certified_within_source_observation_model'])
         self.assertEqual(report['total_ontario_fsa'],498)
         self.assertEqual(report['independent_google_grid_source_complete'],9)
+        self.assertEqual(report['recovery_source_complete'],60)
+        self.assertEqual(report['first_pass_complete'],0)
+        self.assertEqual(report['historical_complete_keyword_only_business_feeds'],60)
         with (self.out/'Ontario_Google_Best_60_Across_498.csv').open() as file:
             certified=list(csv.DictReader(file))
         self.assertEqual(len(certified),60)
         self.assertTrue(all(item['completed_source_feed']=='True' for item in certified))
+
+    def test_60_keyword_only_feeds_never_certify_therapist_counts(self):
+        self.make_nine()
+        with patch('research.finalize_full_google_498.independent_grid_searches_complete',return_value=True):
+            with self.assertRaisesRegex(RuntimeError,'incompletely observed'):
+                combine(self.audit,self.recovery,self.out,self.native)
+        self.assertFalse((self.out/'Ontario_Google_Best_60_Across_498.csv').exists())
+        with (self.out/'google_498_recovery_report.json').open() as fh:
+            result=json.load(fh)
+        self.assertEqual(result['clinically_completed_eligible_fsa'],9)
+        self.assertEqual(result['historical_complete_keyword_only_business_feeds'],60)
+        self.assertIsNone(result['top_60_cutoff_observed_google_listings_per_10000_residents'])
 
     def test_partial_native_scan_is_not_certification(self):
         self.make_nine('partial_native')
