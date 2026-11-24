@@ -80,7 +80,7 @@ class PriorityGoogleRecoveryReconciliationTests(unittest.TestCase):
         self.assertEqual(result['clinically_complete_eligible_sources'],0)
         self.assertEqual(result['unresolved_contenders'],498)
 
-    def test_true_zero_density_equal_cutoff_can_be_rank_dominated_by_population(self):
+    def test_old_zero_density_completion_flags_without_location_proof_are_revoked(self):
         # 60 clinically complete sources with higher local populations rank
         # above every unresolved source whose observed lower bound is zero.
         with self.source.open(newline='') as fh:
@@ -95,10 +95,11 @@ class PriorityGoogleRecoveryReconciliationTests(unittest.TestCase):
         # Must still retain a real source checkpoint in this merge.
         self.save(self.document(unknown=True))
         result=merge(self.source,self.maps,self.out)
-        self.assertEqual(result['clinically_complete_eligible_sources'],60)
-        self.assertEqual(result['unresolved_contenders'],0)
-        self.assertTrue(result['observed_google_source_model_60_verified'])
-        self.assertTrue((self.out/'Ontario_60_Certified_Within_Observed_Google_Model.csv').exists())
+        self.assertEqual(result['legacy_geographic_completion_flags_revoked_pending_reverification'],60)
+        self.assertEqual(result['clinically_complete_eligible_sources'],0)
+        self.assertEqual(result['unresolved_contenders'],498)
+        self.assertFalse(result['observed_google_source_model_60_verified'])
+        self.assertFalse((self.out/'Ontario_60_Certified_Within_Observed_Google_Model.csv').exists())
 
     def test_zero_density_tie_with_larger_unverified_population_remains_contender(self):
         with self.source.open(newline='') as fh:
