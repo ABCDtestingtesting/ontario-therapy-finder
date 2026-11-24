@@ -1,7 +1,10 @@
 """Exact identity and source integrity for externally corroborated clinical places."""
 import unittest
 from research.external_google_clinical_adjudications import (
-    EVIDENCE, independent_clinical_service_evidence)
+    EVIDENCE, ORIGINAL_GOOGLE_BUSINESS_ADJUDICATIONS,
+    independent_clinical_service_evidence,
+    independent_nonclinical_service_evidence,
+    original_google_business_corroboration)
 from research.finalize_full_google_498 import clinical_title_classification
 
 def example(row):
@@ -18,6 +21,39 @@ class ExternallyGroundedTherapistTests(unittest.TestCase):
                 src=example(row)
                 self.assertEqual(independent_clinical_service_evidence(src),row[-1])
                 self.assertEqual(clinical_title_classification(src),'clinical')
+
+    def original_place(self, row):
+        key,name,lat,lon,google_id,evidence_url,kind=row
+        return {'key':key,'name':name,'lat':lat,'lon':lon,
+            'source_url':'https://www.google.com/maps/place/'+name.replace(' ','+')+
+                '/data=!4m7!3m6!1s'+google_id}
+
+    def test_all_original_google_correspondences_have_evidence_and_proper_modality(self):
+        self.assertEqual(len(ORIGINAL_GOOGLE_BUSINESS_ADJUDICATIONS),10)
+        self.assertEqual(sum(r[-1]=='clinical' for r in ORIGINAL_GOOGLE_BUSINESS_ADJUDICATIONS),9)
+        for record in ORIGINAL_GOOGLE_BUSINESS_ADJUDICATIONS:
+            with self.subTest(name=record[1]):
+                place=self.original_place(record)
+                observed=original_google_business_corroboration(place)
+                self.assertEqual(observed,(record[-1],record[-2]))
+                self.assertEqual(clinical_title_classification(place),record[-1])
+                if record[-1]=='clinical':
+                    self.assertEqual(independent_clinical_service_evidence(place),record[-2])
+                else:
+                    self.assertEqual(independent_nonclinical_service_evidence(place),record[-2])
+                    self.assertIsNone(independent_clinical_service_evidence(place))
+
+    def test_original_google_id_name_and_coordinate_mismatches_fail_closed(self):
+        row=ORIGINAL_GOOGLE_BUSINESS_ADJUDICATIONS[0]
+        original=self.original_place(row)
+        for change in ({'key':'other'}, {'name':'Another Counseling Center'},
+                       {'source_url':'https://www.google.com/maps/place/Noid'},
+                       {'lat':original['lat']+0.01},
+                       {'lon':original['lon']+0.01}):
+            with self.subTest(change=change):
+                place=dict(original,**change)
+                self.assertIsNone(original_google_business_corroboration(place))
+                self.assertIsNone(independent_clinical_service_evidence(place))
 
     def test_no_google_place_id_is_accepted_from_name_alone(self):
         row=example(EVIDENCE[0])
