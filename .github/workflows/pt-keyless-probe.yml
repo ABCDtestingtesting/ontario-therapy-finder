@@ -1,0 +1,17 @@
+name: Verify free anonymous search sources without signup or payment
+on:
+  push:
+    paths:
+      - 'pt-weekly-mac/keyless_probe.py'
+      - '.github/workflows/pt-keyless-probe.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test real official anonymous source responses
+        run: python3 pt-weekly-mac/keyless_probe.py
