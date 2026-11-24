@@ -1,0 +1,25 @@
+name: Verify additional Bing RSS search source
+on:
+  push:
+    paths:
+      - 'pt-weekly-mac/bing_rss_probe.py'
+      - 'pt-weekly-mac/test_bing_rss.py'
+      - '.github/workflows/pt-bing-rss.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test feed parsing and scope
+        run: cd pt-weekly-mac && python -m unittest -v test_bing_rss.py
+      - name: Probe the actual documented feed
+        run: python pt-weekly-mac/bing_rss_probe.py bing-rss-probe.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Bing-RSS-observations
+          path: bing-rss-probe.json
