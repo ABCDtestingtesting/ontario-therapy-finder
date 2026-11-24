@@ -141,7 +141,14 @@ class GoogleSourceCertificationTests(unittest.TestCase):
                 combine(baseline, recovery, output)
             with (output / 'Ontario_Google_Unresolved_Ranking_Contenders.csv').open(newline='') as fh:
                 contenders = list(csv.DictReader(fh))
-            self.assertEqual([v['fsa'] for v in contenders], ['T060'])
+            self.assertEqual(len(contenders),61)
+            self.assertIn('T060',[v['fsa'] for v in contenders])
+            # The other 60 were only Google keyword-feed completions;
+            # their listings have no verified clinical classifications.
+            self.assertFalse((output/'Ontario_Google_Best_60_Across_498.csv').exists())
+            report=json.loads((output/'google_498_recovery_report.json').read_text())
+            self.assertEqual(report['clinically_completed_eligible_fsa'],0)
+            self.assertEqual(report['historical_complete_keyword_only_business_feeds'],60)
             self.assertEqual(float(contenders[0]['google_listings_per_10000_residents_or_lower_bound']), 0.0)
 
     def test_nonzero_raw_count_without_mental_health_title_stays_ambiguous(self):
