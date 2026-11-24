@@ -1,0 +1,65 @@
+name: Integrate actual Google clinical locations into all 498 Ontario FSA audits
+on:
+  push:
+    branches: [ontario-401-fsa-live-ranking-20261121]
+    paths:
+      - '.github/workflows/ontario-498-clinical-source-integration.yml'
+      - 'research/reconcile_original_clinical_evidence.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  integrate-clinically-grounded-sources:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Recover actual first-pass clinical places and most recent independently reconciled 498-area study
+        run: |
+          set -euo pipefail
+          mkdir -p original-source independent-source
+          gh run download 45316363779 -R "$GITHUB_REPOSITORY" -n ontario-498-original-google-clinical-business-evidence -D original-source
+          gh run download 45258480198 -R "$GITHUB_REPOSITORY" -n ontario-498-independently-rechecked-53-zero-fsas -D independent-source
+          test -s original-source/Ontario_498_Firstpass_Verified_Clinical_Lower_Bounds.csv
+          test -s independent-source/Ontario_Google_498_Independently_Reviewed.csv
+      - name: Compile and verify source scoring and clinical classification
+        run: |
+          python -m compileall -q research/reconcile_original_clinical_evidence.py
+          python -m unittest research.test_independent_rank_dominance -v
+      - name: Reconcile 498 distinct Ontario FSAs without claiming absence from missing Google results
+        run: |
+          python -m research.reconcile_original_clinical_evidence --independent independent-source/Ontario_Google_498_Independently_Reviewed.csv --original original-source/Ontario_498_Firstpass_Verified_Clinical_Lower_Bounds.csv --out integrated-ontario-498-clinical
+      - name: Assert final approval remains blocked when evidence incomplete
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('integrated-ontario-498-clinical')
+          report=json.loads((root/'Ontario_498_Clinical_Evidence_Integrated_Report.json').read_text())
+          assert report['all_498_fsas_reconciled']
+          assert report['all_eligible_sources']>=60
+          if not report['top_60_certified_within_source_model']:
+              assert not (root/'Ontario_Certified_60_Within_Source_Model.csv').exists()
+              assert report['unresolved_rank_contenders']>0
+              print('SOURCE_AUDIT_SUCCEEDED_PUBLICATION_PROPERLY_BLOCKED', report['unresolved_rank_contenders'])
+          else:
+              assert (root/'Ontario_Certified_60_Within_Source_Model.csv').is_file()
+              print('SIXTY_AREAS_CERTIFIED_FROM_ITEM_LEVEL_EVIDENCE')
+          PY
+      - name: Save complete evidence audit and separately labeled provisional opportunities
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ontario-498-integrated-clinical-place-evidence
+          retention-days: 30
+          if-no-files-found: error
+          path: integrated-ontario-498-clinical/
