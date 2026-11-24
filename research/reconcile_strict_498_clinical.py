@@ -5,6 +5,7 @@ Source complete means verified within that Google observation model alone.
 import argparse,csv,json
 from datetime import datetime,timezone
 from pathlib import Path
+from fractions import Fraction
 
 EXCLUDE={'L6Z','L7A','L6X','L6R','N1T','N3S','P5N','N4W'}
 
@@ -68,15 +69,16 @@ def reconcile(strict,category,out):
           'original_source_sha256':a['original_google_place_source_sha256'],
         })
     eligible=[r for r in rows if not r['previously_screened_excluded']]
-    key=lambda r:(r['observed_clinical_offices_per_10000_lower_bound'],
+    key=lambda r:(Fraction(r['cross_source_clinical_office_lower_bound'],
+                            r['population_within_5km_2021_estimate']),
                   -r['population_within_5km_2021_estimate'],r['fsa'])
     ranked=sorted(eligible,key=key)
     verified=[r for r in ranked if r['merged_google_observation_source_complete']]
-    cutoff=(verified[59]['observed_clinical_offices_per_10000_lower_bound']
-            if len(verified)>=60 else None)
+    cutoff_key=key(verified[59]) if len(verified)>=60 else None
+    cutoff=float(cutoff_key[0])*10000 if cutoff_key is not None else None
     unresolved=[r for r in ranked if not r['merged_google_observation_source_complete']
-      and (cutoff is None or r['observed_clinical_offices_per_10000_lower_bound']<=cutoff)]
-    certified=cutoff is not None and not unresolved
+      and (cutoff_key is None or key(r)<=cutoff_key)]
+    certified=cutoff_key is not None and not unresolved
     out=Path(out);out.mkdir(parents=True,exist_ok=True)
     columns=list(rows[0])
     def save(name,items,rank=False):
