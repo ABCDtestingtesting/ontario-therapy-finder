@@ -4,6 +4,7 @@ full 498-area five-kilometre clinical competition source ledger.
 from __future__ import annotations
 import argparse,csv,json,math
 from datetime import datetime,timezone
+from fractions import Fraction
 from pathlib import Path
 from research.finalize_full_google_498 import clinical_title_classification
 from research.scan_all_maps import distance_km
@@ -109,14 +110,22 @@ def merge(source,checkpoints,out):
                     'new_google_source_ambiguous_offices','new_google_source_verified_clinical_offices'):
             row.setdefault(key,'')
     eligible=[r for r in by_code.values() if r['previously_screened_excluded']=='False']
-    score=lambda r:(float(r['observed_clinical_offices_per_10000_lower_bound']),
+    # Compare exact integer count/population fractions: floating rounding
+    # can falsely make a tied region appear strictly dominated.
+    score=lambda r:(Fraction(int(r['cross_source_clinical_office_lower_bound']),
+                            int(r['population_within_5km_2021_estimate'])),
                     -int(r['population_within_5km_2021_estimate']),r['fsa'])
     ranked=sorted(eligible,key=score)
     good=[r for r in ranked if r['merged_google_observation_source_complete']=='True']
-    cutoff=float(good[59]['observed_clinical_offices_per_10000_lower_bound']) if len(good)>=60 else None
+    cutoff_key=score(good[59]) if len(good)>=60 else None
+    cutoff=float(cutoff_key[0])*10000 if cutoff_key is not None else None
+    # At equal clinical density, the approved tie-break favours the larger
+    # 5-km population and finally the alphabetical three-character FSA.
+    # A lower-bound density tied with the cutoff can therefore be excluded
+    # ONLY when it cannot outrank the full deterministic cutoff tuple.
     unresolved=[r for r in ranked if r['merged_google_observation_source_complete']!='True'
-                and (cutoff is None or float(r['observed_clinical_offices_per_10000_lower_bound'])<=cutoff)]
-    ready=cutoff is not None and len(unresolved)==0
+                and (cutoff_key is None or score(r)<=cutoff_key)]
+    ready=cutoff_key is not None and len(unresolved)==0
     out=Path(out);out.mkdir(parents=True,exist_ok=True)
     fields=list(next(iter(by_code.values())))
     def write(name,records,rank=False):
