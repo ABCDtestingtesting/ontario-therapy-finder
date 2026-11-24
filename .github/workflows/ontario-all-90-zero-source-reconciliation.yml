@@ -38,6 +38,29 @@ jobs:
             gh run download "$id" -R "$GITHUB_REPOSITORY" -n "$name" -D "$dest"
             gh run download "$id" -R "$GITHUB_REPOSITORY" -p "$kind" -D recovered-90
           done
+          mkdir -p repaired-source
+          gh run download 45436422223 -R "$GITHUB_REPOSITORY" -p 'recovery-missing-ontario-fsa-*' -D repaired-source
+          python - <<'PY'
+          import json,shutil
+          from pathlib import Path
+          known={'K6T','N8A','N8M'}
+          seen={}
+          recovered=Path('recovered-90')
+          before={p.stem for p in recovered.glob('**/[A-Z][0-9][A-Z].json')}
+          if before & known or len(before)!=87:
+              raise RuntimeError('Existing 87 Google source IDs differ from independently recorded missing three')
+          for p in Path('repaired-source').glob('**/[A-Z][0-9][A-Z].json'):
+              code=p.stem
+              if code not in known or code in seen or json.loads(p.read_text()).get('fsa')!=code:
+                  raise RuntimeError('Unexpected or duplicated repaired Google source checkpoint '+code)
+              dest=recovered/'repaired'/p.name
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              shutil.copy2(p,dest)
+              seen[code]=dest
+          if set(seen)!=known:
+              raise RuntimeError('Missing independently rechecked FSA proof '+str(known-set(seen)))
+          print('GOOGLE_FULL_90_FSA_CHECKPOINTS_RECOVERED',len(before)+len(seen),flush=True)
+          PY
           test -s initial-498/Ontario_498_With_Independently_Corroborated_Clinic_Evidence.csv
       - name: Verify 90 distinct planned FSA locations and every recoverable source identity
         run: |
@@ -71,8 +94,8 @@ jobs:
             'note':'Missing source checkpoint is uncertainty; never zero existing therapists'}
           (out/'Ontario_Google_90_Source_Integrity_Report.json').write_text(json.dumps(report,indent=2))
           print('GOOGLE_90_SOURCE_INTEGRITY',json.dumps({k:v for k,v in report.items() if k!='source_checkpoints'}),flush=True)
-          if not sources:
-              raise RuntimeError('All recovered 90 Google sources absent')
+          if len(sources)!=90:
+              raise RuntimeError('All 90 targeted live Google source checkpoints required; got '+str(len(sources)))
           PY
       - name: Install clinical search source parser and regression-test all incomplete-source safety rules
         run: |
