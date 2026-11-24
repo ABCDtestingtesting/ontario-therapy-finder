@@ -1,0 +1,65 @@
+name: Verify official Ontario 2021 full-FSA population and boundary data
+on:
+  push:
+    branches: [ontario-401-fsa-live-ranking-20261121]
+    paths:
+      - '.github/workflows/ontario-official-fsa-population-boundary-probe.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download official Statistics Canada population table and 2021 FSA boundaries
+        run: |
+          set -euo pipefail
+          mkdir -p official-population
+          curl --fail --location --retry 2 --connect-timeout 20 --max-time 180 \
+            https://www150.statcan.gc.ca/n1/tbl/csv/98100019-eng.zip \
+            -o official-population/fsa-population.zip
+          curl --fail --location --retry 2 --connect-timeout 20 --max-time 150 \
+            https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lfsa000a21a_e.zip \
+            -o official-population/fsa-boundaries.zip || \
+          curl --fail --location --retry 2 --connect-timeout 20 --max-time 150 \
+            https://data.source.coop/dataforcanada/d4c-datapkg-statistical/archive/statcan/boundaries/2021/lfsa000a21a_e.zip \
+            -o official-population/fsa-boundaries.zip
+          unzip -tq official-population/fsa-population.zip
+          unzip -tq official-population/fsa-boundaries.zip
+      - name: Audit census geography population and real FSA shape schemas before use
+        run: |
+          python - <<'PY'
+          import csv,io,hashlib,json,zipfile
+          from pathlib import Path
+          r=Path('official-population')
+          summary={}
+          for stem in ('fsa-population','fsa-boundaries'):
+              p=r/(stem+'.zip')
+              with zipfile.ZipFile(p) as z:
+                  names=z.namelist()
+                  summary[stem]={'zip_bytes':p.stat().st_size,
+                    'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),
+                    'names':names[:15],
+                    'total_members':len(names)}
+                  if stem=='fsa-population':
+                      cs=[n for n in names if n.endswith('.csv') and not n.endswith('MetaData.csv')]
+                      if not cs:raise RuntimeError('Official FSA population CSV absent')
+                      with z.open(cs[0]) as fh:
+                          text=io.TextIOWrapper(fh,encoding='utf-8-sig')
+                          rd=csv.DictReader(text)
+                          summary[stem]['headers']=rd.fieldnames
+                          summary[stem]['rows_preview']=[next(rd) for _ in range(4)]
+                  if stem=='fsa-boundaries' and not any(n.endswith('.shp') for n in names):
+                      raise RuntimeError('Official FSA geometry shapefile absent')
+          (r/'official_source_probe.json').write_text(json.dumps(summary,indent=2))
+          print('STATCAN_FSA_OFFICIAL_DATA_SCHEMA',json.dumps(summary),flush=True)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: official-2021-fsa-census-data-probe
+          retention-days: 30
+          if-no-files-found: warn
+          path: official-population/official_source_probe.json
