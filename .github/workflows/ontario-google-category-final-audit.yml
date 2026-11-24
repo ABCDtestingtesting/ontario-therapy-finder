@@ -16,8 +16,6 @@ on:
         description: Completed Google place category verification run
         type: string
         required: true
-  schedule:
-    - cron: '37 */3 * * *'
 permissions:
   actions: read
   contents: read
@@ -172,7 +170,7 @@ jobs:
       - name: Merge without dropping historical source observations
         run: |
           python -m compileall -q research/merge_google_checkpoints.py research/test_google_checkpoint_merge.py research/finalize_full_google_498.py
-          python -m unittest research.test_google_checkpoint_merge research.test_google_category_evidence research.test_google_exterior_place research.test_k7g_uncapped_zoom -v
+          python -m unittest research.test_google_checkpoint_merge research.test_google_category_evidence research.test_google_exterior_place research.test_k7g_uncapped_zoom research.test_external_clinical_adjudications -v
           python - <<'PY'
           import json
           from pathlib import Path
@@ -294,7 +292,7 @@ jobs:
           found[0].write_text(json.dumps(reviewed,indent=2))
           print('K7G_VERIFIED_LATEST_UNCAPPED_SOURCE_OLD_CAP_PRESERVED',flush=True)
           PY
-      - name: Audit all 498 and certify only if outstanding areas cannot outrank 60th
+      - name: Audit all 498 with clinically verified businesses only; certify only if every competitor is bounded
         run: |
           python -m research.finalize_full_google_498 first-pass/google_all_ontario_498.csv recovery-output audited-google-498 --native-root native-results
       - name: Preserve complete 498 audit, provisional 60, unresolved areas and certification status
