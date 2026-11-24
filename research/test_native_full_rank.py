@@ -130,6 +130,13 @@ class CompleteOntarioRankingTests(unittest.TestCase):
     def test_originally_observed_clinic_missing_from_complete_new_source_blocks_certification(self):
         self.make_nine()
         self.make_sixty_real_clinical_source_feeds()
+        # A high-population FSA with two confirmed clinics can still
+        # beat the 60th verified area; its missing source must remain pending.
+        with self.audit.open(newline='') as fh:
+            original_rows=list(csv.DictReader(fh))
+        next(r for r in original_rows if r['fsa']==self.codes[9])['population_5km_estimate']='100000'
+        with self.audit.open('w',newline='') as fh:
+            wr=csv.DictWriter(fh,fieldnames=list(original_rows[0]));wr.writeheader();wr.writerows(original_rows)
         evidence=self.root/'firstpass_item_evidence.csv'
         fields=['fsa','firstpass_clinical_title_lower_bound','firstpass_ambiguous_titles',
                 'firstpass_nonclinical_titles','original_google_located_businesses',
