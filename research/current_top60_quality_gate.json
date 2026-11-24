@@ -4,7 +4,7 @@
   "ready_for_database": false,
   "obsolete_preliminary_source_run": 45219618676,
   "obsolete_preliminary_artifact": "Ontario_Google_Best_60_Across_498.csv",
-  "reason": "Real 498 FSA live audit 45323065002 reconciled 6,751 explicit clinical-title geolocated Google listings with targeted category verified records. Only 22 eligible sources were clinically complete; 468 eligible areas cannot be ruled out. Google does not enumerate all therapists or ensure individual-provider counts. No certified Ontario 60 may be published.",
+  "reason": "The latest CI and live 498-FSA audit verified the complete clinical-item source and 22 clinically complete eligible feeds; 468 eligible areas remain unverified and no verified ranking cutoff exists. No certified Ontario best-60 list is publishable.",
   "independent_source_run": 45232783797,
   "blocking_conditions": [
     "All potential top-60 FSA source evidence must be clinically audited",
@@ -28,11 +28,13 @@
   "original_google_fsa_with_one_or_more_confirmed_clinical_titles": 373,
   "fsas_where_independent_competitor_lower_bound_increased_after_firstpass_place_audit": 180,
   "final_rank_source_certification_status": "BLOCKED_481_ELIGIBLE_FSA_UNCERTAINTIES",
-  "latest_full_498_clinical_audit_run": 45323065002,
-  "latest_full_498_clinical_audit_utc": "2026-11-24T03:59:04Z",
+  "latest_full_498_clinical_audit_run": 45323419282,
+  "latest_full_498_clinical_audit_utc": "2026-11-24T04:02:19Z",
   "clinically_audited_complete_eligible_source_count": 22,
   "eligible_uncertified_fsa_count": 468,
   "original_item_level_clinical_source_fsa_count": 498,
   "original_item_level_clinical_lower_bound_total": 6751,
-  "strict_source_model_60_certified": false
+  "strict_source_model_60_certified": false,
+  "latest_full_498_clinical_audit_verified_real_live": true,
+  "full_source_validation_status": "PASSED; CLINICAL TOP60 CERTIFICATION BLOCKED BY 468 INCOMPLETE ELIGIBLE FSAS"
 }
