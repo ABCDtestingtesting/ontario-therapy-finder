@@ -57,10 +57,16 @@ jobs:
           assert not d['certified_60_lowest_registered_therapist_to_population_fsas']
           for name in ('Ontario_498_Official_FSA_Population_Google_Business_Audit.csv',
                        'Ontario_60_Geographically_Screened_Observed_Place_Candidates_NOT_CERTIFIED.csv',
-                       'Ontario_60_Observed_Clinical_Lower_Bounds_NOT_CERTIFIED.csv'):
+                       'Ontario_60_Observed_Clinical_Lower_Bounds_NOT_CERTIFIED.csv',
+                       'Ontario_60_10k_Residents_Geographically_Screened_Candidates_NOT_CERTIFIED.csv'):
               with (p/name).open(newline='') as f:
                   rows=list(csv.DictReader(f))
               assert len(rows)==(498 if name.startswith('Ontario_498_') else 60),name
+          mapped=json.loads((p/'Ontario_498_Geographically_Assigned_Google_Places.json').read_text())
+          assert mapped['source_type']=='official_2021_fsa_polygon_google_place_geography'
+          assert len(mapped['all_places_by_fsa'])==498
+          assert sum(map(len,mapped['all_places_by_fsa'].values()))==d['unique_google_businesses_mapped_to_eligible_fsa']
+          assert d['fsas_with_90_percent_geographic_footprint_and_at_least_10000_residents']>=60
           print('STATCAN_OFFICIAL_ON_FSA_GEOGRAPHIC_AUDIT_VERIFIED',d,flush=True)
           PY
       - name: Preserve real area-population ratios, full uncertainty audit and separately labeled provisional leads
