@@ -214,8 +214,13 @@ def unverified_tile_geographic_result_scope(tile):
         return True
     if tile.get('geographic_result_scope_verified') is False:
         return True
-    if int(tile.get('visible_links') or 0)>0 and not tile.get('places'):
-        return True
+    if not tile.get('places'):
+        # Empty business listings require Google's explicit no-results state.
+        # A blank/unfinished list or global search cannot certify no clinics.
+        if int(tile.get('visible_links') or 0)>0:
+            return True
+        if tile.get('reason')!='explicit_no_results':
+            return True
     return False
 
 
