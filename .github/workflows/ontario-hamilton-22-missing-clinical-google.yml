@@ -4,6 +4,7 @@ on:
     branches: [ontario-401-fsa-live-ranking-20261121]
     paths:
       - '.github/workflows/ontario-hamilton-22-missing-clinical-google.yml'
+      - 'research/hamilton_unsearched_22_google_sources.py'
   workflow_dispatch:
 permissions:
   contents: read
