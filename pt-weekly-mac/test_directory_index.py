@@ -16,6 +16,7 @@ class DirectoryTest(unittest.TestCase):
             self.assertTrue(all(r["count_status"]=="historical_snapshot_only" and not r["exact_current_count_verified"] for r in rows))
             self.assertEqual(rows[0]["fsa"],"M3N")
             self.assertTrue(all(r["google"] and r["bing"] and r["duckduckgo"] and r["brave"] for r in rows))
+            self.assertTrue(all(not r["exact_current_count_verified"] for r in rows))
     def test_exa_and_freeserp(self):
         q="Number of Counsellors in M3N 30+"
         self.assertEqual(extract("exa",{"content":[{"text":"Title: M3N\nURL: "+url("M3N")+"\n"+q}]},"M3N"),[("30+",None)])
