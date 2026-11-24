@@ -1,11 +1,7 @@
-name: Resume only incomplete Ontario Google Maps source tiles
+name: Legacy incomplete Google Maps tile rescue (manual only)
 on:
-  workflow_run:
-    workflows:
-      - Recheck remaining Ontario Google Maps ranking contenders
-    types: [completed]
-  schedule:
-    - cron: '51 */4 * * *'
+  # Historical 13-area rescue only by manual request. Modern 90-area
+  # source grids use independent verified checkpoints.
   workflow_dispatch:
 permissions:
   actions: read
