@@ -23,6 +23,7 @@ def audit(data, candidates):
     ids_by_area=defaultdict(set)
     areas_by_id=defaultdict(set)
     problems=[]
+    if data.get("schema_version")!=2:problems.append("Unsupported evidence schema")
     for row in records:
         key=(row.get("fsa"),row.get("source"),row.get("variant"))
         counts[key]+=1
@@ -35,6 +36,9 @@ def audit(data, candidates):
         ids=row.get("ids")
         if not isinstance(ids,list) or any(not isinstance(i,str) or not re.fullmatch(r"\d{4,12}",i) for i in ids) or len(ids)!=len(set(ids)):
             problems.append("invalid or duplicate profile IDs: "+repr(key));continue
+        scoped=row.get("postal_text_ids")
+        if not isinstance(scoped,list) or any(not isinstance(i,str) for i in scoped) or len(set(scoped))!=len(scoped) or not set(scoped)<=set(ids):
+            problems.append("invalid postal-text evidence: "+repr(key));continue
         if bool(ids)!=(row["status"]=="indexed_leads_only"):
             problems.append("inconsistent response status: "+repr(key));continue
         if not re.fullmatch(r"[a-f0-9]{64}",str(row.get("response_hash",""))):

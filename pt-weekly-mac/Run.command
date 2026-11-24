@@ -5,9 +5,10 @@ for p in /opt/homebrew/bin/python3 /usr/local/bin/python3 /usr/bin/python3 "$(co
   if [ -x "$p" ] && "$p" -c 'import sys,zoneinfo; assert sys.version_info >= (3,9); zoneinfo.ZoneInfo("America/Toronto")' 2>/dev/null; then PY="$p"; break; fi
 done
 if [ -z "$PY" ]; then echo 'Python 3.9+ with time zone data is required. Install Python from python.org.'; exit 1; fi
-"$PY" -m unittest discover -s . -p 'test_monitor.py' || exit 1
-"$PY" monitor.py "$@"
+"$PY" -m unittest discover -s . -p 'test_keyless.py' || exit 1
+if [ "${1:-}" = "--self-test" ]; then exit 0; fi
+"$PY" weekly_keyless.py "$@"
 code=$?
-echo "Exit status: $code (3 = incomplete direct directory coverage)."
+echo "Exit status: $code (0 = completed index survey, 3 = incomplete; neither certifies an exact competitor ranking)."
 if [ -t 0 ]; then read -r -p 'Press Enter to close.' unused; fi
 exit "$code"

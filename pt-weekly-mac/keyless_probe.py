@@ -173,7 +173,12 @@ def survey(output=None, baseline=None, sources=None, delay=time.sleep, resume=Fa
                 if name in stopped:item.update(status="source_stopped",reason=stopped[name],ids=None)
                 else:
                     try:
-                        obj=fn(query)
+                        for attempt in range(3):
+                            try:
+                                obj=fn(query);break
+                            except (TimeoutError,urllib.error.URLError) as transient:
+                                if attempt==2:raise
+                                delay(2**(attempt+1))
                         found,scoped,dates=indexed_evidence(name,obj,fsa)
                         if name=="freeserp":item["returned_rows"]=len(obj["results"])
                         item.update(status="indexed_leads_only" if found else "no_indexed_leads_not_zero_competitors",ids=found,

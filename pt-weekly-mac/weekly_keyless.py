@@ -18,26 +18,30 @@ def weekly(home,baseline,day,collector=survey):
     daily=out/(day.isoformat()+".json")
     with baseline.open(newline="",encoding="utf8") as f: rows=list(csv.DictReader(f))
     code=collector(output=daily,baseline=baseline,resume=True)
-    current=audit(json.loads(daily.read_text()),rows)
+    daily_data=json.loads(daily.read_text());current=audit(daily_data,rows)
+    if daily_data.get("survey_day")!=day.isoformat():
+        current["index_survey_verified"]=False;current["problems"].append("Daily file date does not match survey date")
     verified_days=[];day_data=[]
     for p in sorted(out.glob("????-??-??.json")):
         date=dt.date.fromisoformat(p.stem)
         if not period<=date<=period+dt.timedelta(days=6) or date>day:continue
         d=json.loads(p.read_text());a=audit(d,rows)
-        if a["index_survey_verified"]:
+        if d.get("survey_day")==p.stem and a["index_survey_verified"]:
             verified_days.append(p.stem);day_data.append((p.stem,d))
     result=[]
     for row in rows:
         f=row["fsa"];pop=int(row["census_population_2021"])
         sets={s:set() for s in ("exa","freeserp")}
-        per_day=[];all_ids=set()
+        per_day=[];all_ids=set();postal_ids=set()
         for date,d in day_data:
             daily_ids=set()
             for x in d["observations"]:
                 if x["fsa"]==f:
-                    sets[x["source"]].update(x["ids"]);daily_ids.update(x["ids"])
+                    sets[x["source"]].update(x["ids"]);daily_ids.update(x["ids"]);postal_ids.update(x["postal_text_ids"])
             all_ids.update(daily_ids);per_day.append(len(daily_ids))
-        result.append({"fsa":f,"population_2021":pop,"verified_index_survey_days":len(verified_days),
+        result.append({"fsa":f,"population_2021":pop,"directory_url":"https://www.psychologytoday.com/ca/therapists/"+f.lower(),
+          "unique_index_leads_with_postal_text":len(postal_ids) if verified_days else None,
+          "postal_text_leads_per_10000_residents":round(len(postal_ids)*10000/pop,4) if verified_days else None,"verified_index_survey_days":len(verified_days),
           "exa_unique_index_leads":len(sets["exa"]) if verified_days else None,
           "freeserp_unique_index_leads":len(sets["freeserp"]) if verified_days else None,
           "union_index_leads":len(all_ids) if verified_days else None,
