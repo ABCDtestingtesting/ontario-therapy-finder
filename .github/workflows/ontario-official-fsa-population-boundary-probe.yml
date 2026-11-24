@@ -62,4 +62,7 @@ jobs:
           name: official-2021-fsa-census-data-probe
           retention-days: 30
           if-no-files-found: warn
-          path: official-population/official_source_probe.json
+          path: |
+            official-population/official_source_probe.json
+            official-population/fsa-population.zip
+            official-population/fsa-boundaries.zip
