@@ -1,6 +1,6 @@
 """Safeguards for geographically verified K7G zoom-specific cap resolution."""
 import unittest
-from research.adjudicate_k7g_uncapped_zoom import replace_capped_tile_with_uncapped_local_recheck,K7G_KEY
+from research.adjudicate_k7g_uncapped_zoom import replace_capped_tile_with_uncapped_local_recheck,retain_verified_k7g_or_reconcile,K7G_KEY
 from research.merge_google_checkpoints import required_base_tile_keys
 
 def sample():
@@ -28,6 +28,30 @@ class K7GTests(unittest.TestCase):
         self.assertEqual(merged['complete_tiles'][K7G_KEY]['visible_links'],0)
         self.assertTrue(merged['superseded_tile_observations'][K7G_KEY][0]['capped'])
         self.assertTrue(old['complete_tiles'][K7G_KEY]['capped'])
+    def test_recent_completed_18_tiles_stay_complete_when_stale_probe_is_seen(self):
+        prior,probe=sample()
+        verified=replace_capped_tile_with_uncapped_local_recheck(prior,probe)
+        expected=verified['complete_tiles'][K7G_KEY]['source_url']
+        observed=retain_verified_k7g_or_reconcile(verified,probe)
+        self.assertEqual(observed['status'],'verified_tile_feed')
+        self.assertEqual(observed['complete_tiles'][K7G_KEY]['source_url'],expected)
+        self.assertTrue(observed['superseded_tile_observations'][K7G_KEY][0]['capped'])
+        self.assertEqual(observed['completed_coverage_tiles'],18)
+
+    def test_recent_completed_source_missing_cap_history_fails_closed(self):
+        prior,probe=sample()
+        verified=replace_capped_tile_with_uncapped_local_recheck(prior,probe)
+        verified['superseded_tile_observations']={}
+        with self.assertRaisesRegex(RuntimeError,'previous source cap'):
+            retain_verified_k7g_or_reconcile(verified,probe)
+
+    def test_recent_completed_source_missing_tile_fails_closed(self):
+        prior,probe=sample()
+        verified=replace_capped_tile_with_uncapped_local_recheck(prior,probe)
+        verified['complete_tiles'].pop(K7G_KEY)
+        with self.assertRaises(RuntimeError):
+            retain_verified_k7g_or_reconcile(verified,probe)
+
     def test_bad_geography_or_result_cap_fails_closed(self):
         for attr,value in [('map_area_search_verified',False),('capped',True),
                            ('reason','not_proven'),('visible_links',120)]:
