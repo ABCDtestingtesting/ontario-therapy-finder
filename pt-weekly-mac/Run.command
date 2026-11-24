@@ -9,6 +9,11 @@ if [ -z "$PY" ]; then echo 'Python 3.9+ with time zone data is required. Install
 if [ "${1:-}" = "--self-test" ]; then exit 0; fi
 "$PY" weekly_keyless.py "$@"
 code=$?
+# Independent directory-statistic survey; preserve historical evidence when unavailable.
+OUT="$HOME/Library/Application Support/PT Weekly Index Survey/$(TZ=America/Toronto date +%F)-directory"
+"$PY" directory_index.py --out "$OUT"
+dircode=$?
+if [ "$dircode" -ne 0 ]; then code=3; fi
 echo "Exit status: $code (0 = completed index survey, 3 = incomplete; neither certifies an exact competitor ranking)."
 if [ -t 0 ]; then read -r -p 'Press Enter to close.' unused; fi
 exit "$code"

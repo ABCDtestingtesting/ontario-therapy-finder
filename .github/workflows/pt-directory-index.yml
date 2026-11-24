@@ -1,0 +1,25 @@
+name: Live targeted PT directory statistic discovery
+on:
+  push:
+    paths:
+      - 'pt-weekly-mac/directory_index.py'
+      - 'pt-weekly-mac/directory_snapshot.csv'
+      - '.github/workflows/pt-directory-index.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  directory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate all 60 areas and scope
+        run: cd pt-weekly-mac && python -m unittest -v test_directory_index.py
+      - name: Live targeted directory index search
+        run: python3 pt-weekly-mac/directory_index.py --out directory-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PT-directory-statistics
+          path: directory-evidence/

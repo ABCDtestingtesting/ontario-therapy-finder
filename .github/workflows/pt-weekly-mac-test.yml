@@ -25,7 +25,7 @@ jobs:
           cd pt-weekly-mac
           test -x Run.command
           bash -n Run.command
-          zip -9 "$RUNNER_TEMP/PT-Weekly-Mac.zip" Run.command weekly_keyless.py keyless_probe.py release_gate.py test_keyless.py candidates.csv README.txt
+          zip -9 "$RUNNER_TEMP/PT-Weekly-Mac.zip" Run.command weekly_keyless.py keyless_probe.py release_gate.py test_keyless.py test_directory_index.py directory_index.py directory_snapshot.csv candidates.csv README.txt
       - name: Extract and test the distributable itself
         run: |
           mkdir "$RUNNER_TEMP/release-test"
@@ -33,6 +33,7 @@ jobs:
           unzip "$RUNNER_TEMP/PT-Weekly-Mac.zip"
           test -x Run.command
           ./Run.command --self-test
+          python -m unittest -v test_directory_index.py
           python -m compileall -q .
       - uses: actions/upload-artifact@v4
         with:
