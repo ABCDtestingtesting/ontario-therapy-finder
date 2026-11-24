@@ -95,6 +95,7 @@ def evaluate(boundaries:Path,census:Path,centres:Path,observed:Path,out:Path):
     polys=[geometry[code] for code in codes]
     tree=STRtree(polys)
     counts=defaultdict(lambda:{'clinical':0,'nonclinical':0,'ambiguous':0})
+    businesses_by_fsa=defaultdict(list)
     outside=0
     for business in sites.values():
         pt=Point(*project.transform(float(business['lon']),float(business['lat'])))
@@ -104,6 +105,7 @@ def evaluate(boundaries:Path,census:Path,centres:Path,observed:Path,out:Path):
             outside+=1
             continue
         counts[hits[0]][business['observed_title_classification']]+=1
+        businesses_by_fsa[hits[0]].append(business)
     circles=[Point(*project.transform(float(x['lon']),float(x['lat']))).buffer(5000,quad_segs=8)
              for x in areas]
     cover=unary_union(circles)
@@ -126,6 +128,11 @@ def evaluate(boundaries:Path,census:Path,centres:Path,observed:Path,out:Path):
         })
     if len(rows)!=498:raise RuntimeError('Bad FSA output cardinality')
     out.mkdir(parents=True,exist_ok=True)
+    (out/'Ontario_498_Geographically_Assigned_Google_Places.json').write_text(
+        json.dumps({'source_type':'official_2021_fsa_polygon_google_place_geography',
+                    'original_source_runs':[44949320059,44949323771],
+                    'outside_hamilton':True,
+                    'all_places_by_fsa':{code:businesses_by_fsa[code] for code in allowed}},indent=2))
     fields=list(rows[0])
     def write(name,items,numbered=False):
         with (out/name).open('w',newline='',encoding='utf8') as fh:
@@ -143,6 +150,10 @@ def evaluate(boundaries:Path,census:Path,centres:Path,observed:Path,out:Path):
                       -x['official_2021_fsa_population'],x['fsa']))
     if len(safer)<60:raise RuntimeError('Fewer than 60 areas have reasonable search footprint coverage')
     write('Ontario_60_Geographically_Screened_Observed_Place_Candidates_NOT_CERTIFIED.csv',safer[:60],True)
+    viable_population=[r for r in safer if r['official_2021_fsa_population']>=10000]
+    if len(viable_population)<60:raise RuntimeError('Too few geographically covered 10,000+ resident FSAs')
+    write('Ontario_60_10k_Residents_Geographically_Screened_Candidates_NOT_CERTIFIED.csv',
+          viable_population[:60],True)
     report={
       'ontario_official_2021_fsa_polygons':len(provincial),
       'eligible_ontario_fsas_outside_hamilton':len(rows),
@@ -156,6 +167,8 @@ def evaluate(boundaries:Path,census:Path,centres:Path,observed:Path,out:Path):
       'unique_ambiguous_google_businesses':sum(v['ambiguous'] for v in counts.values()),
       'fsas_with_at_least_90_percent_geographic_footprint':len(safer),
       'fsas_with_less_than_90_percent_geographic_footprint':len(rows)-len(safer),
+      'fsas_with_90_percent_geographic_footprint_and_at_least_10000_residents':len(viable_population),
+      'geolocated_places_saved_by_actual_2021_fsa_polygon':sum(map(len,businesses_by_fsa.values())),
       'absence_of_therapists_inferred_from_empty_google':False,
       'certified_60_lowest_registered_therapist_to_population_fsas':False,
       'limitations':'Observed businesses, not practitioner headcounts; source only collected within nearby 5km areas, Google directories are incomplete, ambiguous place titles remain unresolved.'
