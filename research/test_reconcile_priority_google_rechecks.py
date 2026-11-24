@@ -42,7 +42,11 @@ class PriorityGoogleRecoveryReconciliationTests(unittest.TestCase):
         return {'fsa':key,'center':[43.7,-79.5],
           'status':'observed_capped' if capped else 'verified_tile_feed',
           'complete_tiles':{k:{'status':'observed',
-                'map_area_search_verified':True,'capped':capped,
+                'map_area_search_verified':True,
+                'geographic_result_scope_verified':True,
+                'visible_links':1,
+                'places':[place], 'reason':'visible_end_of_list',
+                'capped':capped,
                 'unresolved':[]} for k in TILE_KEYS},
           'completed_coverage_tiles':18,'total_coverage_tiles':18,
           'pending':[],'capped_leaf_tiles':1 if capped else 0,
@@ -116,6 +120,17 @@ class PriorityGoogleRecoveryReconciliationTests(unittest.TestCase):
         self.save(self.document(remote=True))
         with self.assertRaisesRegex(RuntimeError,'outside five-kilometre'):
             merge(self.source,self.maps,self.out)
+
+    def test_remote_only_google_map_search_results_cannot_verify_no_clinics(self):
+        doc=self.document()
+        for tile in doc['complete_tiles'].values():
+            tile['places']=[]
+            tile['visible_links']=120
+            tile['geographic_result_scope_verified']=False
+        self.save(doc)
+        report=merge(self.source,self.maps,self.out)
+        self.assertEqual(report['rechecked_sources_fully_clinical'],0)
+        self.assertFalse(report['observed_google_source_model_60_verified'])
 
     def test_missing_tile_cannot_certify(self):
         record=self.document()
