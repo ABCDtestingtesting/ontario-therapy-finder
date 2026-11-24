@@ -127,6 +127,32 @@ class CompleteOntarioRankingTests(unittest.TestCase):
         self.assertEqual(summary['original_item_level_clinical_lower_bound_total'],3)
         self.assertFalse(summary['google_60_certified_within_source_observation_model'])
 
+    def test_originally_observed_clinic_missing_from_complete_new_source_blocks_certification(self):
+        self.make_nine()
+        self.make_sixty_real_clinical_source_feeds()
+        evidence=self.root/'firstpass_item_evidence.csv'
+        fields=['fsa','firstpass_clinical_title_lower_bound','firstpass_ambiguous_titles',
+                'firstpass_nonclinical_titles','original_google_located_businesses',
+                'firstpass_source_shard_sha256']
+        with evidence.open('w',newline='') as fh:
+            wr=csv.DictWriter(fh,fieldnames=fields);wr.writeheader()
+            for code in self.codes:
+                count=2 if code==self.codes[9] else 0
+                wr.writerow({'fsa':code,'firstpass_clinical_title_lower_bound':count,
+                    'firstpass_ambiguous_titles':0,'firstpass_nonclinical_titles':0,
+                    'original_google_located_businesses':count,
+                    'firstpass_source_shard_sha256':'a'*64})
+        with patch('research.finalize_full_google_498.independent_grid_searches_complete',return_value=True):
+            with self.assertRaisesRegex(RuntimeError,'incompletely observed'):
+                combine(self.audit,self.recovery,self.out,self.native,evidence)
+        rows={r['fsa']:r for r in csv.DictReader(
+            (self.out/'ontario_498_google_recovery_audit.csv').open())}
+        self.assertEqual(rows[self.codes[9]]['google_observed_therapy_locations_lower_bound'],'2')
+        self.assertEqual(rows[self.codes[9]]['completed_source_feed'],'False')
+        report=json.loads((self.out/'google_498_recovery_report.json').read_text())
+        self.assertEqual(report['clinically_completed_eligible_fsa'],68)
+        self.assertFalse(report['google_60_certified_within_source_observation_model'])
+
     def test_duplicate_or_incomplete_original_clinical_sources_fail_closed(self):
         source=self.root/'broken.csv'
         source.write_text('fsa,firstpass_clinical_title_lower_bound\\nK0A,1\\n')
