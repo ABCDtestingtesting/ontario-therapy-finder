@@ -341,7 +341,7 @@ def combine(first_pass, recovery_root, output, native_root=None, original_clinic
                             and (not source.get('unresolved_leaf_links')
                                  or exterior_verified)
                             and recovery_clinically_classified(source)
-                            and observed_recovered >= original_clinical))
+                            and observed_recovered >= original_clinical)
         native_ok = bool(independent
                          and independent.get('status') == 'grid_observed_complete'
                          and independent.get('process_returncode') == 0
