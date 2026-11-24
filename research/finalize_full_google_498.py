@@ -248,11 +248,33 @@ def independent_grid_empty_evidenced(meta, path):
     return independent_grid_searches_complete(meta, path)
 
 
-def combine(first_pass, recovery_root, output, native_root=None):
+def combine(first_pass, recovery_root, output, native_root=None, original_clinical_audit=None):
     with open(first_pass, newline='') as fh:
         originals = list(csv.DictReader(fh))
     if len(originals) != 498 or len({r['fsa'] for r in originals}) != 498:
         raise RuntimeError('Expected 498 distinct populated Ontario postal code areas')
+    original_place_evidence = {}
+    if original_clinical_audit is not None:
+        with open(original_clinical_audit, newline='', encoding='utf8') as clinical_file:
+            preserved = list(csv.DictReader(clinical_file))
+        if len(preserved) != 498 or {x['fsa'] for x in preserved} != {x['fsa'] for x in originals}:
+            raise RuntimeError('Original item-level Google clinical source must cover 498 distinct Ontario FSAs')
+        for row in preserved:
+            code = row['fsa']
+            if code in original_place_evidence:
+                raise RuntimeError('Duplicate item-level clinical evidence for '+code)
+            clinical = int(row['firstpass_clinical_title_lower_bound'])
+            ambiguous = int(row['firstpass_ambiguous_titles'])
+            nonclinical = int(row['firstpass_nonclinical_titles'])
+            total = int(row['original_google_located_businesses'])
+            digest = row['firstpass_source_shard_sha256']
+            if (min(clinical, ambiguous, nonclinical) < 0
+                    or clinical+ambiguous+nonclinical != total):
+                raise RuntimeError('Invalid Google business clinical source partition '+code)
+            if len(digest)!=64 or any(c not in '0123456789abcdef' for c in digest):
+                raise RuntimeError('Missing original Google place source SHA256 '+code)
+            original_place_evidence[code] = row
+
     recovery = {}
     for path in Path(recovery_root).glob('**/[A-Z][0-9][A-Z].json'):
         item = json.loads(path.read_text())
@@ -290,7 +312,11 @@ def combine(first_pass, recovery_root, output, native_root=None):
         # disjoint without canonical Google place IDs. Max is a valid bound.
         # Keyword-only Google counts are not clinically verified and cannot
         # be used as a lower bound on psychotherapists or psychologists.
-        lower = max(observed_recovered, independent_observed)
+        # The original first-pass source includes individual geolocated Google
+        # business evidence. Only unambiguous clinical titles contribute.
+        original_clinical = (int(original_place_evidence[code]['firstpass_clinical_title_lower_bound'])
+                             if code in original_place_evidence else 0)
+        lower = max(original_clinical, observed_recovered, independent_observed)
         # Distinct Google searches cannot be summed without place-level
         # deduplication. The maximum of two observed counts is a safe minimum.
         base_ok = source_complete(old)
@@ -355,6 +381,8 @@ def combine(first_pass, recovery_root, output, native_root=None):
             'historical_keyword_observed_google_proxy_count': baseline,
             'historical_keyword_proxies_used_as_clinical_lower_bound': False,
             'historical_keyword_feed_complete': base_ok,
+            'original_google_clinical_title_lower_bound': original_clinical,
+            'original_google_place_source_sha256': original_place_evidence[code]['firstpass_source_shard_sha256'] if code in original_place_evidence else '',
             'google_therapy_locations_used_in_score': count,
             'google_listings_per_10000_residents_or_lower_bound': round(observed_density, 8),
             'residents_per_google_listing_or_upper_bound': residents_per_listing,
@@ -426,6 +454,8 @@ def combine(first_pass, recovery_root, output, native_root=None):
         'first_pass_complete': 0,
         'historical_complete_keyword_only_business_feeds': sum(source_complete(old) for old in originals),
         'clinically_completed_eligible_fsa': len(verified),
+        'original_item_level_clinical_source_fsa_count': len(original_place_evidence),
+        'original_item_level_clinical_lower_bound_total': sum(int(r['firstpass_clinical_title_lower_bound']) for r in original_place_evidence.values()),
         'recovery_source_complete': quality['local_tiled_complete'],
         'independent_google_grid_source_complete': quality['native_gridded_google_complete'],
         'independent_google_grid_empty_confirmed': quality['native_gridded_google_empty_confirmed'],
@@ -453,5 +483,6 @@ if __name__ == '__main__':
     parser.add_argument('recovery_root')
     parser.add_argument('output')
     parser.add_argument('--native-root', default=None)
+    parser.add_argument('--original-clinical-audit', default=None)
     args = parser.parse_args()
-    combine(args.first_pass, args.recovery_root, args.output, args.native_root)
+    combine(args.first_pass, args.recovery_root, args.output, args.native_root, args.original_clinical_audit)
