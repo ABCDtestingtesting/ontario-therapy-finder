@@ -2,6 +2,8 @@
 import json,re,urllib.request,urllib.error,csv,time,datetime,hashlib,os,tempfile
 from pathlib import Path
 from urllib.parse import urlsplit, urlencode
+from zoneinfo import ZoneInfo
+TORONTO=ZoneInfo("America/Toronto")
 EXA="https://mcp.exa.ai/mcp"
 TAVILY="https://api.tavily.com/search"
 class Unavailable(RuntimeError):pass
@@ -11,7 +13,9 @@ def request(url,obj,headers=None):
     req=urllib.request.Request(url,data=json.dumps(obj).encode(),headers=h)
     try:
         with urllib.request.urlopen(req,timeout=30) as r:
-            return r.read(2_000_000).decode(),dict(r.headers.items())
+            raw=r.read(2_000_001)
+            if len(raw)>2_000_000:raise Unavailable("Response exceeds size cap")
+            return raw.decode(),dict(r.headers.items())
     except urllib.error.HTTPError as e:raise Unavailable(f"HTTP {e.code}") from None
 def unpack(raw):
     try:return json.loads(raw)
@@ -60,6 +64,56 @@ def tavily(query):
 def profiles(obj):
     urls=re.findall(r'https://(?:www\.)?psychologytoday\.com/ca/therapists/[^/\s"\\]+/(\d{4,12})(?=[/?#\s"\\]|$)',json.dumps(obj,ensure_ascii=False))
     return sorted(set(urls))
+def profile_id(url):
+    try:u=urlsplit(url)
+    except ValueError:return None
+    if u.scheme!="https" or u.hostname not in ("psychologytoday.com","www.psychologytoday.com"):return None
+    m=re.fullmatch(r"/ca/therapists/[^/]+/(\d{4,12})/?",u.path,re.I)
+    return m.group(1) if m else None
+def mentions_fsa(text,fsa):
+    return bool(re.search(r"(?<![A-Z0-9])"+re.escape(fsa)+r"(?:[ ]?\d[A-Z]\d)?(?![A-Z0-9])",text,re.I))
+def indexed_evidence(source,obj,fsa):
+    # Match exact postal text only in a single result's own title/snippet/highlight.
+    # A text mention is not proof of active advertised-area membership.
+    found=set(); scoped=set(); dates={}
+    if source=="freeserp":
+        rows=obj.get("results")
+        if not isinstance(rows,list) or any(not isinstance(x,dict) or not isinstance(x.get("url"),str) for x in rows):
+            raise Unavailable("Malformed FreeSerp result row")
+        for x in rows:
+            i=profile_id(x["url"])
+            if not i:continue
+            found.add(i)
+            if mentions_fsa(" ".join(str(x.get(k) or "") for k in ("title","snippet")),fsa):
+                scoped.add(i)
+            meta=x.get("source")
+            captured=(meta.get("captured_at") if isinstance(meta,dict) else None) or x.get("crawled_at")
+            if isinstance(captured,str) and re.match(r"^\d{4}-\d{2}-\d{2}",captured):dates[i]=captured[:10]
+    elif source=="exa":
+        blocks=obj.get("content")
+        if not isinstance(blocks,list):raise Unavailable("Malformed Exa content")
+        for b in blocks:
+            if not isinstance(b,dict) or not isinstance(b.get("text"),str):continue
+            raw=b["text"]
+            # Exa returns text result records. Split on result title headers, and
+            # accept a postal mention only where exactly one profile URL is present.
+            parts=re.split(r"(?im)(?=^\s*(?:\d+\.\s*)?(?:Title|URL):\s*)",raw)
+            # Recombine title followed by its URL; never attach an unrelated result's text.
+            pending=""
+            for part in parts:
+                if not part.strip():continue
+                if re.match(r"(?im)^\s*(?:\d+\.\s*)?Title:",part):
+                    pending=part;continue
+                chunk=pending+part;pending=""
+                ids=profiles(chunk);found.update(ids)
+                if len(ids)==1 and mentions_fsa(chunk,fsa):scoped.add(ids[0])
+            if pending:
+                ids=profiles(pending);found.update(ids)
+                if len(ids)==1 and mentions_fsa(pending,fsa):scoped.add(ids[0])
+        # Preserve additional URL discoveries separately; do not attribute their geography.
+        found.update(profiles(obj))
+    else:raise ValueError("Unsupported source")
+    return sorted(found),sorted(scoped),dates
 def get_json(url,params):
     req=urllib.request.Request(url+"?"+urlencode(params),headers={"Accept":"application/json","User-Agent":"PT-weekly-keyless-probe/1.0"})
     try:
@@ -84,7 +138,7 @@ def survey(output=None, baseline=None, sources=None, delay=time.sleep, resume=Fa
     output.parent.mkdir(parents=True,exist_ok=True)
     with (Path(baseline) if baseline else root/"candidates.csv").open(newline="",encoding="utf8") as f: rows=list(csv.DictReader(f))
     if len(rows)!=60 or len({r["fsa"] for r in rows})!=60:raise ValueError("Expected 60 distinct FSAs")
-    report={"schema_version":1,"started_at":datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    report={"schema_version":2,"survey_day":datetime.datetime.now(TORONTO).date().isoformat(),"started_at":datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "exact_active_advertiser_ranking_certified":False,"source_scope":"third-party search index; no verified active directory membership",
             "observations":[]}
     expected={(r["fsa"],name,v) for r in rows for name in ("freeserp","exa") for v in range(2)}
@@ -92,11 +146,11 @@ def survey(output=None, baseline=None, sources=None, delay=time.sleep, resume=Fa
     retained={}
     if resume and output.exists():
         old=json.loads(output.read_text(encoding="utf8"))
-        for x in old.get("observations",[]):
+        for x in old.get("observations",[]) if old.get("schema_version")==2 and old.get("survey_day")==report["survey_day"] else []:
             key=(x.get("fsa"),x.get("source"),x.get("variant"))
-            if key in expected and x.get("population_2021")==populations[key[0]] and x.get("status") in ("indexed_leads_only","no_indexed_leads_not_zero_competitors") and isinstance(x.get("ids"),list):
+            if key in expected and x.get("population_2021")==populations[key[0]] and x.get("status") in ("indexed_leads_only","no_indexed_leads_not_zero_competitors") and isinstance(x.get("ids"),list) and isinstance(x.get("postal_text_ids"),list) and re.fullmatch(r"[a-f0-9]{64}",str(x.get("response_hash",""))):
                 retained[key]=x
-        report["started_at"]=old.get("started_at",report["started_at"])
+        if retained:report["started_at"]=old.get("started_at",report["started_at"])
     report["observations"]=list(retained.values())
     def save():
         with tempfile.NamedTemporaryFile(mode="w",dir=output.parent,encoding="utf8",delete=False) as tmp:
@@ -120,16 +174,10 @@ def survey(output=None, baseline=None, sources=None, delay=time.sleep, resume=Fa
                 else:
                     try:
                         obj=fn(query)
-                        if name=="freeserp":
-                            # Use only top-level result URLs, not incidental links in snippets.
-                            data=obj["results"]
-                            if any(not isinstance(x,dict) or not isinstance(x.get("url"),str) for x in data):
-                                raise Unavailable("Malformed result row")
-                            urls=[x["url"] for x in data]
-                            found=profiles(urls)
-                            item["returned_rows"]=len(data)
-                        else:found=profiles(obj)
+                        found,scoped,dates=indexed_evidence(name,obj,fsa)
+                        if name=="freeserp":item["returned_rows"]=len(obj["results"])
                         item.update(status="indexed_leads_only" if found else "no_indexed_leads_not_zero_competitors",ids=found,
+                                    postal_text_ids=scoped,index_capture_dates=dates,
                                     response_hash=hashlib.sha256(json.dumps(obj,sort_keys=True).encode()).hexdigest())
                     except Exception as e:
                         reason=f"{type(e).__name__}: {str(e)[:200]}"
