@@ -1,5 +1,8 @@
 name: Reconcile 90 actual Google FSA source searches and certify only resolved Ontario top 60
 on:
+  push:
+    paths:
+      - '.github/workflows/ontario-all-90-zero-source-reconciliation.yml'
   workflow_run:
     workflows:
       - Recover final 30 current zero-bound Ontario Google FSA source grids
