@@ -1,0 +1,77 @@
+name: Verify all 521 populated Ontario FSA codes against complete Statistics Canada 2021 data
+on:
+  push:
+    branches: [ontario-401-fsa-live-ranking-20261121]
+    paths:
+      - '.github/workflows/ontario-all-populated-521-fsa-coverage.yml'
+      - 'research/official_520_full_ontario.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  census-google-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch and verify Canada's official 2021 FSA populations without paid APIs
+        run: |
+          set -euo pipefail
+          mkdir -p statcan
+          curl --fail --location --retry 3 --retry-all-errors --connect-timeout 20 --max-time 180 \
+            https://www150.statcan.gc.ca/n1/tbl/csv/98100019-eng.zip -o statcan/census-fsa.zip
+          echo 'ff65fc06b0d3435d6588592c225e0f90c41a34156269dac0c596c8f63045eaac  statcan/census-fsa.zip' | sha256sum --check
+          unzip -j -o -q statcan/census-fsa.zip 98100019.csv -d statcan
+          test -s statcan/98100019.csv
+      - name: Restore 498 geographically located clinics from source-verified Google observations
+        run: |
+          set -euo pipefail
+          mkdir -p original
+          if ! gh run download 45399514764 -R "$GITHUB_REPOSITORY" -n verified-ontario-498-official-fsa-place-density-audit -D original; then
+            gh run download 45399489463 -R "$GITHUB_REPOSITORY" -n verified-ontario-498-official-fsa-place-density-audit -D original
+          fi
+          test -s original/Ontario_498_Official_FSA_Population_Google_Business_Audit.csv
+      - name: Reconcile all 521 populated FSA codes with 520 official geographic polygons, flag previously unsearched areas
+        run: |
+          python -m compileall -q research/official_520_full_ontario.py
+          python -m research.official_520_full_ontario \
+            --original original/Ontario_498_Official_FSA_Population_Google_Business_Audit.csv \
+            --official statcan/98100019.csv --out complete-ontario-521
+      - name: Prove no Ontario populated postal region is silently omitted
+        run: |
+          python - <<'PY'
+          import csv,json
+          from pathlib import Path
+          p=Path('complete-ontario-521')
+          report=json.loads((p/'Ontario_521_Provincial_Research_Completeness.json').read_text())
+          assert report['official_Ontario_nonzero_population_FSA_codes']==521
+          assert report['2021_geographic_boundary_polygons_available']==520
+          assert report['original_clinically_screened_FSA_sources']==498
+          assert report['unsearched_FSA_count']==23
+          assert len(report['unsearched_Hamilton_FSA_sources'])==22
+          assert report['unpolygoned_but_populated_special_fsa']=='M7A'
+          assert not report['certified_lowest_60_per_capita_therapist_FSAs']
+          with (p/'Ontario_ALL_521_Populated_FSA_Codes_Census_Google_Source_Audit.csv').open() as f:
+              d=list(csv.DictReader(f))
+          assert len(d)==521 and len({r['fsa'] for r in d})==521
+          extra=next(r for r in d if r['fsa']=='M7A')
+          assert int(extra['official_2021_population'])==5
+          assert extra['Google_source_observed_for_FSA']=='False'
+          print('ONTARIO_ALL_521_2021_OFFICIAL_CODE_COVERAGE_VERIFIED',report,flush=True)
+          PY
+      - name: Preserve source files and transparent 521 FSA population/competition research
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ontario-all-521-populated-fsa-official-census-coverage
+          retention-days: 90
+          if-no-files-found: warn
+          path: complete-ontario-521/
