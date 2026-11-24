@@ -4,7 +4,7 @@
   "ready_for_database": false,
   "obsolete_preliminary_source_run": 45219618676,
   "obsolete_preliminary_artifact": "Ontario_Google_Best_60_Across_498.csv",
-  "reason": "The latest CI and live 498-FSA audit verified the complete clinical-item source and 22 clinically complete eligible feeds; 468 eligible areas remain unverified and no verified ranking cutoff exists. No certified Ontario best-60 list is publishable.",
+  "reason": "498 distinct Ontario FSAs outside Hamilton and real FSA polygon populations are now reconciled to 2021 Statistics Canada, with original 14,686 unique Google businesses deduplicated by location. Of these 2,273 have explicit therapy titles in eligible FSAs and 9,635 remain ambiguous. Geographic collection footprints cover >=90% of polygon area for 306 FSAs; 192 remain below threshold. Google is not exhaustive and registered therapist headcounts are not known. The final 60 cannot yet be certified.",
   "independent_source_run": 45232783797,
   "blocking_conditions": [
     "All potential top-60 FSA source evidence must be clinically audited",
@@ -44,5 +44,18 @@
   "new_top60_candidates_after_round2": [
     "P2A",
     "P8N"
-  ]
+  ],
+  "latest_successful_official_fsa_geographic_audit_run": 45399514764,
+  "latest_official_fsa_geographic_audit_status": "SUCCESS_NOT_CERTIFIED",
+  "eligible_full_fsa_ontario_outside_hamilton": 498,
+  "official_2021_population_in_eligible_fsas": 13618086,
+  "original_5km_google_observed_business_locations": 26730,
+  "unique_google_businesses_across_original_searches": 14686,
+  "unique_google_businesses_geographically_assigned_to_eligible_fsa": 14679,
+  "unique_clinical_business_titles_in_eligible_official_fsa_polygons": 2273,
+  "unique_ambiguous_business_titles_in_eligible_official_fsa_polygons": 9635,
+  "fsa_polygon_geographic_coverage_at_least_90_percent": 306,
+  "fsa_polygon_geographic_coverage_below_90_percent": 192,
+  "third_round_category_review_run": 45398000435,
+  "third_round_new_candidate_set_changes": 0
 }
