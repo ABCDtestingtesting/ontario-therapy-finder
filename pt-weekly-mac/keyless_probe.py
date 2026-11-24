@@ -45,7 +45,11 @@ def exa(query):
     if "numResults" in props:args["numResults"]=10
     if "type" in props and "fast" in props["type"].get("enum",[]):args["type"]="fast"
     result,_=rpc("tools/call",{"name":"web_search_exa","arguments":args},session,3)
-    if result.get("isError"):raise Unavailable("Exa tool rejected search: "+str(result.get("content"))[:200])
+    metadata = result.get("_meta") or {}
+    if isinstance(metadata, dict) and metadata.get("ai.exa/rateLimited"):
+        raise Unavailable("Exa rate limit reached")
+    if result.get("isError"):
+        raise Unavailable("Exa tool returned an error")
     return result
 def tavily(query):
     raw,_=request(TAVILY,{"query":query,"search_depth":"basic","max_results":10,"include_answer":False,"include_raw_content":False,"auto_parameters":False},{"X-Tavily-Access-Mode":"keyless","X-Client-Source":"tavily-python-keyless","Accept":"application/json"})
