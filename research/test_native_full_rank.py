@@ -72,6 +72,14 @@ class CompleteOntarioRankingTests(unittest.TestCase):
                 'capped_leaf_tiles':0 if i < 69 else 1,
                 'pending':[],'unresolved_leaf_links':0
             }
+            row['complete_tiles']={
+                'map_movement_v7_checkbox_on|'+'|'.join(map(str,(n,e,0,term))): {
+                    'status':'observed','map_area_search_verified':True,
+                    'geographic_result_scope_verified':True,
+                    'visible_links':1,'capped':False,'unresolved':[],
+                    'places':row['local_places'][:1], 'reason':'visible_end_of_list'}
+                for n in (-3.4,0.0,3.4) for e in (-3.4,0.0,3.4)
+                for term in ('psychotherapist','psychologist')}
             (self.recovery/(code+'.json')).write_text(json.dumps(row))
 
     def test_exact_498_and_complete_native_coverage_certifies_top_60(self):
