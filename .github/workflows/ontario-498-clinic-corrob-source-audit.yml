@@ -1,0 +1,68 @@
+name: Independently corroborate original Google clinical offices across all 498 Ontario FSAs
+on:
+  push:
+    branches: [ontario-401-fsa-live-ranking-20261121]
+    paths:
+      - '.github/workflows/ontario-498-clinic-corrob-source-audit.yml'
+      - 'research/merge_corrob_clinical_places.py'
+      - 'research/external_google_clinical_adjudications.py'
+      - 'research/test_external_clinical_adjudications.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore 498 source observed business evidence
+        run: |
+          set -euo pipefail
+          mkdir -p original-cases original-498
+          gh run download 45317051215 -R "$GITHUB_REPOSITORY" -n ontario-498-original-google-clinical-business-evidence -D original-cases
+          gh run download 45420439600 -R "$GITHUB_REPOSITORY" -n ontario-498-strict-5km-clinical-source-crossaudit -D original-498
+          test -s original-cases/Ontario_498_All_Google_Businesses_With_Uncertain_Categories.json
+          test -s original-498/Ontario_498_Strict_5km_Google_Clinical_Crossaudit.csv
+      - name: Test exact independent clinical evidence and false-positive rejection
+        run: |
+          python -m compileall -q research/merge_corrob_clinical_places.py research/external_google_clinical_adjudications.py
+          python -m unittest research.test_external_clinical_adjudications -v
+      - name: Recalculate actual five-km clinic lower bounds from exact authenticated Google place identities
+        run: |
+          python -m research.merge_corrob_clinical_places --prior original-498/Ontario_498_Strict_5km_Google_Clinical_Crossaudit.csv --raw original-cases/Ontario_498_All_Google_Businesses_With_Uncertain_Categories.json --out clinic-evidence-verified-498
+      - name: Retain true 498 population and explicit final-60 uncertainty gate
+        run: |
+          python - <<'PY'
+          import csv,json
+          from pathlib import Path
+          root=Path('clinic-evidence-verified-498')
+          summary=json.loads((root/'Ontario_Clinic_External_Corroboration_Report.json').read_text())
+          assert summary['observed_original_fsa_cohort']==498
+          assert summary['external_clinical_google_businesses_with_matching_source_in_fsas']>=9
+          assert summary['source_title_nonclinical_corrections']>=1
+          assert summary['clinic_lower_bound_increase']>0
+          with (root/'Ontario_498_With_Independently_Corroborated_Clinic_Evidence.csv').open() as f:
+              rows={r['fsa']:r for r in csv.DictReader(f)}
+          assert len(rows)==498 and int(rows['N3B']['cross_source_clinical_office_lower_bound'])>=1
+          assert int(rows['N8A']['cross_source_clinical_office_lower_bound'])>=2
+          assert (root/'Ontario_60_Certified_Within_Observed_Google_Model.csv').is_file()==summary['final60_source_model_certified']
+          assert not summary['individual_clinician_headcounts_proven']
+          print('EXACT_ORIGINAL_GOOGLE_CLINIC_CORROBORATION_VERIFIED',summary,flush=True)
+          PY
+      - name: Preserve full FSA source proof audit and provisional clinical competition ranking
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ontario-498-independently-confirmed-original-google-clinical-offices
+          retention-days: 90
+          if-no-files-found: warn
+          path: clinic-evidence-verified-498/
