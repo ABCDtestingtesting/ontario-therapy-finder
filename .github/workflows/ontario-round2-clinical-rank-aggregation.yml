@@ -1,0 +1,68 @@
+name: Recalculate Ontario 498 after second real Google category pass
+on:
+  workflow_run:
+    workflows:
+      - Recheck reshuffled Ontario 60 candidate Google categories
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      source_run:
+        description: Second-pass Google detail-page source run
+        type: string
+        required: false
+permissions:
+  contents: read
+  actions: read
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN: ${{ inputs.source_run || github.event.workflow_run.id || '45396558001' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reconcile independently preserved source files and second-pass Google businesses
+        run: |
+          set -euo pipefail
+          mkdir -p original prior-ranking new-plan second-pass-categories
+          gh run download 45317051215 -R "$GITHUB_REPOSITORY" -n ontario-498-original-google-clinical-business-evidence -D original
+          gh run download 45318340069 -R "$GITHUB_REPOSITORY" -n ontario-category-reclassified-498-source-audit -D prior-ranking
+          gh run download "$SOURCE_RUN" -R "$GITHUB_REPOSITORY" -n round2-60-google-category-evidence-plan -D new-plan
+          gh run download "$SOURCE_RUN" -R "$GITHUB_REPOSITORY" -p 'round2-verified-google-categories-*' -D second-pass-categories
+          test -s original/Ontario_498_All_Google_Businesses_With_Uncertain_Categories.json
+          test -s prior-ranking/Ontario_498_After_Primary_Category_Checks.csv
+          test -s new-plan/plan.json
+          test "$(find second-pass-categories -name '[A-Z][0-9][A-Z].json' -type f | wc -l | tr -d ' ')" -eq 60
+      - name: Run clinical evidence and 498-FSA source integrity regression tests
+        run: |
+          python -m compileall -q research/reconcile_provisional_google_categories.py
+          python -m unittest research.test_reconcile_provisional_categories research.test_native_full_rank research.test_external_clinical_adjudications -v
+      - name: Recalculate real 498 Ontario business ratios and preserve unresolved sources
+        run: |
+          python -m research.reconcile_provisional_google_categories --full prior-ranking/Ontario_498_After_Primary_Category_Checks.csv --raw original/Ontario_498_All_Google_Businesses_With_Uncertain_Categories.json --plan new-plan/plan.json --categories second-pass-categories --out round2-clinical-ontario-498
+      - name: Never publish the last 60 until source-completion gate certifies ranking
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          p=Path('round2-clinical-ontario-498')
+          report=json.loads((p/'Ontario_Category_Review_Integration_Report.json').read_text())
+          assert report['google_category_source_checkpoints_present']==60
+          assert not report['proved_zero_therapists_anywhere']
+          assert (p/'Ontario_Certified_60_Within_Google_Observation_Model.csv').is_file() == report['final_60_source_model_certified']
+          print('ROUND2_498_CLINICAL_SOURCE_AUDIT_PASSED',report,flush=True)
+          PY
+      - name: Persist precise Google source citations, new candidates and unverified ranks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ontario-498-after-second-google-category-pass
+          retention-days: 30
+          if-no-files-found: warn
+          path: round2-clinical-ontario-498/
