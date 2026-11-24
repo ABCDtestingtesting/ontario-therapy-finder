@@ -70,6 +70,17 @@ def merge(source,checkpoints,out):
     if len(rows)!=498 or len({r['fsa'] for r in rows})!=498:
         raise RuntimeError('498 FSA audit must be complete')
     by_code={r['fsa']:r for r in rows}
+    # The old completed-source flags proved a Google response ended, but
+    # did not prove the results were scoped to the Ontario search location.
+    # Live runs observed global results with a correctly centered viewport.
+    # Preserve each observed clinic lower bound; revoke unverified
+    # completion before applying the newly measured 18-tile source evidence.
+    old_completed={code for code,row in by_code.items()
+        if row['merged_google_observation_source_complete']=='True'}
+    for row in rows:
+        row['legacy_complete_before_geographic_scope_reverification']=(
+            row['merged_google_observation_source_complete'])
+        row['merged_google_observation_source_complete']='False'
     sources={}
     for path in Path(checkpoints).glob('**/[A-Z][0-9][A-Z].json'):
         code=path.stem
@@ -91,9 +102,8 @@ def merge(source,checkpoints,out):
         if revised>old_count:
             changed+=1
             new_total+=revised-old_count
-        existing=row['merged_google_observation_source_complete']=='True'
         source_fully_compatible=classified_complete and clinical>=old_count
-        complete=(existing and clinical<=old_count) or source_fully_compatible
+        complete=source_fully_compatible
         row['cross_source_clinical_office_lower_bound']=str(revised)
         pop=int(row['population_within_5km_2021_estimate'])
         row['observed_clinical_offices_per_10000_lower_bound']=str(round(10000*revised/pop,9))
@@ -148,6 +158,7 @@ def merge(source,checkpoints,out):
       'additional_geolocated_clinical_business_lower_bound':new_total,
       'all_eligible_fsa':len(eligible),
       'clinically_complete_eligible_sources':len(good),
+      'legacy_geographic_completion_flags_revoked_pending_reverification':len(old_completed),
       'unresolved_contenders':len(unresolved),
       'cutoff_clinical_offices_per_10000':cutoff,
       'observed_google_source_model_60_verified':ready,
