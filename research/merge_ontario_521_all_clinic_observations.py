@@ -9,6 +9,7 @@ from datetime import datetime,timezone
 from fractions import Fraction
 from pathlib import Path
 from shapely.geometry import Point,shape
+from shapely import make_valid
 from shapely.ops import unary_union
 from shapely.strtree import STRtree
 from pyproj import Transformer
@@ -122,7 +123,12 @@ def reconcile(areas:Path,raw:Path,plan:Path,checkpoints:Path,boundaries:Path,out
         if code in ontario:raise RuntimeError('Duplicated official FSA polygon '+code)
         ontario.add(code)
         g=shape(sr.shape.__geo_interface__)
-        if not g.is_valid or g.is_empty:raise RuntimeError('Invalid Statistics Canada polygon '+code)
+        # Official 2021 polygon P0P contains fixable topological defects.
+        # Repair geometry without altering its recorded census identity.
+        if not g.is_valid:
+            g=make_valid(g)
+        if g.is_empty or g.area<=0 or not g.is_valid:
+            raise RuntimeError('Invalid Statistics Canada polygon '+code)
         poly[code]=g
     if len(poly)!=520 or set(poly)!=(set(by_code)-{'M7A'}):
         raise RuntimeError('Census 2021 official polygons differ from full 521 FSA population codes')
