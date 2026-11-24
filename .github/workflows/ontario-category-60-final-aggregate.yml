@@ -1,0 +1,69 @@
+name: Recalculate 498 Ontario areas after real Google business-category reviews
+on:
+  workflow_run:
+    workflows:
+      - Verify actual Google business categories across provisional Ontario top-60 FSAs
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      source_run:
+        description: Google primary category source run with per-FSA artifacts
+        required: false
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN: ${{ inputs.source_run || github.event.workflow_run.id || '45317225760' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore 498 audited original locations and actual category source evidence
+        run: |
+          set -euo pipefail
+          mkdir -p original integrated candidate-categories candidates
+          gh run download 45317051215 -R "$GITHUB_REPOSITORY" -n ontario-498-original-google-clinical-business-evidence -D original
+          gh run download 45316648370 -R "$GITHUB_REPOSITORY" -n ontario-498-integrated-clinical-place-evidence -D integrated
+          gh run download "$SOURCE_RUN" -R "$GITHUB_REPOSITORY" -n candidate-60-uncertain-google-businesses -D candidates
+          gh run download "$SOURCE_RUN" -R "$GITHUB_REPOSITORY" -p 'verified-provisional-google-categories-*' -D candidate-categories
+          test -s original/Ontario_498_All_Google_Businesses_With_Uncertain_Categories.json
+          test -s integrated/Ontario_498_Actual_Clinical_Business_Evidence.csv
+          test -s candidates/plan.json
+          test "$(find candidate-categories -type f -name '[A-Z][0-9][A-Z].json' | wc -l)" -ge 1
+      - name: Install clinical source verification dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m compileall -q research/reconcile_provisional_google_categories.py
+      - name: Recalculate every FSA after actual Google business-detail categories
+        run: |
+          python -m research.reconcile_provisional_google_categories --full integrated/Ontario_498_Actual_Clinical_Business_Evidence.csv --raw original/Ontario_498_All_Google_Businesses_With_Uncertain_Categories.json --plan candidates/plan.json --categories candidate-categories --out fresh-clinical-ontario-498
+      - name: Enforce that an incomplete source never publishes a certified list
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('fresh-clinical-ontario-498')
+          report=json.loads((root/'Ontario_Category_Review_Integration_Report.json').read_text())
+          assert report['google_category_source_checkpoints_present']>=1
+          assert not report['proved_zero_therapists_anywhere']
+          certified=(root/'Ontario_Certified_60_Within_Google_Observation_Model.csv').is_file()
+          assert certified==report['final_60_source_model_certified']
+          print('SAFE_GOOGLE_CATEGORY_498_AUDIT',report,flush=True)
+          PY
+      - name: Preserve complete newly ranked 498 audit and source uncertainty
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ontario-category-reclassified-498-source-audit
+          retention-days: 30
+          if-no-files-found: warn
+          path: fresh-clinical-ontario-498/
