@@ -1,6 +1,6 @@
 """No-account search source probe. Use only official anonymous endpoints."""
 import json,re,urllib.request,urllib.error
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlencode
 EXA="https://mcp.exa.ai/mcp"
 TAVILY="https://api.tavily.com/search"
 class Unavailable(RuntimeError):pass
@@ -59,10 +59,27 @@ def tavily(query):
 def profiles(obj):
     urls=re.findall(r'https://(?:www\.)?psychologytoday\.com/ca/therapists/[^/\s"\\]+/(\d{4,12})(?=[/?#\s"\\]|$)',json.dumps(obj,ensure_ascii=False))
     return sorted(set(urls))
+def get_json(url,params):
+    req=urllib.request.Request(url+"?"+urlencode(params),headers={"Accept":"application/json","User-Agent":"PT-weekly-keyless-probe/1.0"})
+    try:
+        with urllib.request.urlopen(req,timeout=30) as r:
+            raw=r.read(2_000_001)
+            if len(raw)>2_000_000:raise Unavailable("Response exceeds size cap")
+            return json.loads(raw)
+    except urllib.error.HTTPError as e:raise Unavailable(f"HTTP {e.code}") from None
+def freeserp(query):
+    obj=get_json("https://freeserp.ai/api.php",{"index":"web","q":query,"size":20})
+    if not isinstance(obj,dict) or obj.get("ok") is not True or not isinstance(obj.get("results"),list):
+        raise Unavailable("Unrecognized FreeSerp response")
+    return obj
+def mwmbl(query):
+    obj=get_json("https://api.mwmbl.org/api/v2/search/",{"q":query})
+    if not isinstance(obj,(dict,list)):raise Unavailable("Unrecognized Mwmbl response")
+    return obj
 def main():
     query='site:psychologytoday.com/ca/therapists/ "L3S" Markham Ontario therapist'
     failures=0
-    for name,fn in [("exa",exa),("tavily",tavily)]:
+    for name,fn in [("exa",exa),("tavily",tavily),("freeserp",freeserp),("mwmbl",mwmbl)]:
         try:
             p=profiles(fn(query));print(name,"unique indexed profile IDs",len(p),flush=True)
             if not p:failures+=1
