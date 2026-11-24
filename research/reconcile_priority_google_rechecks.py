@@ -6,7 +6,7 @@ import argparse,csv,json,math
 from datetime import datetime,timezone
 from fractions import Fraction
 from pathlib import Path
-from research.finalize_full_google_498 import clinical_title_classification
+from research.finalize_full_google_498 import clinical_title_classification, recovery_geographically_verified
 from research.scan_all_maps import distance_km
 
 OFFSETS=(-3.4,0.0,3.4)
@@ -30,6 +30,7 @@ def verify_doc(code,doc,center):
         and int(doc.get('capped_leaf_tiles',0))==0
         and int(doc.get('unresolved_leaf_links',0))==0
         and TILE_KEYS.issubset(set(tiles))
+        and recovery_geographically_verified(doc)
         and all(tiles[k].get('status')=='observed'
           and tiles[k].get('map_area_search_verified') is True
           and tiles[k].get('capped') is False
