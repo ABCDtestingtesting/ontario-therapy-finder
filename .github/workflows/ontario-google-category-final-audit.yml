@@ -170,7 +170,7 @@ jobs:
       - name: Merge without dropping historical source observations
         run: |
           python -m compileall -q research/merge_google_checkpoints.py research/test_google_checkpoint_merge.py research/finalize_full_google_498.py
-          python -m unittest research.test_google_checkpoint_merge research.test_google_category_evidence research.test_google_exterior_place research.test_k7g_uncapped_zoom research.test_external_clinical_adjudications research.test_native_full_rank -v
+          python -m unittest research.test_google_checkpoint_merge research.test_google_category_evidence research.test_google_exterior_place research.test_k7g_uncapped_zoom research.test_external_clinical_adjudications research.test_native_full_rank research.test_google_bounded_recovery -v
           python - <<'PY'
           import json
           from pathlib import Path
