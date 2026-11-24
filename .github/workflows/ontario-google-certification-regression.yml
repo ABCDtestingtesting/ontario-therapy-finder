@@ -6,6 +6,9 @@ on:
     paths:
       - 'research/finalize_full_google_498.py'
       - 'tests/test_google_498_certification.py'
+      - 'research/test_native_full_rank.py'
+      - 'research/external_google_clinical_adjudications.py'
+      - 'research/test_external_clinical_adjudications.py'
       - '.github/workflows/ontario-google-certification-regression.yml'
   workflow_dispatch:
 permissions:
@@ -23,5 +26,6 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: Syntax and source-verification regression tests
         run: |
-          python -m compileall -q research/finalize_full_google_498.py tests/test_google_498_certification.py
+          python -m compileall -q research/finalize_full_google_498.py tests/test_google_498_certification.py research/test_native_full_rank.py
           python -m unittest discover -s tests -p 'test_google_498_certification.py' -v
+          python -m unittest research.test_native_full_rank research.test_external_clinical_adjudications -v
