@@ -12,6 +12,7 @@ import csv
 import json
 import math
 import re
+from research.external_google_clinical_adjudications import independent_clinical_service_evidence
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -69,6 +70,8 @@ def clinical_title_classification(place):
             pass
     if any(term in name for term in NONCLINICAL_TITLE_TERMS):
         return 'nonclinical'
+    if independent_clinical_service_evidence(place):
+        return 'clinical'
     if any(term in name for term in CLINICAL_TITLE_TERMS):
         return 'clinical'
     # Exact Google Maps business-detail categories are stronger evidence than
