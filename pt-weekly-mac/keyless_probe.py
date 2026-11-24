@@ -1,5 +1,5 @@
 """No-account search source probe. Use only official anonymous endpoints."""
-import json,re,urllib.request,urllib.error,csv,time,datetime,hashlib
+import json,re,urllib.request,urllib.error,csv,time,datetime,hashlib,os,tempfile
 from pathlib import Path
 from urllib.parse import urlsplit, urlencode
 EXA="https://mcp.exa.ai/mcp"
@@ -77,22 +77,40 @@ def mwmbl(query):
     obj=get_json("https://api.mwmbl.org/api/v2/search/",{"q":query})
     if not isinstance(obj,(dict,list)):raise Unavailable("Unrecognized Mwmbl response")
     return obj
-def survey():
+def survey(output=None, baseline=None, sources=None, delay=time.sleep, resume=False):
     # These are discovery observations, never current or complete PT membership.
     root=Path(__file__).resolve().parent
-    output=root/"keyless-observations.json"
-    with (root/"candidates.csv").open(newline="",encoding="utf8") as f: rows=list(csv.DictReader(f))
+    output=Path(output) if output else root/"keyless-observations.json"
+    output.parent.mkdir(parents=True,exist_ok=True)
+    with (Path(baseline) if baseline else root/"candidates.csv").open(newline="",encoding="utf8") as f: rows=list(csv.DictReader(f))
     if len(rows)!=60 or len({r["fsa"] for r in rows})!=60:raise ValueError("Expected 60 distinct FSAs")
     report={"schema_version":1,"started_at":datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "exact_active_advertiser_ranking_certified":False,"source_scope":"third-party search index; no verified active directory membership",
             "observations":[]}
+    expected={(r["fsa"],name,v) for r in rows for name in ("freeserp","exa") for v in range(2)}
+    populations={r["fsa"]:int(r["census_population_2021"]) for r in rows}
+    retained={}
+    if resume and output.exists():
+        old=json.loads(output.read_text(encoding="utf8"))
+        for x in old.get("observations",[]):
+            key=(x.get("fsa"),x.get("source"),x.get("variant"))
+            if key in expected and x.get("population_2021")==populations[key[0]] and x.get("status") in ("indexed_leads_only","no_indexed_leads_not_zero_competitors") and isinstance(x.get("ids"),list):
+                retained[key]=x
+        report["started_at"]=old.get("started_at",report["started_at"])
+    report["observations"]=list(retained.values())
     def save():
-        temp=output.with_suffix(".tmp");temp.write_text(json.dumps(report,indent=2),encoding="utf8");temp.replace(output)
+        with tempfile.NamedTemporaryFile(mode="w",dir=output.parent,encoding="utf8",delete=False) as tmp:
+            os.chmod(tmp.name,0o600);json.dump(report,tmp,indent=2);name=tmp.name
+        os.replace(name,output)
     stopped={}
+    providers=sources if sources is not None else [("freeserp",freeserp),("exa",exa)]
+    if {name for name,_ in providers}!={"freeserp","exa"} or len(providers)!=2:raise ValueError("Expected both anonymous sources")
+    save()
     for row in rows:
         fsa=row["fsa"]
-        for name,fn in [("freeserp",freeserp),("exa",exa)]:
+        for name,fn in providers:
             for variant in range(2):
+                if (fsa,name,variant) in retained:continue
                 query=[f'site:psychologytoday.com/ca/therapists/ "{fsa}" Ontario therapist',
                        f'site:psychologytoday.com/ca/therapists/ "{fsa}" Ontario counselling online'][variant]
                 item={"fsa":fsa,"source":name,"variant":variant,"query":query,
@@ -117,7 +135,7 @@ def survey():
                         reason=f"{type(e).__name__}: {str(e)[:200]}"
                         item.update(status="unavailable",reason=reason,ids=None)
                         if isinstance(e,Unavailable) and ("429" in reason or "rate limit" in reason.lower() or "401" in reason or "403" in reason or "402" in reason):stopped[name]=reason
-                    time.sleep(1)
+                    delay(1)
                 report["observations"].append(item);save()
                 print(fsa,name,variant,item["status"],len(item["ids"]) if item["ids"] is not None else "-",flush=True)
     report["finished_at"]=datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -126,7 +144,7 @@ def survey():
        for name in ("freeserp","exa")}
     save();print(json.dumps(report["coverage"],indent=2),flush=True)
     # A completed probe is evidence collection only; exact-ranking gate remains closed.
-    return 0 if len(report["observations"])==240 else 1
+    return 0 if len(report["observations"])==240 and all(x["areas_with_two_responses"]==60 for x in report["coverage"].values()) else 3
 def main():
     import sys
     if "--survey" in sys.argv:return survey()
