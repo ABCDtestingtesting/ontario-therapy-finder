@@ -99,13 +99,27 @@ def scan_tile(context, code, center, north, east, level, term, root):
             key = identity(link, xy)
             inside[key] = {'name': link.get('name') or 'Unknown', 'lat': xy[0],
                            'lon': xy[1], 'source_url': link.get('url'), 'key': key}
+    # A centred Google Maps viewport does not establish local results.
+    # Live source run 45421150683 returned dozens of remote businesses,
+    # including US listings, while the map itself was correctly centred.
+    # Such a feed has not proven absence of clinics in the search area.
+    unscoped=(bool(links) and not inside)
+    local_scope_verified=(not unscoped and
+        (len(inside)>0 or (not links and
+         evidence.get('completion_reason')=='explicit_no_results')))
+    scope_partial=partial or not local_scope_verified
     return {
         'code': code, 'north_km': north, 'east_km': east, 'level': level,
         'term': term, 'source_url': evidence.get('geographic_refresh_url') or evidence['search_url'],
         'map_area_search_verified': evidence.get('geographic_refresh_verified') is True,
-        'visible_links': len(links), 'capped': partial or len(links) >= 120,
-        'reason': evidence.get('completion_reason'), 'places': list(inside.values()),
-        'unresolved': unresolved, 'status': 'observed_partial' if partial else 'observed',
+        'geographic_result_scope_verified':local_scope_verified,
+        'unscoped_remote_search_result_links':len(links) if unscoped else 0,
+        'visible_links': len(links), 'capped': scope_partial or len(links) >= 120,
+        'reason': ('results_not_localized_to_study_radius' if unscoped
+                   else evidence.get('completion_reason')),
+        'places': list(inside.values()),
+        'unresolved': unresolved,
+        'status': 'observed_partial' if scope_partial else 'observed',
         'observed_at': datetime.now(timezone.utc).isoformat(),
     }
 
