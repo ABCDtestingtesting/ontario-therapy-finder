@@ -6,6 +6,8 @@ on:
       - '.github/workflows/test-ontario-clinical-category-reconciliation.yml'
       - 'research/reconcile_provisional_google_categories.py'
       - 'research/test_reconcile_provisional_categories.py'
+      - 'research/reconcile_priority_google_rechecks.py'
+      - 'research/test_reconcile_priority_google_rechecks.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,7 +22,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install source verification dependencies
+        run: python -m pip install -r requirements.txt
       - name: Compile and test source identities, evidence preservation and publication blocking
         run: |
           python -m compileall -q research/reconcile_provisional_google_categories.py
-          python -m unittest research.test_reconcile_provisional_categories -v
+          python -m unittest research.test_reconcile_provisional_categories research.test_reconcile_priority_google_rechecks -v
