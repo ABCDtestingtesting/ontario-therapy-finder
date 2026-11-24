@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "source_date": "2026-11-24",
+  "analysis_scope": "Original first 90 priority Ontario 5-km Google psychotherapist/psychologist FSA research areas",
+  "full_498_2021_population_crossaudit_run": 45420439600,
+  "original_87_result_run": 45435276426,
+  "original_87_artifact_id": 14941176032,
+  "original_verified_recovered_fsa_count": 87,
+  "original_missing_fsa_codes": [
+    "K6T",
+    "N8A",
+    "N8M"
+  ],
+  "missing_three_recovery_run": 45436422223,
+  "complete_original_90_source_checkpoint_count": 90,
+  "repaired_fsa_sources": [
+    {
+      "fsa": "K6T",
+      "artifact_id": 14941607592,
+      "source_sha256": "8592627bfc9f89c3ceb621928111e8d42f41f6124d764544454cce7f089dfaab",
+      "source_status": "coverage_incomplete",
+      "unique_observed_google_places": 1,
+      "verified_clinical_office_addition_beyond_prior_evidence": 0,
+      "ambiguous_businesses": [
+        "Mosaic Integrative Health"
+      ]
+    },
+    {
+      "fsa": "N8A",
+      "artifact_id": 14941758344,
+      "source_sha256": "d1f48129816a4dc74e3092cebf212417c28724e1800fbc4290c7d34240e7ca4a",
+      "source_status": "coverage_incomplete",
+      "unique_observed_google_places": 5,
+      "verified_clinical_office_addition_beyond_prior_evidence": 0,
+      "known_previously_corroborated_clinic": "P.A.C.E. Therapy and Counselling Services",
+      "other_business_category_uncertainties": 4
+    },
+    {
+      "fsa": "N8M",
+      "artifact_id": 14942671041,
+      "source_sha256": "d156d482dd507e5026d36fc362031a216d9e84eeef963121a31dbecfdb3d4c3e",
+      "source_status": "coverage_incomplete",
+      "unique_observed_google_places": 0,
+      "absence_of_clinics_proven": false
+    }
+  ],
+  "completed_geographically_localized_source_enumerations_from_repaired_three": 0,
+  "all_90_google_searches_attempted_with_durable_evidence": true,
+  "all_90_clinical_business_sources_fully_enumerated": false,
+  "source_90_research_can_certify_true_lowest_therapist_per_resident_60": false,
+  "registration_headcounts_complete": false,
+  "remaining_uncertainties": "Google returned remote or capped search results; individual therapist headcounts and all FSA geography remain unverified. Original 498 survey also omitted 22 Hamilton FSAs and populated M7A FSA, now separately audited."
+}
