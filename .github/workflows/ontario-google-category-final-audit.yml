@@ -2,14 +2,6 @@ name: Recalculate Ontario Google 498 after live business-category recovery
 on:
   push:
     paths: ['.github/workflows/ontario-google-category-final-audit.yml']
-  workflow_run:
-    workflows:
-      - Classify unresolved Ontario Google Maps businesses from verified place categories
-      - Recover all capped and incomplete Ontario Google Maps postal areas
-      - Recheck remaining Ontario Google Maps ranking contenders
-      - Resume only incomplete Ontario Google Maps source tiles
-      - Probe final four Ontario Google ranking contenders with bounded local search
-    types: [completed]
   workflow_dispatch:
     inputs:
       category_run_id:
