@@ -4,7 +4,7 @@
   "ready_for_database": false,
   "obsolete_preliminary_source_run": 45219618676,
   "obsolete_preliminary_artifact": "Ontario_Google_Best_60_Across_498.csv",
-  "reason": "498 distinct Ontario FSAs outside Hamilton and real FSA polygon populations are now reconciled to 2021 Statistics Canada, with original 14,686 unique Google businesses deduplicated by location. Of these 2,273 have explicit therapy titles in eligible FSAs and 9,635 remain ambiguous. Geographic collection footprints cover >=90% of polygon area for 306 FSAs; 192 remain below threshold. Google is not exhaustive and registered therapist headcounts are not known. The final 60 cannot yet be certified.",
+  "reason": "Actual Google source evidence revealed remote listings despite correctly centered Ontario map views. Historic 22 completed sources cannot certify geographic completeness until revised per-tile tests pass. 90 high-uncertainty areas are undergoing direct grid rechecks; any empty remote-only Google result remains unresolved. Independent clinical evidence was added for Woolwich and Wallaceburg offices. Final 60 remains blocked.",
   "independent_source_run": 45232783797,
   "blocking_conditions": [
     "All potential top-60 FSA source evidence must be clinically audited",
@@ -57,5 +57,9 @@
   "fsa_polygon_geographic_coverage_at_least_90_percent": 306,
   "fsa_polygon_geographic_coverage_below_90_percent": 192,
   "third_round_category_review_run": 45398000435,
-  "third_round_new_candidate_set_changes": 0
+  "third_round_new_candidate_set_changes": 0,
+  "google_search_geo_scope_issue": "Actual results included dozens of distant/global clinic listings (including US businesses) while browser viewport map center was successfully verified; 18-tile completion and historic zero reports now require source geography revalidation",
+  "geographic_result_scope_reaudit_required": true,
+  "pre_geo_scope_completed_count_not_certified": 22,
+  "pending_geographic_scope_full_audit_run": 45426173631
 }
