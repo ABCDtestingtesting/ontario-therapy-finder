@@ -18,6 +18,8 @@ class DirectoryTest(unittest.TestCase):
             self.assertTrue(all(r["google"] and r["bing"] and r["duckduckgo"] and r["brave"] for r in rows))
             self.assertTrue(all(not r["exact_current_count_verified"] for r in rows))
             self.assertTrue(all(r["verified_competition_rank"]=="" for r in rows))
+            self.assertEqual([r["weekly_approximation_rank"] for r in rows],list(range(1,61)))
+            self.assertEqual(len(list(csv.DictReader(open(Path(t)/"weekly-top60-approximation.csv")))),60)
             self.assertTrue(all(r["possible_max_per_10000"]=="" for r in rows if r["bound"]=="lower"))
     def test_exa_and_freeserp(self):
         q="Number of Counsellors in M3N 30+"

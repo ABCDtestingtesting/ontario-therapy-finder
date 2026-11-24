@@ -1,5 +1,5 @@
 """Targeted index-directory discovery. No direct automated PT requests."""
-import argparse,csv,datetime as dt,hashlib,json,re,time
+import argparse,csv,datetime as dt,hashlib,json,re,time,concurrent.futures,threading
 from pathlib import Path
 from urllib.parse import urlsplit,urlencode
 from keyless_probe import exa,freeserp,Unavailable
@@ -49,26 +49,37 @@ def run(out,baseline=ROOT/"candidates.csv",seed=ROOT/"directory_snapshot.csv",pr
     with Path(seed).open() as f:historical={r["fsa"]:r for r in csv.DictReader(f)}
     if len(areas)!=60 or len({r["fsa"] for r in areas})!=60 or set(historical)!={r["fsa"] for r in areas}:raise ValueError("Candidate/snapshot mismatch")
     providers=providers if providers is not None else [("exa",exa),("freeserp",freeserp)]
-    rows=[];obs=[];stopped={}
+    rows=[];obs=[];stopped={};lock=threading.Lock()
     def save():
         p=out/"directory-index-evidence.json"
         tmp=p.with_suffix(".tmp");tmp.write_text(json.dumps(obs,indent=2));tmp.replace(p)
+    def one(name,fn,query,fsa):
+        rec={"fsa":fsa,"source":name,"query":query,"observed_at":dt.datetime.now(dt.timezone.utc).isoformat()}
+        try:
+            data=fn(query)
+            counts=extract(name,data,fsa)
+            rec.update(status="indexed_directory_statistic" if counts else "no_matching_statistic",counts=counts,
+                response_hash=hashlib.sha256(json.dumps(data,sort_keys=True).encode()).hexdigest())
+            return rec,[(name,c,a) for c,a in counts]
+        except Exception as e:
+            rec.update(status="unavailable",reason=str(e)[:200])
+            return rec,[]
+    # Bound concurrency: every FSA/source gets an outcome, even on provider failure.
+    jobs={}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(8,max(1,len(providers)*3))) as pool:
+        for area in areas:
+            fsa=area["fsa"];query=f'{url(fsa)} "Number of Counsellors in {fsa}"'
+            for name,fn in providers:
+                jobs[(fsa,name)]=pool.submit(one,name,fn,query,fsa)
+        for (fsa,name),future in jobs.items():
+            rec,_=future.result()
+            obs.append(rec);save()
+    lookup={(r["fsa"],r["source"]):r for r in obs}
     for area in areas:
         fsa=area["fsa"];pop=int(area["census_population_2021"]);hits=[]
-        query=f'{url(fsa)} "Number of Counsellors in {fsa}"'
         for name,fn in providers:
-            rec={"fsa":fsa,"source":name,"query":query,"observed_at":dt.datetime.now(dt.timezone.utc).isoformat()}
-            if name in stopped:rec.update(status="source_stopped",reason=stopped[name])
-            else:
-                try:
-                    data=fn(query);counts=extract(name,data,fsa)
-                    rec.update(status="indexed_directory_statistic" if counts else "no_matching_statistic",counts=counts,response_hash=hashlib.sha256(json.dumps(data,sort_keys=True).encode()).hexdigest())
-                    hits.extend((name,c,a) for c,a in counts)
-                except Exception as e:
-                    rec.update(status="unavailable",reason=str(e)[:200])
-                    if isinstance(e,Unavailable) and any(x in str(e).lower() for x in ("429","403","401","402","rate limit")):stopped[name]=str(e)
-                delay(1)
-            obs.append(rec);save()
+            rec=lookup[(fsa,name)]
+            hits.extend((name,c,a) for c,a in rec.get("counts",[]))
         distinct={c for _,c,_ in hits}
         count=next(iter(distinct)) if len(distinct)==1 else historical[fsa]["displayed_count"]
         status="indexed_statistic_retrieved" if len(distinct)==1 else "conflicting_index_statistics_historical_fallback" if distinct else "historical_snapshot_only"
@@ -88,10 +99,15 @@ def run(out,baseline=ROOT/"candidates.csv",seed=ROOT/"directory_snapshot.csv",pr
     # Display order is an exploratory heuristic only. Never claim exact rank.
     for i,r in enumerate(rows,1):
         r["screening_order"]=i
+        r["weekly_approximation_rank"]=i
+        r["weekly_approximation_method"]="PT indexed count if unambiguous; otherwise dated PT directory snapshot; displayed bound per 10,000 census residents"
         r["verified_competition_rank"]=""
         r["screening_order_is_verified_rank"]=False
     with (out/"directory-screening.csv").open("w",newline="") as f:
         w=csv.DictWriter(f,fieldnames=list(rows[0]));w.writeheader();w.writerows(rows)
+    with (out/"weekly-top60-approximation.csv").open("w",newline="") as f:
+        w=csv.DictWriter(f,fieldnames=["weekly_approximation_rank","fsa","population_2021","displayed_count","screening_proxy_per_10000","count_status","historical_capture_age","directory_url"])
+        w.writeheader();w.writerows([{k:r[k] for k in w.fieldnames} for r in rows])
     return rows
 def main():
     p=argparse.ArgumentParser();p.add_argument("--out",type=Path,required=True);a=p.parse_args();rows=run(a.out)
