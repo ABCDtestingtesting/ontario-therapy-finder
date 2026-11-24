@@ -49,7 +49,10 @@ def reconcile(strict,category,out):
         clinic=max(clinic_a,clinic_b)
         source_complete=truth(a['completed_source_feed'])
         independent_conflict=clinic_b>clinic_a
-        merged_complete=source_complete and not independent_conflict
+        # Older Google source completion did not establish that the list
+        # matched the tile's requested geography. The observed clinic
+        # count is retained, but the source cannot be called complete.
+        merged_complete=False
         rows.append({
           'fsa':code,
           'population_within_5km_2021_estimate':pop,
@@ -58,7 +61,8 @@ def reconcile(strict,category,out):
           'cross_source_clinical_office_lower_bound':clinic,
           'observed_clinical_offices_per_10000_lower_bound':round(10000*clinic/pop,9),
           'residents_per_observed_clinical_office_upper_bound':round(pop/clinic,2) if clinic else '',
-          'source_a_grid_clinically_complete':source_complete,
+          'source_a_grid_clinically_complete':False,
+          'source_a_legacy_completion_flag_before_geo_revalidation':source_complete,
           'source_b_detected_additional_clinical_offices':independent_conflict,
           'merged_google_observation_source_complete':merged_complete,
           'previously_screened_excluded':code in EXCLUDE or truth(a['excluded_last_90_days']),
@@ -96,6 +100,8 @@ def reconcile(strict,category,out):
         'crosschecked_2021_5km_fsa_sources':498,
         'eligible_areas_after_eight_and_recent_exclusions':len(eligible),
         'fully_clinically_audited_eligible_sources':len(verified),
+        'legacy_google_completed_sources_revoked_pending_geographic_validation':
+            sum(r['source_a_legacy_completion_flag_before_geo_revalidation'] for r in rows),
         'areas_where_additional_google_clinics_found':sum(r['source_b_clinical_office_lower_bound']>r['source_a_clinical_office_lower_bound'] for r in rows),
         'previously_complete_sources_with_new_unaccounted_clinics':sum(r['source_a_grid_clinically_complete'] and r['source_b_detected_additional_clinical_offices'] for r in rows),
         'unresolved_potential_top60_contenders':len(unresolved),
