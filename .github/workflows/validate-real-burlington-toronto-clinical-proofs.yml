@@ -1,0 +1,65 @@
+name: Validate exact Burlington and Toronto Google clinical-service evidence
+on:
+  push:
+    branches: [ontario-401-fsa-live-ranking-20261121]
+    paths:
+      - '.github/workflows/validate-real-burlington-toronto-clinical-proofs.yml'
+      - 'research/external_google_clinical_adjudications.py'
+      - 'research/finalize_full_google_498.py'
+      - 'research/test_external_clinical_adjudications.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore real Google business checkpoints and clinical categories
+        run: |
+          set -euo pipefail
+          mkdir -p source/L7M source/M9M
+          gh run download 45207259811 -R "$GITHUB_REPOSITORY" -n verified-google-categories-L7M -D source/L7M
+          gh run download 45207259811 -R "$GITHUB_REPOSITORY" -n verified-google-categories-M9M -D source/M9M
+          test -s source/L7M/L7M.json
+          test -s source/M9M/M9M.json
+      - name: Test immutable Google business identity and clinical evidence
+        run: |
+          python -m unittest research.test_external_clinical_adjudications -v
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from research.finalize_full_google_498 import clinical_title_classification
+          from research.external_google_clinical_adjudications import independent_clinical_service_evidence
+          report={}
+          for code,minimum in (('L7M',6),('M9M',30)):
+              data=json.loads(Path(f'source/{code}/{code}.json').read_text())
+              assert data['fsa']==code and data['status']=='observed_capped'
+              places=data['local_places']
+              assert len(places)==int(data['unique_observed_local_places'])
+              assert len({p['key'] for p in places})==len(places)
+              externally=[p for p in places if independent_clinical_service_evidence(p)]
+              clinical=[p for p in places if clinical_title_classification(p)=='clinical']
+              assert len(clinical)>=minimum,(code,len(clinical))
+              report[code]={'clinical_businesses_geographically_observed_lower_bound':len(clinical),
+                            'externally_corroborated_google_businesses':len(externally),
+                            'all_provider_locations_exhaustively_verified':False,
+                            'source_google_cap_still_unresolved':True}
+          Path('source-check-summary.json').write_text(json.dumps(report,indent=2))
+          print('EXACT_REAL_GOOGLE_PLACE_CLINICAL_CHECK',json.dumps(report),flush=True)
+          PY
+      - name: Preserve exact source verification report
+        uses: actions/upload-artifact@v4
+        with:
+          name: exact-google-clinical-verification-L7M-M9M
+          retention-days: 30
+          path: source-check-summary.json
