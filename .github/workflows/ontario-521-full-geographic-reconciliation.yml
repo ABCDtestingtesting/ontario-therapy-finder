@@ -1,0 +1,105 @@
+name: Reconcile all 521 Ontario FSA populations and clinical Google locations after Hamilton search
+on:
+  push:
+    paths:
+      - '.github/workflows/ontario-521-full-geographic-reconciliation.yml'
+  workflow_run:
+    workflows:
+      - Fill 22 omitted Hamilton Ontario FSA Google clinical evidence gaps
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      source_run:
+        description: Explicit source workflow ID (defaults to latest 22 Hamilton evidence plan)
+        type: string
+        required: false
+permissions:
+  contents: read
+  actions: read
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HAM_RUN: ${{ inputs.source_run || github.event.workflow_run.id || '45437175675' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore original individual Google business sources and complete 521-populated-FSA census table
+        run: |
+          set -euo pipefail
+          mkdir -p original full-521 centre-plan hamilton-checkpoints
+          gh run download 45317051215 -R "$GITHUB_REPOSITORY" -n ontario-498-original-google-clinical-business-evidence -D original
+          gh run download 45436142319 -R "$GITHUB_REPOSITORY" -n ontario-all-521-populated-fsa-official-census-coverage -D full-521
+          gh run download "$HAM_RUN" -R "$GITHUB_REPOSITORY" -n hamilton-22-official-polygon-source-search-plan -D centre-plan
+          test -s original/Ontario_498_All_Google_Businesses_With_Uncertain_Categories.json
+          test -s full-521/Ontario_ALL_521_Populated_FSA_Codes_Census_Google_Source_Audit.csv
+          test -s centre-plan/hamilton_22_verified_centres.json
+      - name: Restore any genuinely evidenced new Hamilton search-area business checkpoints
+        run: |
+          set -euo pipefail
+          for i in $(seq 0 21); do
+            if ! gh run download "$HAM_RUN" -R "$GITHUB_REPOSITORY" -n "hamilton-source-FSA-$i" -D "hamilton-checkpoints/hamilton-$i"; then
+              echo "HAMILTON_GOOGLE_SOURCE_MISSING_OR_RESTRICTED $i; retain as incomplete rather than zero businesses" >&2
+            fi
+          done
+          echo "VERIFIABLE_HAMILTON_FSA_COUNT=$(find hamilton-checkpoints -type f -name '[A-Z][0-9][A-Z].json' | wc -l | tr -d ' ')"
+      - name: Restore pinned official Statistics Canada 2021 geographic FSA polygons
+        run: |
+          set -euo pipefail
+          mkdir -p original-geography
+          if ! curl --fail --location --retry 3 --retry-all-errors --max-time 180 \
+            https://data.source.coop/dataforcanada/d4c-datapkg-statistical/archive/statcan/boundaries/2021/lfsa000a21a_e.zip -o original-geography/2021.zip; then
+            gh run download 45398047285 -R "$GITHUB_REPOSITORY" -n official-2021-fsa-census-data-probe -D original-geography
+            cp original-geography/fsa-boundaries.zip original-geography/2021.zip
+          fi
+          echo 'e581e76ca39122aebccde7653d7cb16037b3efccb7abbc4537125dc8326202b5  original-geography/2021.zip' | sha256sum --check
+          unzip -q original-geography/2021.zip -d original-geography
+          test -s original-geography/lfsa000a21a_e/lfsa000a21a_e.shp
+      - name: Prove business identities and distinguish registered-therapist counts from clinic listings
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install 'pyshp>=2.3,<4' 'shapely>=2,<3' 'pyproj>=3.5,<4'
+          python -m compileall -q research/merge_ontario_521_all_clinic_observations.py
+          python -m unittest research.test_ontario_521_business_geography research.test_external_clinical_adjudications -v
+      - name: Deduplicate Google businesses onto actual official FSA polygons across all Ontario
+        run: |
+          python -m research.merge_ontario_521_all_clinic_observations \
+            --areas full-521/Ontario_ALL_521_Populated_FSA_Codes_Census_Google_Source_Audit.csv \
+            --raw original/Ontario_498_All_Google_Businesses_With_Uncertain_Categories.json \
+            --plan centre-plan/hamilton_22_verified_centres.json \
+            --checkpoints hamilton-checkpoints \
+            --boundaries original-geography/lfsa000a21a_e/lfsa000a21a_e.shp \
+            --out province-521-verified-geography
+      - name: Audit full Ontario code counts and ban unsupported 60-therapist scarcity claims
+        run: |
+          python - <<'PY'
+          import csv,json
+          from pathlib import Path
+          root=Path('province-521-verified-geography')
+          report=json.loads((root/'Ontario_521_Location_Crosscheck_Report.json').read_text())
+          assert report['Ontario_2021_nonzero_population_fsa_codes']==521
+          assert report['Ontario_2021_official_fsa_polygons']==520
+          assert report['FSA_codes_originally_scanned']==498
+          assert report['uniquely_identified_Google_businesses']>=14686
+          assert not report['source_model_certified_exact_lowest_60']
+          assert not report['individual_therapists_counted']
+          with (root/'Ontario_521_Geographically_Deduplicated_Google_Office_Audit.csv').open() as fh:
+              rows={r['fsa']:r for r in csv.DictReader(fh)}
+          assert len(rows)==521 and int(rows['M7A']['official_2021_fsa_population'])==5
+          assert rows['M7A']['FSA_has_official_2021_geographic_polygon']=='False'
+          print('VERIFIED_FULL_PROVINCE_521_SOURCE_AUDIT',report,flush=True)
+          PY
+      - name: Preserve complete 521 census FSA sources, mapped verified clinics and ranked leads explicitly labelled uncertified
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ontario-521-geolocated-clinical-business-source-audit
+          retention-days: 90
+          if-no-files-found: warn
+          path: province-521-verified-geography/
