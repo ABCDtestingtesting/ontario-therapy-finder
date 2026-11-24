@@ -204,6 +204,16 @@ class CompleteOntarioRankingTests(unittest.TestCase):
         meta['process_returncode']=124
         self.assertFalse(independent_grid_empty_evidenced(meta,folder/'native_evidence.json'))
 
+    def test_valid_498_source_audit_can_succeed_without_false_top60_certification(self):
+        # The audit has distinct failure and publication states.
+        report=combine(self.audit,self.recovery,self.out,self.native,
+                       allow_uncertified_audit=True)
+        self.assertEqual(report['total_ontario_fsa'],498)
+        self.assertFalse(report['google_60_certified_within_source_observation_model'])
+        self.assertEqual(report['clinically_completed_eligible_fsa'],0)
+        self.assertFalse((self.out/'Ontario_Google_Best_60_Across_498.csv').exists())
+        self.assertTrue((self.out/'ontario_498_google_recovery_audit.csv').exists())
+
     def test_missing_independent_sources_fail_gate(self):
         with self.assertRaisesRegex(RuntimeError,'incompletely observed'):
             combine(self.audit,self.recovery,self.out,self.native)
