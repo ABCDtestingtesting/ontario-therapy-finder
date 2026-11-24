@@ -1,0 +1,86 @@
+name: Fill 22 omitted Hamilton Ontario FSA Google clinical evidence gaps
+on:
+  push:
+    branches: [ontario-401-fsa-live-ranking-20261121]
+    paths:
+      - '.github/workflows/ontario-hamilton-22-missing-clinical-google.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore actual official 2021 Ontario FSA polygon and 2021 population source
+        run: |
+          set -euo pipefail
+          mkdir -p original
+          curl --fail --location --retry 3 --retry-all-errors --max-time 180 https://www150.statcan.gc.ca/n1/tbl/csv/98100019-eng.zip -o original/census.zip
+          curl --fail --location --retry 3 --retry-all-errors --max-time 180 https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lfsa000a21a_e.zip -o original/polygons.zip
+          echo 'ff65fc06b0d3435d6588592c225e0f90c41a34156269dac0c596c8f63045eaac  original/census.zip' | sha256sum --check
+          echo 'e581e76ca39122aebccde7653d7cb16037b3efccb7abbc4537125dc8326202b5  original/polygons.zip' | sha256sum --check
+          unzip -jo -q original/census.zip 98100019.csv -d original
+          unzip -q original/polygons.zip -d original
+          test -s original/lfsa000a21a_e/lfsa000a21a_e.shp
+      - name: Verify official 520 FSA geometries and exactly 22 previously excluded Hamilton centres
+        run: |
+          python -m pip install 'pyshp>=2.3,<4' 'shapely>=2,<3' 'pyproj>=3.5,<4' playwright
+          python -m compileall -q research/hamilton_unsearched_22_google_sources.py
+          python -m research.hamilton_unsearched_22_google_sources plan --boundaries original/lfsa000a21a_e/lfsa000a21a_e.shp --census original/98100019.csv --out hamilton-plan
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hamilton-22-official-polygon-source-search-plan
+          retention-days: 90
+          if-no-files-found: error
+          path: hamilton-plan/
+  scan:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        index: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21]
+    env:
+      PYTHONUNBUFFERED: '1'
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: hamilton-22-official-polygon-source-search-plan
+          path: hamilton-plan
+      - name: Install geographic source browser and test search fail-closed behavior
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install 'pyshp>=2.3,<4' 'shapely>=2,<3' 'pyproj>=3.5,<4'
+          python -m playwright install --with-deps firefox
+          python -m unittest research.test_google_bounded_recovery -v
+      - name: Collect 18 genuine map-area Google psychologist and psychotherapist searches
+        timeout-minutes: 10
+        run: |
+          python -m research.hamilton_unsearched_22_google_sources scan --source hamilton-plan/hamilton_22_verified_centres.json --index ${{ matrix.index }} --out "hamilton-source-${{ matrix.index }}" --seconds 360
+      - name: Preserve every observed clinical place, blocked source, and actual polygon coverage percentage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hamilton-source-FSA-${{ matrix.index }}
+          retention-days: 90
+          if-no-files-found: warn
+          path: |
+            hamilton-source-${{ matrix.index }}/checkpoints/
+            hamilton-source-${{ matrix.index }}/source-result.json
