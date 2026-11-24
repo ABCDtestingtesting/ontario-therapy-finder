@@ -77,12 +77,18 @@ def enrich(document_path: Path, max_seconds: int = 2900) -> dict:
                         place['google_category_error'] = 'Google verification required'
                         break
                     category = category_from_google_page(page)
-                    place['google_category_checked_at'] = datetime.now(timezone.utc).isoformat()
-                    if category:
+                    verified_page = ('google.com/maps/place/' in page.url
+                                     and page.url.startswith('https://'))
+                    if category and verified_page:
+                        place['google_category_checked_at'] = datetime.now(timezone.utc).isoformat()
                         place['google_business_category'] = category
                         place['google_category_evidence_url'] = page.url
+                        place.pop('google_category_error', None)
                     else:
-                        place['google_category_error'] = 'Missing verifiable Google Maps primary business category'
+                        place['google_category_error'] = (
+                            'Google detail page missing primary category or redirected to another page')
+                        # Leave checked_at unset, so a later healthy Google
+                        # session can retry the same uncertain business.
                     checked += 1
                 except Exception as exc:
                     failures.append(place.get('key'))
