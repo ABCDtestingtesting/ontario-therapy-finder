@@ -33,7 +33,7 @@ jobs:
           mkdir -p original current previous
           gh run download 45317051215 -R "$GITHUB_REPOSITORY" -n ontario-498-original-google-clinical-business-evidence -D original
           gh run download 45397202284 -R "$GITHUB_REPOSITORY" -n ontario-498-after-second-google-category-pass -D current
-          gh run download 45396848091 -R "$GITHUB_REPOSITORY" -p 'round3-verified-google-categories-*' -D previous
+          gh run download 45396848091 -R "$GITHUB_REPOSITORY" -p 'round2-verified-google-categories-*' -D previous
           test -s original/Ontario_498_All_Google_Businesses_With_Uncertain_Categories.json
           test -s current/Ontario_New_Provisional_Top60.csv
           test "$(find previous -name '[A-Z][0-9][A-Z].json' -type f | wc -l | tr -d ' ')" -eq 60
