@@ -43,6 +43,12 @@ def prepare(firstpass: Path, provisional: Path, out: Path, previous: Path | None
                 if place.get('google_business_category') and not (
                     place.get('google_category_evidence_url') and place.get('google_category_checked_at')):
                     raise RuntimeError('Previous classification has no Google detail-page proof '+code)
+                if (not place.get('google_business_category')
+                    and place.get('google_category_checked_at')):
+                    # Older collectors incorrectly marked missing categories
+                    # checked. Permit a fresh attempt rather than treating
+                    # the absent evidence as a completed classification.
+                    place.pop('google_category_checked_at',None)
             saved[code]=doc
     
     for position,row in enumerate(candidates,1):
