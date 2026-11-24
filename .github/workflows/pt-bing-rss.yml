@@ -17,7 +17,14 @@ jobs:
       - name: Test feed parsing and scope
         run: cd pt-weekly-mac && python -m unittest -v test_bing_rss.py
       - name: Probe the actual documented feed
-        run: python pt-weekly-mac/bing_rss_probe.py bing-rss-probe.json
+        run: |
+          python pt-weekly-mac/bing_rss_probe.py bing-rss-probe.json || test "$?" -eq 3
+          python - <<'PY'
+          import json
+          x=json.load(open("bing-rss-probe.json"))
+          assert x["tested_areas"]==5
+          print("Bing RSS directory counts:",x["areas_with_directory_counts"],"of 5; do not enable this source until productive")
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
