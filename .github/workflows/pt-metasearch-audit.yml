@@ -1,0 +1,45 @@
+name: Independent Google Bing and other search engine evidence
+on:
+  push:
+    paths:
+      - 'pt-weekly-mac/metasearch_audit.py'
+      - '.github/workflows/pt-metasearch-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  metasearch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start private SearXNG using standard engine adapters
+        run: |
+          mkdir -p "$RUNNER_TEMP/searx-config"
+          cat > "$RUNNER_TEMP/searx-config/settings.yml" <<'YML'
+          use_default_settings: true
+          server:
+            secret_key: "ephemeral-ci-local-only"
+            limiter: false
+            image_proxy: false
+          search:
+            formats: [html, json]
+          YML
+          docker run -d --name pt-metasearch -p 127.0.0.1:8888:8080 -v "$RUNNER_TEMP/searx-config:/etc/searxng" docker.io/searxng/searxng:latest
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8888/healthz; then break; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:8888/healthz
+      - name: Test every engine independently on 60 postal codes
+        run: python3 pt-weekly-mac/metasearch_audit.py --out metasearch-evidence
+      - name: Save diagnostics
+        if: always()
+        run: docker logs pt-metasearch > metasearch-container.log 2>&1 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: independent-engine-evidence
+          path: |
+            metasearch-evidence/
+            metasearch-container.log
