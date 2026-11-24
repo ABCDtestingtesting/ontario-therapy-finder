@@ -78,7 +78,7 @@ jobs:
           python -m unittest research.test_reconcile_priority_google_rechecks research.test_native_full_rank -v
       - name: Recompute clinically verified Google source lower bounds across all 498 Ontario FSAs
         run: |
-          python -m research.reconcile_priority_google_rechecks --audit initial-498/Ontario_498_Strict_5km_Google_Clinical_Crossaudit.csv --checkpoints recovered-90 --out current-ontario-498
+          python -m research.reconcile_priority_google_rechecks --audit initial-498/Ontario_498_With_Independently_Corroborated_Clinic_Evidence.csv --checkpoints recovered-90 --out current-ontario-498
       - name: Block any unverified Ontario top-60 publication
         run: |
           python - <<'PY'
