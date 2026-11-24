@@ -1,0 +1,48 @@
+name: PT local Mac launcher and 60-FSA integration tests
+on:
+  push:
+    paths:
+      - 'pt-weekly-mac/**'
+      - '.github/workflows/pt-weekly-mac-test.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mac-test:
+    strategy:
+      matrix:
+        os: [macos-15, macos-15-intel]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify executable launchers and real files
+        run: |
+          cd pt-weekly-mac
+          test -x Run.command && test -x Configure.command
+          bash -n Run.command Configure.command
+          python -m unittest -v test_monitor.py
+          python -m compileall -q monitor.py
+      - name: Verify launch without configured sources fails closed
+        run: |
+          cd pt-weekly-mac
+          export HOME="$RUNNER_TEMP/pt-local-home"
+          mkdir -p "$HOME/Library/Application Support/PT Weekly Competition"
+          echo '{}' > "$HOME/Library/Application Support/PT Weekly Competition/config.json"
+          set +e
+          ./Run.command
+          result=$?
+          set -e
+          test "$result" -eq 2
+      - name: Package executable Mac launchers
+        run: |
+          cd pt-weekly-mac
+          zip -9 "$RUNNER_TEMP/PT-Weekly-Mac.zip" Run.command Configure.command monitor.py test_monitor.py candidates.csv README.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PT-Weekly-Mac-${{ matrix.os }}
+          path: ${{ runner.temp }}/PT-Weekly-Mac.zip
