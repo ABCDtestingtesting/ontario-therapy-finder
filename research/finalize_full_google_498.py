@@ -248,7 +248,7 @@ def independent_grid_empty_evidenced(meta, path):
     return independent_grid_searches_complete(meta, path)
 
 
-def combine(first_pass, recovery_root, output, native_root=None, original_clinical_audit=None):
+def combine(first_pass, recovery_root, output, native_root=None, original_clinical_audit=None, allow_uncertified_audit=False):
     with open(first_pass, newline='') as fh:
         originals = list(csv.DictReader(fh))
     if len(originals) != 498 or len({r['fsa'] for r in originals}) != 498:
@@ -475,8 +475,13 @@ def combine(first_pass, recovery_root, output, native_root=None, original_clinic
     }
     (out / 'google_498_recovery_report.json').write_text(json.dumps(report, indent=2))
     print('ONTARIO_GOOGLE_498_COVERAGE', json.dumps(report), flush=True)
-    if not certified:
+    if not certified and not allow_uncertified_audit:
         raise RuntimeError(f'{len(contenders)} incompletely observed areas could still enter the top 60; provisional ranked list and complete audit preserved')
+    if not certified:
+        print('SOURCE_AUDIT_SUCCESS_CERTIFICATION_BLOCKED',
+              json.dumps({'unresolved_eligible_sources':len(contenders),
+                          'clinically_complete_eligible_sources':len(verified),
+                          'top_60_ready':False}), flush=True)
     return report
 
 
@@ -487,5 +492,6 @@ if __name__ == '__main__':
     parser.add_argument('output')
     parser.add_argument('--native-root', default=None)
     parser.add_argument('--original-clinical-audit', default=None)
+    parser.add_argument('--allow-uncertified-audit', action='store_true')
     args = parser.parse_args()
-    combine(args.first_pass, args.recovery_root, args.output, args.native_root, args.original_clinical_audit)
+    combine(args.first_pass, args.recovery_root, args.output, args.native_root, args.original_clinical_audit, args.allow_uncertified_audit)
