@@ -1,9 +1,5 @@
 name: Audit recovered Google Maps evidence across all 498 Ontario areas
 on:
-  workflow_run:
-    workflows:
-      - Recover all capped and incomplete Ontario Google Maps postal areas
-    types: [completed]
   workflow_dispatch:
     inputs:
       recovery_run_id:
