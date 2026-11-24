@@ -1,0 +1,125 @@
+name: Recover next 30 candidate Ontario Google FSA search grids
+on:
+  push:
+    branches: [ontario-401-fsa-live-ranking-20261121]
+    paths:
+      - '.github/workflows/ontario-google-next30-uncertain-live-resume.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore strict 498 FSA Google ranking and historical source checkpoints
+        run: |
+          set -euo pipefail
+          mkdir -p crossaudit source-archive targeted-save selected
+          gh run download 45420439600 -R "$GITHUB_REPOSITORY" -n ontario-498-strict-5km-clinical-source-crossaudit -D crossaudit
+          gh run download 45070243739 -R "$GITHUB_REPOSITORY" -p 'google-tile-recovery-*' -D source-archive
+          gh run download 45106178601 -R "$GITHUB_REPOSITORY" -p 'targeted-google-*' -D targeted-save
+          test -s crossaudit/Ontario_498_Strict_5km_Google_Clinical_Crossaudit.csv
+          test "$(find source-archive -name '[A-Z][0-9][A-Z].json' -type f | wc -l | tr -d ' ')" -eq 241
+      - name: Select true highest-priority incomplete Google source areas and preserve strongest known observations
+        run: |
+          python - <<'PY'
+          import csv,shutil,json
+          from pathlib import Path
+          with Path('crossaudit/Ontario_498_Strict_5km_Google_Clinical_Crossaudit.csv').open() as f:
+              rows=list(csv.DictReader(f))
+          if len(rows)!=498 or len({r['fsa'] for r in rows})!=498:
+              raise RuntimeError('Missing complete Ontario source records')
+          pending=sorted((r for r in rows if
+              r['previously_screened_excluded']=='False' and
+              r['merged_google_observation_source_complete']=='False'),
+              key=lambda r:(float(r['observed_clinical_offices_per_10000_lower_bound']),
+                            -int(r['population_within_5km_2021_estimate']),r['fsa']))[30:60]
+          if len(pending)!=30:raise RuntimeError('Missing 30 unique priority areas')
+          candidates=Path('selected')
+          (candidates/'seeds').mkdir(exist_ok=True)
+          for row in pending:
+              code=row['fsa']
+              previous=list(Path('source-archive').glob('**/'+code+'.json'))
+              newer=list(Path('targeted-save').glob('**/'+code+'.json'))
+              if len(previous)>1 or len(newer)>1:
+                  raise RuntimeError('Duplicate source checkpoint '+code)
+              original=json.loads(previous[0].read_text()) if previous else None
+              candidate=json.loads(newer[0].read_text()) if newer else None
+              chosen=original
+              if candidate and candidate.get('fsa')==code:
+                  if (original is None or (set(original.get('complete_tiles',{})).issubset(
+                        set(candidate.get('complete_tiles',{})))
+                        and {x['key'] for x in original.get('local_places',[])}.issubset(
+                        {x['key'] for x in candidate.get('local_places',[])}))):
+                      chosen=candidate
+              if chosen:
+                  if chosen.get('fsa')!=code:raise RuntimeError('Wrong Google checkpoint '+code)
+                  (candidates/'seeds'/(code+'.json')).write_text(json.dumps(chosen))
+          shutil.copy2('crossaudit/Ontario_498_Strict_5km_Google_Clinical_Crossaudit.csv',
+                       candidates/'full-498.csv')
+          (candidates/'plan.json').write_text(json.dumps({'candidate_fsa_count':30,
+              'source_seed_count':len(list((candidates/'seeds').glob('*.json'))),
+              'fsas':[r['fsa'] for r in pending],
+              'method':'2021 5km FSA catchment population and strictly clinical Google listing lower-bound, excluding previous screened FSAs'},indent=2))
+          print('PRIORITY_30_GOOGLE_RECOVERY_PLAN',(candidates/'plan.json').read_text(),flush=True)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: next30-incomplete-google-verified-sources
+          retention-days: 30
+          if-no-files-found: error
+          path: selected/
+  research:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 28
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9]
+    env:
+      PYTHONUNBUFFERED: '1'
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: next30-incomplete-google-verified-sources
+          path: selected
+      - name: Install free Google Maps collection Firefox
+        run: |
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps firefox
+          python -m compileall -q research/continue_priority_google_areas.py
+          python -m unittest research.test_google_checkbox_state research.test_google_bounded_recovery research.test_google_partial_lower_bounds -v
+      - name: Complete three fresh actual map-area searches with source checks and durable checkpoints
+        timeout-minutes: 23
+        run: |
+          python -m research.continue_priority_google_areas --audit selected/full-498.csv --seeds selected/seeds --shard ${{ matrix.shard }} --shards 10 --cohort 30 --offset 30 --seconds 360 --out "priority-google-${{ matrix.shard }}"
+      - name: Store successes, capped Google results, and remaining blocked area searches
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: next30-priority-ontario-google-source-${{ matrix.shard }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            priority-google-${{ matrix.shard }}/checkpoints/
+            priority-google-${{ matrix.shard }}/progress.json
+            priority-google-${{ matrix.shard }}/result.json
