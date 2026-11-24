@@ -1,12 +1,7 @@
-name: Audit Ontario Google 498 after targeted recovery
+name: Legacy 31-FSA Google source audit (manual only)
 on:
-  workflow_run:
-    workflows:
-      - Recheck remaining Ontario Google Maps ranking contenders
-    types: [completed]
-  schedule:
-    # Fallback when GitHub does not emit workflow_run for a feature-branch workflow.
-    - cron: '17 */2 * * *'
+  # Historical collector kept for explicit source comparison only.
+  # Current full 498-FSA audits use ontario-google-category-final-audit.yml.
   workflow_dispatch:
     inputs:
       recovery_run_id:
