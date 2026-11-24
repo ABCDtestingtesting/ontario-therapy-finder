@@ -62,7 +62,7 @@ def plan(boundaries:Path,census:Path,out:Path):
     out.mkdir(parents=True,exist_ok=True)
     (out/'hamilton_22_verified_centres.json').write_text(json.dumps(d,indent=2))
     print('HAMILTON_22_OFFICIAL_CENSUS_SOURCE_PLAN',json.dumps({'fsas':EXPECTED,
-        'small_fsa_5km_coverage':{k:r['single_five_km_catchment_polygon_area_share'] for k,r in records.items()}},flush=True))
+        'small_fsa_5km_coverage':{k:r['single_five_km_catchment_polygon_area_share'] for k,r in records.items()}}),flush=True)
     return d
 
 def scan(source:Path,index:int,out:Path,seconds:int):
