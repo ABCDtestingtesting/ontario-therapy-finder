@@ -10,7 +10,7 @@ from pathlib import Path
 from research.finalize_full_google_498 import clinical_title_classification
 
 
-def prepare(firstpass: Path, provisional: Path, out: Path):
+def prepare(firstpass: Path, provisional: Path, out: Path, previous: Path | None = None):
     original=json.loads(firstpass.read_text())['all_places_by_fsa']
     with provisional.open(newline='',encoding='utf8') as fh:
         candidates=list(csv.DictReader(fh))
@@ -21,19 +21,46 @@ def prepare(firstpass: Path, provisional: Path, out: Path):
     checkpoint.mkdir(parents=True,exist_ok=True)
     report=[]
     seen_fsas=set()
+    saved={}
+    if previous is not None:
+        for path in previous.glob('**/[A-Z][0-9][A-Z].json'):
+            code=path.stem
+            if code in saved or code not in original:
+                raise RuntimeError('Duplicate or invalid previous category source '+code)
+            doc=json.loads(path.read_text())
+            if doc.get('fsa')!=code:
+                raise RuntimeError('Previous source FSA identity mismatch '+code)
+            raw={p['key']:p for p in original[code]}
+            newer=doc.get('local_places')
+            if (not isinstance(newer,list) or len(newer)!=len(raw)
+                or len({p['key'] for p in newer})!=len(raw)
+                or {p['key'] for p in newer}!=set(raw)):
+                raise RuntimeError('Previous category source lost original Google places '+code)
+            for place in newer:
+                orig=raw[place['key']]
+                if any(place.get(k)!=orig.get(k) for k in ('key','name','lat','lon','source_url')):
+                    raise RuntimeError('Previous category source changed identity '+code)
+                if place.get('google_business_category') and not (
+                    place.get('google_category_evidence_url') and place.get('google_category_checked_at')):
+                    raise RuntimeError('Previous classification has no Google detail-page proof '+code)
+            saved[code]=doc
+    
     for position,row in enumerate(candidates,1):
         code=row['fsa']
         if code not in original or code in seen_fsas:
             raise RuntimeError('Invalid candidate from historic place observations: '+code)
         seen_fsas.add(code)
-        places=original[code]
+        places=saved[code]['local_places'] if code in saved else original[code]
         if len({p['key'] for p in places})!=len(places):
             raise RuntimeError('Duplicate canonical Google places for '+code)
         clinical=sum(clinical_title_classification(p)=='clinical' for p in places)
         uncertain=sum(clinical_title_classification(p)=='ambiguous' for p in places)
-        if int(row['firstpass_title_confirmed_clinical_places'])!=clinical:
+        firstpass_places=original[code]
+        firstpass_clinical=sum(clinical_title_classification(p)=='clinical' for p in firstpass_places)
+        firstpass_unknown=sum(clinical_title_classification(p)=='ambiguous' for p in firstpass_places)
+        if int(row['firstpass_title_confirmed_clinical_places'])!=firstpass_clinical:
             raise RuntimeError('Source classification changed unexpectedly: '+code)
-        if int(row['firstpass_ambiguous_business_titles'])!=uncertain:
+        if int(row['firstpass_ambiguous_business_titles'])!=firstpass_unknown:
             raise RuntimeError('Source title ambiguity changed unexpectedly: '+code)
         doc={'fsa':code,'status':'original_firstpass_business_places',
              'source_runs':[44949320059,44949323771],
@@ -42,9 +69,11 @@ def prepare(firstpass: Path, provisional: Path, out: Path):
              'local_places':places}
         (checkpoint/(code+'.json')).write_text(json.dumps(doc,indent=2))
         report.append({'fsa':code,'provisional_rank':position,'geolocated_places':len(places),
-            'ambiguous_place_titles':uncertain,'source_confirmed_clinical_places':clinical})
+            'ambiguous_place_titles':uncertain,'source_confirmed_clinical_places':clinical,
+            'reused_original_verified_categories':code in saved})
     summary={'candidate_fsa_count':len(report),
         'geolocated_firstpass_places':sum(x['geolocated_places'] for x in report),
+        'candidate_fsas_reusing_previous_checkpoints':sum(x['reused_original_verified_categories'] for x in report),
         'ambiguous_primary_google_categories_to_check':sum(x['ambiguous_place_titles'] for x in report),
         'fsas':report,'proven_zero_providers':False}
     (out/'plan.json').write_text(json.dumps(summary,indent=2))
@@ -57,5 +86,6 @@ if __name__=='__main__':
     p.add_argument('--original',type=Path,required=True)
     p.add_argument('--provisional',type=Path,required=True)
     p.add_argument('--out',type=Path,required=True)
+    p.add_argument('--previous',type=Path)
     args=p.parse_args()
-    prepare(args.original,args.provisional,args.out)
+    prepare(args.original,args.provisional,args.out,args.previous)
