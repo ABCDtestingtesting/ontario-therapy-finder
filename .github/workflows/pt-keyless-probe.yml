@@ -10,8 +10,13 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Test real official anonymous source responses
-        run: python3 pt-weekly-mac/keyless_probe.py
+        run: python3 pt-weekly-mac/keyless_probe.py --survey
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PT-anonymous-index-coverage
+          path: pt-weekly-mac/keyless-observations.json
