@@ -97,7 +97,7 @@ class OriginalGooglePlaceTests(unittest.TestCase):
           'url':'https://www.google.com/maps/place/Test'}]
         row['local_count']=1
         self.flush()
-        with self.assertRaisesRegex(RuntimeError,'incomplete Google source contains unverified results'):
+        with self.assertRaisesRegex(RuntimeError,'Incomplete Google source contains unverified results'):
             parse_sources(self.sources,self.baseline)
 
 
