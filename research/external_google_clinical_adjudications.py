@@ -36,6 +36,55 @@ EVIDENCE = (
      'https://the-clinic-for-emotional-wellness-inc.vaughandirect.ca/'),
 )
 
+# Source positions and immutable Google place identifiers originate from the
+# original geographically verified November 2026 44-shard business evidence.
+# The independent URLs document actual professional mental-health service.
+# A generic 'therapy' business can be MASSAGE; record nonclinical proof too.
+# (original source key, exact name, lat, lon, Google Maps place ID,
+#  independently corroborating URL, clinical/nonclinical)
+ORIGINAL_GOOGLE_BUSINESS_ADJUDICATIONS = (
+    ('woolwich counselling centre:43.59398:-80.56044',
+     'Woolwich Counselling Centre',43.5939832,-80.5604359,
+     '0x882bee8a2b67b173:0xe09c45e7c5e4a13',
+     'https://woolwichcounselling.org/services-programs/','clinical'),
+    ('p.a.c.e. therapy and counselling services:42.59407:-82.38467',
+     'P.A.C.E. Therapy and Counselling Services',42.5940716,-82.3846748,
+     '0x88256ba3079b22dd:0x5ec103b6abdd2c62',
+     'https://www.pace-inc.com/therapy','clinical'),
+    ('p.a.c.e. therapy and counselling services:42.40576:-82.18621',
+     'P.A.C.E. Therapy and Counselling Services',42.4057624,-82.1862095,
+     '0x882ff9cba8ce150f:0xb859fb4f3279b2a7',
+     'https://www.pace-inc.com/therapy','clinical'),
+    ('p.a.c.e. therapy and counselling services:42.98522:-82.39902',
+     'P.A.C.E. Therapy and Counselling Services',42.9852235,-82.3990197,
+     '0x88259dd982c48d6d:0x773a971ba0f291ce',
+     'https://www.pace-inc.com/therapy','clinical'),
+    ('counselcarecanada:42.59295:-82.38618',
+     'Counselcarecanada',42.5929475,-82.386185,
+     '0x88255d4af9fd6b1f:0x9eba2f2b5ab10311',
+     'https://www.ccclifesolutions.com/','clinical'),
+    ('k. harris counselling services:43.09752:-79.09729',
+     'K. Harris Counselling Services',43.0975196,-79.0972891,
+     '0x89d343c8d5dab8eb:0xc05bbe885c9f0f9f',
+     'https://www.kharriscounsellingservices.ca/ourteam','clinical'),
+    ('nova phoenix counselling services - niagara falls:43.09219:-79.09288',
+     'Nova Phoenix Counselling Services - Niagara Falls',43.0921909,-79.0928808,
+     '0x89d3432e32c80809:0xd4d490120dd99d39',
+     'https://novaphoenix.ca/locations/niagara-falls-therapy/','clinical'),
+    ('nova phoenix counselling services - st. catharines:43.16465:-79.24308',
+     'Nova Phoenix Counselling Services - St. Catharines',43.1646492,-79.2430826,
+     '0x89d351726e4251ef:0x77c882181a4ed9d6',
+     'https://novaphoenix.ca/therapy-offices/','clinical'),
+    ('adrienne richardson niagara counselling/ online therapy:43.09739:-79.09712',
+     'Adrienne Richardson Niagara Counselling/ Online Therapy',43.0973937,-79.0971165,
+     '0x89d34342a0b6ec2b:0x9ab84d9e6a8316f4',
+     'https://www.rainbowhealthontario.ca/service-provider-directory/adrienne-richardson-niagara-counselling-online-therapy/','clinical'),
+    ('danny laramee therapy solutions:45.37361:-75.94325',
+     'Danny Laramee Therapy Solutions',45.3736136,-75.9432492,
+     '0x4cd1ff1c39def935:0x700b67f3d6f461c8',
+     'https://dannylarameetherapy.ca/services','nonclinical'),
+)
+
 from urllib.parse import urlparse
 
 LOOKUP = {}
@@ -51,6 +100,9 @@ def independent_clinical_service_evidence(place):
     """Return corroborating evidence URL only for exact identified source.
     A check is about a listed clinic, never individual practitioner counts.
     """
+    additional = original_google_business_corroboration(place)
+    if additional and additional[0]=='clinical':
+        return additional[1]
     row = LOOKUP.get(str(place.get('key') or ''))
     if row is None:
         return None
@@ -68,3 +120,39 @@ def independent_clinical_service_evidence(place):
     except (ValueError, TypeError, KeyError):
         return None
     return citation
+
+# Only an exact source key, name, Google Maps place ID, geographic coordinate
+# and independent service reference can change the clinical classification.
+ORIGINAL_GOOGLE_CORROBORATED = {}
+for key, name, lat, lon, google_id, evidence_url, kind in ORIGINAL_GOOGLE_BUSINESS_ADJUDICATIONS:
+    if key in ORIGINAL_GOOGLE_CORROBORATED or kind not in ('clinical','nonclinical'):
+        raise RuntimeError('Duplicate or unclassified original Google place proof')
+    if not google_id.startswith('0x') or ':0x' not in google_id:
+        raise RuntimeError('Missing canonical Google business ID')
+    if urlparse(evidence_url).scheme != 'https':
+        raise RuntimeError('Clinical corroboration must use HTTPS')
+    ORIGINAL_GOOGLE_CORROBORATED[key] = (name, lat, lon, google_id, evidence_url, kind)
+
+
+def original_google_business_corroboration(place):
+    row=ORIGINAL_GOOGLE_CORROBORATED.get(str(place.get('key') or ''))
+    if row is None:
+        return None
+    name,lat,lon,google_id,evidence_url,kind=row
+    if str(place.get('name','')).casefold().strip()!=name.casefold():
+        return None
+    url=str(place.get('source_url') or '')
+    if not url.startswith('https://www.google.com/maps/place/') or ('!1s'+google_id) not in url:
+        return None
+    try:
+        if (abs(float(place['lat'])-lat)>0.00005 or
+            abs(float(place['lon'])-lon)>0.00005):
+            return None
+    except (TypeError,ValueError,KeyError):
+        return None
+    return kind,evidence_url
+
+
+def independent_nonclinical_service_evidence(place):
+    row=original_google_business_corroboration(place)
+    return row[1] if row and row[0]=='nonclinical' else None
