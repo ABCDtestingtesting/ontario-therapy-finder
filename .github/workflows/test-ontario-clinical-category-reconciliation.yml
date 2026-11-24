@@ -1,0 +1,26 @@
+name: Validate Ontario clinical-category evidence reconciliation safeguards
+on:
+  push:
+    branches: [ontario-401-fsa-live-ranking-20261121]
+    paths:
+      - '.github/workflows/test-ontario-clinical-category-reconciliation.yml'
+      - 'research/reconcile_provisional_google_categories.py'
+      - 'research/test_reconcile_provisional_categories.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile and test source identities, evidence preservation and publication blocking
+        run: |
+          python -m compileall -q research/reconcile_provisional_google_categories.py
+          python -m unittest research.test_reconcile_provisional_categories -v
