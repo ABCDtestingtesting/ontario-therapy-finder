@@ -2,10 +2,11 @@
 full 498-area five-kilometre clinical competition source ledger.
 """
 from __future__ import annotations
-import argparse,csv,json
+import argparse,csv,json,math
 from datetime import datetime,timezone
 from pathlib import Path
 from research.finalize_full_google_498 import clinical_title_classification
+from research.scan_all_maps import distance_km
 
 OFFSETS=(-3.4,0.0,3.4)
 TERMS=('psychotherapist','psychologist')
@@ -44,7 +45,18 @@ def verify_doc(code,doc,center):
             raise RuntimeError('Business without mapped name or key '+code)
         if not str(p.get('source_url','')).startswith('https://www.google.com/maps/place/'):
             raise RuntimeError('Google place detail provenance missing '+code)
-        classifications.append(clinical_title_classification(p))
+        try:
+            coords=(float(p['lat']),float(p['lon']))
+            if (not all(math.isfinite(v) for v in coords) or distance_km(center,coords)>5.001):
+                raise RuntimeError('Mapped Google clinic outside five-kilometre FSA study '+code)
+        except (TypeError,ValueError,KeyError) as exc:
+            raise RuntimeError('Google clinic missing verified geographical coordinates '+code) from exc
+        checked=dict(p)
+        if checked.get('google_business_category') and not (
+            str(checked.get('google_category_evidence_url','')).startswith('https://www.google.com/maps/place/')
+            and checked.get('google_category_checked_at')):
+            checked.pop('google_business_category',None)
+        classifications.append(clinical_title_classification(checked))
     clinical=classifications.count('clinical')
     ambiguous=classifications.count('ambiguous')
     verified_clinical_complete=complete and ambiguous==0
