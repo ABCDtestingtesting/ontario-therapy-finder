@@ -1,0 +1,62 @@
+name: Crossaudit strict 498 Ontario 5-km clinical business sources
+on:
+  push:
+    branches: [ontario-401-fsa-live-ranking-20261121]
+    paths:
+      - '.github/workflows/ontario-strict-five-km-final-crossaudit.yml'
+      - 'research/reconcile_strict_498_clinical.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  crossaudit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore independent 498-FSA source archives
+        run: |
+          set -euo pipefail
+          mkdir -p strict categories
+          gh run download 45396129585 -R "$GITHUB_REPOSITORY" -n google-498-category-verified-full-audit -D strict
+          gh run download 45398000435 -R "$GITHUB_REPOSITORY" -n ontario-498-after-second-google-category-pass -D categories
+          test -s strict/audited-google-498/ontario_498_google_recovery_audit.csv
+          test -s categories/Ontario_498_After_Primary_Category_Checks.csv
+      - name: Verify source provenance and recompute the same 2021 five-km population denominators
+        run: |
+          python -m compileall -q research/reconcile_strict_498_clinical.py
+          python -m research.reconcile_strict_498_clinical --strict strict/audited-google-498/ontario_498_google_recovery_audit.csv --categories categories/Ontario_498_After_Primary_Category_Checks.csv --out crossaudited-five-km
+      - name: Assert no fabricated exact ranked top 60
+        run: |
+          python - <<'PY'
+          import csv,json
+          from pathlib import Path
+          root=Path('crossaudited-five-km')
+          report=json.loads((root/'Ontario_498_Strict_5km_Crossaudit_Report.json').read_text())
+          assert report['crosschecked_2021_5km_fsa_sources']==498
+          assert report['eligible_areas_after_eight_and_recent_exclusions']>=60
+          assert report['unresolved_potential_top60_contenders']>=0
+          output=root/'Ontario_60_Certified_Within_Google_Source_Observation_Model.csv'
+          assert output.is_file()==report['certified_top60_within_google_source_model']
+          with (root/'Ontario_498_Strict_5km_Google_Clinical_Crossaudit.csv').open() as f:
+            rows=list(csv.DictReader(f))
+          assert len(rows)==498
+          assert all(row['Google_proves_no_unlisted_clinicians']=='False' for row in rows)
+          print('CROSSAUDITED_498_FSA_5KM_SOURCE_STATUS',report,flush=True)
+          PY
+      - name: Save strict 498 source comparison and incomplete competitor lists
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ontario-498-strict-5km-clinical-source-crossaudit
+          retention-days: 30
+          if-no-files-found: warn
+          path: crossaudited-five-km/
