@@ -12,6 +12,7 @@ from research.finalize_full_google_498 import (
     independent_grid_empty_evidenced,
     independent_grid_searches_complete,
     recovery_clinically_classified,
+    recovery_geographically_verified,
 )
 
 
@@ -99,6 +100,25 @@ class GoogleSourceCertificationTests(unittest.TestCase):
             evidence.write_text(json.dumps(meta))
             self.assertFalse(independent_grid_searches_complete(meta, evidence),
                              'Twenty Google source places cannot yield a complete one-row CSV')
+
+    def test_google_viewport_center_is_not_evidence_of_local_result_scoping(self):
+        tiles={}
+        for north in (-3.4,0.0,3.4):
+            for east in (-3.4,0.0,3.4):
+                for term in ('psychotherapist','psychologist'):
+                    key='map_movement_v7_checkbox_on|'+'|'.join(map(str,(north,east,0,term)))
+                    tiles[key]=dict(status='observed',map_area_search_verified=True,
+                        visible_links=120,capped=False,unresolved=[],places=[],
+                        reason='visible_end_of_list')
+        self.assertFalse(recovery_geographically_verified({'complete_tiles':tiles}))
+        # Explicit no-results from a correctly localized query is distinguishable
+        # from a long global feed with no local clinics.
+        for entry in tiles.values():
+            entry.update(visible_links=0,reason='explicit_no_results',
+                         geographic_result_scope_verified=True)
+        self.assertTrue(recovery_geographically_verified({'complete_tiles':tiles}))
+        next(iter(tiles.values()))['reason']='visible_end_of_list'
+        self.assertFalse(recovery_geographically_verified({'complete_tiles':tiles}))
 
     def test_missing_or_empty_file_does_not_prove_zero_therapists(self):
         with tempfile.TemporaryDirectory() as d:
