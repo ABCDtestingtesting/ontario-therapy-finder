@@ -4,7 +4,7 @@
   "ready_for_database": false,
   "obsolete_preliminary_source_run": 45219618676,
   "obsolete_preliminary_artifact": "Ontario_Google_Best_60_Across_498.csv",
-  "reason": "Official census comparison found 521 populated Ontario FSAs, including 22 Hamilton areas excluded by prior 498 workflow and M7A (5 residents, no 2021 area polygon). All 521 are now in the source-completeness register; 23 have no local Google business search. In the other 498, 192 have less than 90% of their geography covered by earlier 5km collection circles, 9635 business titles remain ambiguous, and previous Google map viewport completion was shown to permit remote results. 87/90 high-uncertainty live rechecks produced 129 additional clinic lower-bound observations, none fully verified a geographic search feed. A guaranteed lowest-therapist-per-resident 60 is not yet established.",
+  "reason": "Verified official census records cover all 521 Ontario populated FSA codes (520 polygons and unpolygoned M7A). Original 498-FSA Google sample had omitted 22 Hamilton regions, now undergoing live research. Spatially deduplicated 14,688 Google businesses gave 2,285 explicit clinical office titles and 9,627 unclassified office titles, with no exhaustive headcounts. All 90 selected high-uncertainty sources now have original SHA-audited checkpoints but none of the 3 repaired searches established complete source coverage. Google can return remote results despite correct viewport. A certified lowest-60 registered-therapist-to-resident ranking remains unproven.",
   "independent_source_run": 45232783797,
   "blocking_conditions": [
     "All potential top-60 FSA source evidence must be clinically audited",
@@ -81,5 +81,21 @@
     "N8M"
   ],
   "new_5km_google_clinical_office_lower_bound_added_in_90": 129,
-  "legacy_source_completion_flags_geo_uncertainty": "REVOKED UNTIL PER-TILE LOCALIZATION VERIFIED"
+  "legacy_source_completion_flags_geo_uncertainty": "REVOKED UNTIL PER-TILE LOCALIZATION VERIFIED",
+  "latest_full_521_spatial_crosscheck_run": 45437816345,
+  "latest_full_521_spatial_crosscheck_status": "PASSED_WITH_UNRESOLVED_GOOGLE_SEARCH_COVERAGE",
+  "official_2021_ontario_fsa_codes_nonzero_population": 521,
+  "official_2021_fsa_polygon_count": 520,
+  "unique_google_original_businesses_reconciled_into_521": 14688,
+  "unique_google_offices_mapped_to_ontario_2021_polygons": 14684,
+  "observed_geographically_matched_explicit_clinical_offices_lower_bound": 2285,
+  "observed_geographically_matched_ambiguous_businesses": 9627,
+  "FSAs_original_google_sampled": 498,
+  "FSAs_omitted_originally": 23,
+  "FSAs_hamilton_previously_omitted_and_currently_being_scanned": 22,
+  "current_hamilton_22_live_source_run": 45437175675,
+  "all_90_priority_fsa_google_source_recheck_checkpoints_recovered": 90,
+  "latest_missing_three_source_run": 45436422223,
+  "full_90_source_sha_manifest_path": "research/verified_90_fsa_source_audit_manifest_20261124.json",
+  "source_geo_scope_certification_status": "UNVERIFIED_REMOTE_ONLY_GOOGLE_FEEDS_AND_INCOMPLETE_FSA_GEOGRAPHIC_ENUMERATION"
 }
