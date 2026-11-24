@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/ontario-firstpass-clinical-evidence-recovery.yml'
       - 'research/validate_firstpass_place_evidence.py'
+      - 'research/test_firstpass_clinical_evidence.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -36,7 +37,7 @@ jobs:
         run: |
           python -m pip install -r requirements.txt
           python -m compileall -q research/validate_firstpass_place_evidence.py research/finalize_full_google_498.py
-          python -m unittest research.test_independent_zero_source research.test_google_category_evidence -v
+          python -m unittest research.test_independent_zero_source research.test_google_category_evidence research.test_firstpass_clinical_evidence -v
       - name: Verify 498 distinct original FSA business datasets and retain strictly clinical title-confirmed lower bounds
         run: |
           python -m research.validate_firstpass_place_evidence --sources original-google --baseline baseline/audited-google-498/ontario_498_google_recovery_audit.csv --out firstpass-verified-clinical-evidence
