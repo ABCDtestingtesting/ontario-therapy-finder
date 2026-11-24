@@ -1,0 +1,88 @@
+name: Verify newly entering Ontario 60 candidate clinical categories third pass
+on:
+  push:
+    branches: [ontario-401-fsa-live-ranking-20261121]
+    paths:
+      - '.github/workflows/ontario-round3-top60-category-research.yml'
+      - 'research/prepare_google_title_uncertainties.py'
+      - 'research/test_prepare_rolling_categories.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify rolling Google category source identity and retry behavior
+        run: |
+          python -m compileall -q research/prepare_google_title_uncertainties.py
+          python -m unittest research.test_prepare_rolling_categories -v
+      - name: Recover all original Google businesses, freshly ranked 60 FSAs and 60 previously reviewed business checkpoints
+        run: |
+          set -euo pipefail
+          mkdir -p original current previous
+          gh run download 45317051215 -R "$GITHUB_REPOSITORY" -n ontario-498-original-google-clinical-business-evidence -D original
+          gh run download 45397202284 -R "$GITHUB_REPOSITORY" -n ontario-498-after-second-google-category-pass -D current
+          gh run download 45396848091 -R "$GITHUB_REPOSITORY" -p 'round3-verified-google-categories-*' -D previous
+          test -s original/Ontario_498_All_Google_Businesses_With_Uncertain_Categories.json
+          test -s current/Ontario_New_Provisional_Top60.csv
+          test "$(find previous -name '[A-Z][0-9][A-Z].json' -type f | wc -l | tr -d ' ')" -eq 60
+      - name: Preserve existing clinical proof and discover newly competing Ontario FSAs
+        run: |
+          python -m research.prepare_google_title_uncertainties --original original/Ontario_498_All_Google_Businesses_With_Uncertain_Categories.json --provisional current/Ontario_New_Provisional_Top60.csv --previous previous --out round3
+      - uses: actions/upload-artifact@v4
+        with:
+          name: round3-60-google-category-evidence-plan
+          retention-days: 30
+          if-no-files-found: error
+          path: round3/
+  categories:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 52
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11]
+    env:
+      PYTHONUNBUFFERED: '1'
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ontario-401-fsa-live-ranking-20261121
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: round3-60-google-category-evidence-plan
+          path: round3
+      - name: Install Google Maps detail-page browser
+        run: |
+          python -m pip install -r requirements.txt
+          python -m compileall -q research/check_provisional_google_categories.py research/enrich_google_categories.py
+          python -m playwright install --with-deps chromium
+      - name: Inspect new clinical rivals while retaining prior confirmed business categories
+        timeout-minutes: 43
+        run: |
+          python -m research.check_provisional_google_categories --input round3 --out "round3-verified-category-${{ matrix.shard }}" --shard ${{ matrix.shard }} --shards 12 --seconds-per-fsa 420
+      - name: Store Google business source evidence and unresolved category uncertainty
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: round3-verified-google-categories-${{ matrix.shard }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: round3-verified-category-${{ matrix.shard }}/
