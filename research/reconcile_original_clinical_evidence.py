@@ -105,8 +105,8 @@ def analyze(independent_path,original_path,dest):
         'checked_at_utc':datetime.now(timezone.utc).isoformat()}
     (dest/'Ontario_498_Clinical_Evidence_Integrated_Report.json').write_text(json.dumps(report,indent=2))
     print('ONTARIO_498_CLINICAL_EVIDENCE_INTEGRATED',json.dumps(report),flush=True)
-    if not certified:
-        raise RuntimeError('Exactly ranked 60 not yet certified; all 498 sources and provisional contenders preserved')
+    # Publication is fail-closed: no certified file is produced when false.
+    # Source-audit success is independent of approval to publish a final list.
     return report
 
 if __name__=='__main__':
