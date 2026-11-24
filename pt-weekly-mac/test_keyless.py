@@ -29,6 +29,10 @@ class TestKeyless(unittest.TestCase):
             self.assertEqual(len(rows),60)
             self.assertTrue(all(r["unique_index_leads_with_postal_text"]=="1" and r["union_index_leads"]=="2" and r["active_pt_competitors"]=="" for r in rows))
             self.assertTrue(all(r["directory_url"].endswith(r["fsa"].lower()) for r in rows))
+            with (folder/"weekly-top60-approximation.csv").open() as f:approx=list(csv.DictReader(f))
+            self.assertEqual(len(approx),60)
+            self.assertTrue(all(x["fresh_search_evidence"]=="True" and x["postal_text_index_leads"]=="1" for x in approx))
+            self.assertEqual([int(x["approximate_rank"]) for x in approx],list(range(1,61)))
             d=json.loads((folder/(day.isoformat()+".json")).read_text())
             with BASE.open() as f:baseline=list(csv.DictReader(f))
             d["observations"][0]["postal_text_ids"]=["99999"]

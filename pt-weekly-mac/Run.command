@@ -14,7 +14,7 @@ OUT="$HOME/Library/Application Support/PT Weekly Index Survey/$(TZ=America/Toron
 "$PY" directory_index.py --out "$OUT"
 dircode=$?
 if [ "$dircode" -ne 0 ]; then code=3; fi
-printf "This week\047s approximate 60-area ranking: %s/weekly-top60-approximation.csv\\n" "$OUT"
+echo "Weekly approximation with this week\047s indexed profile evidence is in the week-start folder printed above. The directory-only report is a secondary cross-check."
 echo "Exit status: $code (0 = completed index survey, 3 = incomplete; neither certifies an exact competitor ranking)."
 if [ -t 0 ]; then read -r -p 'Press Enter to close.' unused; fi
 exit "$code"

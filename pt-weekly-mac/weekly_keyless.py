@@ -11,6 +11,43 @@ def atomic(path,doc):
     with tempfile.NamedTemporaryFile(mode="w",encoding="utf8",dir=path.parent,delete=False) as f:
         os.chmod(f.name,0o600);json.dump(doc,f,indent=2);name=f.name
     os.replace(name,path)
+def write_approximation(out,result,verified_days,snapshot=ROOT/"directory_snapshot.csv"):
+    # This is a reproducible competition proxy, not an advertiser census.
+    # An observed same-week postal-text match is required for each area.
+    from directory_index import proxy
+    with snapshot.open(newline="",encoding="utf8") as f:
+        old={x["fsa"]:x for x in csv.DictReader(f)}
+    if len(result)!=60 or len({x["fsa"] for x in result})!=60 or set(old)!={x["fsa"] for x in result}:
+        raise ValueError("Expected exactly the same 60 candidate areas")
+    items=[]
+    for x in result:
+        f=x["fsa"];pop=x["population_2021"];n=x["unique_index_leads_with_postal_text"]
+        count=old[f]["displayed_count"]
+        historic,bound=proxy(count,pop)
+        items.append(dict(fsa=f,population_2021=pop,postal_text_index_leads=n,
+            postal_text_leads_per_10000=round(n*10000/pop,4) if n is not None else None,
+            historical_directory_count=count,historical_directory_bound=bound,
+            historical_directory_proxy_per_10000=round(historic,4),
+            historical_index_capture_age=old[f]["index_capture_age"],
+            verified_search_days=";".join(verified_days),directory_url=x["directory_url"],
+            fresh_search_evidence=bool(verified_days and n is not None and n>0)))
+    # Rank both signals separately, then average ranks. Missing search evidence
+    # is never interpreted as zero competition or promoted above observed areas.
+    def ranks(key,subset):
+        vals=sorted(x[key] for x in subset)
+        return {x["fsa"]:1+(vals.index(x[key])+len(vals)-1-vals[::-1].index(x[key]))/2 for x in subset}
+    observed=[x for x in items if x["fresh_search_evidence"]]
+    a=ranks("postal_text_leads_per_10000",observed);b=ranks("historical_directory_proxy_per_10000",observed)
+    for x in items:
+        f=x["fsa"]
+        x["combined_rank_score"]=round((a[f]+b[f])/2,2) if f in a else None
+        x["exact_current_directory_count_verified"]=False
+        x["evidence_status"]="same_week_index_leads_plus_historical_count" if f in a else "historical_count_only"
+    items.sort(key=lambda x:(x["combined_rank_score"] is None,x["combined_rank_score"] if x["combined_rank_score"] is not None else x["historical_directory_proxy_per_10000"],x["historical_directory_proxy_per_10000"],x["fsa"]))
+    for i,x in enumerate(items,1):x["approximate_rank"]=i
+    with (out/"weekly-top60-approximation.csv").open("w",newline="",encoding="utf8") as f:
+        wr=csv.DictWriter(f,fieldnames=["approximate_rank"]+[k for k in items[0] if k!="approximate_rank"]);wr.writeheader();wr.writerows(items)
+    return len(observed)
 def weekly(home,baseline,day,collector=survey):
     day=day if isinstance(day,dt.date) else dt.date.fromisoformat(day)
     period=day-dt.timedelta(days=day.weekday())
@@ -54,14 +91,15 @@ def weekly(home,baseline,day,collector=survey):
         os.chmod(f.name,0o600)
         w=csv.DictWriter(f,fieldnames=list(result[0]));w.writeheader();w.writerows(result);name=f.name
     os.replace(name,out/"weekly-index-visibility.csv")
-    status={"week_start":period.isoformat(),"verified_days":verified_days,"three_distinct_survey_days":len(verified_days)>=3,
+    covered=write_approximation(out,result,verified_days)
+    status={"approximation_areas_with_same_week_search_evidence":covered,"approximation_complete":covered==60,"week_start":period.isoformat(),"verified_days":verified_days,"three_distinct_survey_days":len(verified_days)>=3,
       "current_audit":current,"exact_competitor_ranking_ready":False,"source_scope":"Third-party indexed profile leads; not active PT advertisers.",
       "source_options":{"exa":"anonymous indexed search","freeserp":"anonymous indexed search","google":"no eligible public search API",
       "bing":"search API retired","brave":"key and billing details required","duckduckgo":"no verified full-result anonymous API",
       "direct_pt":"not enabled; written authorization needed"}}
     atomic(out/"coverage.json",status)
     print(json.dumps(status,indent=2));print("Reports:",out,flush=True)
-    return 0 if code==0 and current["index_survey_verified"] else 3
+    return 0 if code==0 and current["index_survey_verified"] and covered==60 else 3
 def main():
     p=argparse.ArgumentParser()
     p.add_argument("--home",type=Path,default=Path.home()/"Library/Application Support/PT Weekly Index Survey")
