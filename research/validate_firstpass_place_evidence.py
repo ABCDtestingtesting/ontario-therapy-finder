@@ -29,6 +29,7 @@ def parse_sources(source_root: Path, baseline_path: Path):
         raise RuntimeError(f'Missing original Ontario Google shards: {len(paths)}/{EXPECTED_SHARDS}')
     output = {}
     details = {}
+    all_places = {}
     for path in paths:
         raw = path.read_bytes()
         data = json.loads(raw)
@@ -61,6 +62,7 @@ def parse_sources(source_root: Path, baseline_path: Path):
                 raise RuntimeError(f'Unexpected source status for {code}')
             unique = set()
             clinical, ambiguous, nonclinical = [], 0, 0
+            all_local = []
             for place in locations:
                 name = str(place.get('name') or '').strip()
                 url = str(place.get('url') or '')
@@ -75,6 +77,9 @@ def parse_sources(source_root: Path, baseline_path: Path):
                 unique.add(ident)
                 kind = clinical_title_classification({'name':name, 'lat':xy[0],
                     'lon':xy[1], 'source_url':url})
+                all_local.append({'name':name,'lat':xy[0],'lon':xy[1],
+                    'source_url':url,'observed_title_classification':kind,
+                    'key':name.casefold()+':'+str(round(xy[0],5))+':'+str(round(xy[1],5))})
                 if kind == 'clinical':
                     clinical.append({'name':name,'lat':xy[0],'lon':xy[1],
                         'google_place_url':url})
@@ -96,6 +101,7 @@ def parse_sources(source_root: Path, baseline_path: Path):
                 'clinician_absence_verified':False,
             }
             details[code] = clinical
+            all_places[code] = all_local
     if set(output) != set(base):
         raise RuntimeError(f'Original Google evidence cannot be reconciled to 498 FSAs: {len(output)}')
     for code in output:
@@ -104,11 +110,11 @@ def parse_sources(source_root: Path, baseline_path: Path):
             + output[code]['firstpass_nonclinical_titles']
             + output[code]['firstpass_ambiguous_titles']):
             raise RuntimeError('Original business category partition failed for '+code)
-    return output, details
+    return output, details, all_places
 
 
 def run(source_root: Path, baseline_path: Path, out_dir: Path):
-    rows, details = parse_sources(source_root,baseline_path)
+    rows, details, all_places = parse_sources(source_root,baseline_path)
     out_dir.mkdir(parents=True,exist_ok=True)
     with (out_dir/'Ontario_498_Firstpass_Verified_Clinical_Lower_Bounds.csv').open(
         'w',newline='',encoding='utf8') as fh:
@@ -119,6 +125,10 @@ def run(source_root: Path, baseline_path: Path, out_dir: Path):
         json.dumps({'method':'original geolocated Google Maps place titles, not keyword counts',
           'source_runs':[44949320059,44949323771],
           'no_claim_of_absence':True,'clinical_places_by_fsa':details},indent=2))
+    (out_dir/'Ontario_498_All_Google_Businesses_With_Uncertain_Categories.json').write_text(
+        json.dumps({'source_runs':[44949320059,44949323771],
+          'source_type':'geographically verified Google Maps place listings',
+          'all_places_by_fsa':all_places},indent=2))
     report = {
       'fsa_count':len(rows),
       'google_source_shards':EXPECTED_SHARDS,
