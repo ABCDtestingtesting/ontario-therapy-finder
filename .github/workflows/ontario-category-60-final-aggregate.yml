@@ -43,6 +43,7 @@ jobs:
         run: |
           python -m pip install -r requirements.txt
           python -m compileall -q research/reconcile_provisional_google_categories.py
+          python -m unittest research.test_reconcile_provisional_categories -v
       - name: Recalculate every FSA after actual Google business-detail categories
         run: |
           python -m research.reconcile_provisional_google_categories --full integrated/Ontario_498_Actual_Clinical_Business_Evidence.csv --raw original/Ontario_498_All_Google_Businesses_With_Uncertain_Categories.json --plan candidates/plan.json --categories candidate-categories --out fresh-clinical-ontario-498
