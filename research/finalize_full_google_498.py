@@ -130,6 +130,33 @@ def clinical_recovery_lower_bound(source):
     return sum(confirmed_clinical_title(p) for p in places)
 
 
+def recovery_geographically_verified(source):
+    """Reject remotely scoped Google results even if the viewport was centred."""
+    if not source:
+        return False
+    tiles=source.get('complete_tiles') or {}
+    offsets=(-3.4,0.0,3.4)
+    terms=('psychotherapist','psychologist')
+    required={'map_movement_v7_checkbox_on|'+'|'.join(map(str,(n,e,0,t)))
+              for n in offsets for e in offsets for t in terms}
+    if not required.issubset(tiles):
+        return False
+    for key in required:
+        item=tiles[key]
+        if (item.get('status')!='observed'
+            or item.get('map_area_search_verified') is not True
+            or item.get('capped')
+            or item.get('unresolved')
+            or item.get('geographic_result_scope_verified') is False):
+            return False
+        if not item.get('places'):
+            if item.get('visible_links') is None:
+                return False
+            if int(item['visible_links'])>0 or item.get('reason')!='explicit_no_results':
+                return False
+    return True
+
+
 def recovery_clinically_classified(source):
     if not source:
         return False
@@ -343,6 +370,7 @@ def combine(first_pass, recovery_root, output, native_root=None, original_clinic
                             and (not source.get('unresolved_leaf_links')
                                  or exterior_verified)
                             and recovery_clinically_classified(source)
+                            and recovery_geographically_verified(source)
                             and observed_recovered >= original_clinical)
         native_ok = bool(independent
                          and independent.get('status') == 'grid_observed_complete'
