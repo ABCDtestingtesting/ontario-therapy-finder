@@ -74,3 +74,42 @@ def replace_capped_tile_with_uncapped_local_recheck(doc, probe):
     result['k7g_geographic_zoom_rescue_source']=str(new['source_url'])
     result['k7g_original_google_cap_retained_as_historical_evidence']=True
     return result
+
+
+def retain_verified_k7g_or_reconcile(doc, probe):
+    """A rerun must preserve an already recovered, geographically verified
+    uncapped K7G checkpoint. The historical capped observation stays intact.
+    A still-capped checkpoint must pass the original zoom-16 adjudication.
+    """
+    if doc.get('status') != 'verified_tile_feed':
+        return replace_capped_tile_with_uncapped_local_recheck(doc, probe)
+    if doc.get('fsa') != 'K7G' or probe.get('fsa') != 'K7G':
+        raise RuntimeError('K7G FSA source identity mismatch')
+    tiles = doc.get('complete_tiles', {})
+    required = required_base_tile_keys()
+    if (not required <= set(tiles)
+        or len(required)!=18
+        or doc.get('completed_coverage_tiles')!=18
+        or doc.get('total_coverage_tiles')!=18
+        or doc.get('pending')
+        or doc.get('source_caps_present')
+        or doc.get('capped_leaf_tiles')!=0
+        or doc.get('unresolved_leaf_links')!=0
+        or len(doc.get('local_places', []))!=doc.get('unique_observed_local_places')):
+        raise RuntimeError('Already certified K7G source has unverified status or missing map areas')
+    if any(tiles[k].get('status') != 'observed'
+           or tiles[k].get('map_area_search_verified') is not True
+           or tiles[k].get('capped') or tiles[k].get('unresolved')
+           for k in required):
+        raise RuntimeError('Previously accepted K7G Google map tile failed source verification')
+    previous = doc.get('superseded_tile_observations', {}).get(K7G_KEY, [])
+    if not (previous and any(old.get('capped') is True
+        and old.get('map_area_search_verified') is True for old in previous)):
+        raise RuntimeError('K7G previous source cap is not preserved in the verified checkpoint')
+    if tiles[K7G_KEY].get('capped') or not str(
+        tiles[K7G_KEY].get('source_url', '')).startswith(
+        'https://www.google.com/maps/search/psychotherapist/@'):
+        raise RuntimeError('K7G newly observed search does not match original therapy source')
+    # The newer complete 18-tile source already supersedes the old cap.
+    # Never replace its stronger real map observations with a stale probe.
+    return deepcopy(doc)
