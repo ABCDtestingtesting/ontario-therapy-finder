@@ -12,6 +12,8 @@ jobs:
   plan:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,7 +26,14 @@ jobs:
           set -euo pipefail
           mkdir -p original
           curl --fail --location --retry 3 --retry-all-errors --max-time 180 https://www150.statcan.gc.ca/n1/tbl/csv/98100019-eng.zip -o original/census.zip
-          curl --fail --location --retry 3 --retry-all-errors --max-time 180 https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lfsa000a21a_e.zip -o original/polygons.zip
+          if ! curl --fail --location --retry 2 --max-time 180 https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lfsa000a21a_e.zip -o original/polygons.zip; then
+            echo "STATCAN_BOUNDARY_MIRROR_REQUIRED: federal polygon endpoint HTTP 403" >&2
+            if ! curl --fail --location --retry 3 --retry-all-errors --max-time 180 https://data.source.coop/dataforcanada/d4c-datapkg-statistical/archive/statcan/boundaries/2021/lfsa000a21a_e.zip -o original/polygons.zip; then
+              echo "Official polygon mirror unavailable; restore verified pinned archive from successful source proof" >&2
+              gh run download 45398047285 -R "$GITHUB_REPOSITORY" -n official-2021-fsa-census-data-probe -D source-probe
+              cp source-probe/fsa-boundaries.zip original/polygons.zip
+            fi
+          fi
           echo 'ff65fc06b0d3435d6588592c225e0f90c41a34156269dac0c596c8f63045eaac  original/census.zip' | sha256sum --check
           echo 'e581e76ca39122aebccde7653d7cb16037b3efccb7abbc4537125dc8326202b5  original/polygons.zip' | sha256sum --check
           unzip -jo -q original/census.zip 98100019.csv -d original
