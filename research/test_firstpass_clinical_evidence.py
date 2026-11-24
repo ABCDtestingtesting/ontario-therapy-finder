@@ -50,12 +50,14 @@ class OriginalGooglePlaceTests(unittest.TestCase):
            'url':'https://www.google.com/maps/place/Community+Wellness'}]
         row['local_count']=3
         self.flush()
-        records,details=parse_sources(self.sources,self.baseline)
+        records,details,all_places=parse_sources(self.sources,self.baseline)
         self.assertEqual(len(records),498)
         self.assertEqual(records['K000']['firstpass_clinical_title_lower_bound'],1)
         self.assertEqual(records['K000']['firstpass_nonclinical_titles'],1)
         self.assertEqual(records['K000']['firstpass_ambiguous_titles'],1)
         self.assertEqual(details['K000'][0]['name'],'Test Psychotherapy')
+        self.assertEqual(len(all_places['K000']),3)
+        self.assertEqual({p['observed_title_classification'] for p in all_places['K000']},{'clinical','ambiguous','nonclinical'})
         self.assertFalse(records['K000']['clinician_absence_verified'])
 
     def test_failed_source_is_retained_as_uncertain_empty(self):
@@ -63,7 +65,7 @@ class OriginalGooglePlaceTests(unittest.TestCase):
         row['status']='incomplete'
         row.pop('search_query')
         self.flush()
-        records,_=parse_sources(self.sources,self.baseline)
+        records,_,all_places=parse_sources(self.sources,self.baseline)
         self.assertEqual(records['K001']['original_source_status'],'incomplete')
         self.assertEqual(records['K001']['firstpass_clinical_title_lower_bound'],0)
         self.assertFalse(records['K001']['clinician_absence_verified'])
