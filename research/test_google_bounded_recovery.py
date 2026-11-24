@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from research.recover_google_tiles import run_area, tile_tasks, task_key, SEARCHES
+from research.recover_google_tiles import run_area, tile_tasks, task_key, SEARCHES, unverified_tile_geographic_result_scope
 
 
 class BoundedRecoveryTests(unittest.TestCase):
@@ -18,11 +18,40 @@ class BoundedRecoveryTests(unittest.TestCase):
     @staticmethod
     def evidence(context, code, center, north, east, level, term, root):
         return {
-            'level': level, 'capped': True, 'unresolved': [],
+            'level': level, 'status': 'observed',
+            'map_area_search_verified': True,
+            'geographic_result_scope_verified': True,
+            'visible_links': 1, 'capped': True, 'unresolved': [],
             'places': [{'key': 'google:unique', 'name': 'Test clinic',
                         'lat': 43.76, 'lon': -79.48, 'source_url': 'https://google.com/maps/place/a'}],
             'term': term,
         }
+
+    def test_remote_only_google_maps_feed_cannot_prove_zero_near_fsa_center(self):
+        remote={'status':'observed','map_area_search_verified':True,
+                'visible_links':120,'places':[],
+                'capped':False,'unresolved':[]}
+        self.assertTrue(unverified_tile_geographic_result_scope(remote))
+        remote['visible_links']=15
+        self.assertTrue(unverified_tile_geographic_result_scope(remote))
+        remote['visible_links']=0
+        remote['geographic_result_scope_verified']=False
+        self.assertTrue(unverified_tile_geographic_result_scope(remote))
+
+    def test_legacy_uncapped_remote_results_are_reopened_for_fsa_verification(self):
+        stale={'fsa':'M3J','status':'verified_tile_feed',
+               'complete_tiles':{},'attempts':18,'pending':[]}
+        for task in tile_tasks():
+            stale['complete_tiles'][task_key(task)]={
+                'status':'observed','map_area_search_verified':True,
+                'visible_links':45,'places':[],'capped':False,
+                'unresolved':[]}
+        (self.folder/'M3J.json').write_text(json.dumps(stale))
+        with patch('research.recover_google_tiles.scan_tile',side_effect=self.evidence) as scan:
+            rec=run_area(None,self.area,self.folder,1000)
+        self.assertEqual(scan.call_count,18)
+        self.assertEqual(rec['status'],'observed_capped')
+        self.assertEqual(rec['unique_observed_local_places'],1)
 
     def test_localized_queries_have_distinct_keys_from_legacy_generic_cells(self):
         self.assertEqual(SEARCHES, ('psychotherapist', 'psychologist'))
