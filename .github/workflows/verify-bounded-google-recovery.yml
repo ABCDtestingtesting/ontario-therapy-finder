@@ -59,13 +59,16 @@ jobs:
           root=Path('bounded-ranking-audit')
           report=json.loads((root/'google_498_recovery_report.json').read_text())
           assert report['total_ontario_fsa']==498, report
-          assert report['other_incomplete_google_sources']==241, report
-          assert report['potential_top_60_contenders_unresolved'] > 0, report
-          assert report['dominated_incomplete_sources'] > 0, report
-          assert (report['potential_top_60_contenders_unresolved'] +
-                  report['dominated_incomplete_sources'] <= 241), report
+          # The 257 old "completed" Google keyword pages had no
+          # individually verified clinical businesses. With zero item-level
+          # sources all 498 ARE incomplete (not just the original 241).
+          assert report['other_incomplete_google_sources']==498, report
+          assert report['clinically_completed_eligible_fsa']==0, report
+          assert report['potential_top_60_contenders_unresolved']==490, report
+          assert report['dominated_incomplete_sources']==0, report
           assert not report['google_60_certified_within_source_observation_model'], report
-          assert len(list(csv.DictReader((root/'Ontario_Google_Top60_Completed_Feeds_Provisional.csv').open())))==60
+          assert not (root/'Ontario_Google_Top60_Completed_Feeds_Provisional.csv').exists()
+          assert len(list(csv.DictReader((root/'Ontario_Google_Clinically_Completed_Source_Subset.csv').open())))==0
           assert len(list(csv.DictReader((root/'ontario_498_google_recovery_audit.csv').open())))==498
           assert not (root/'Ontario_Google_Best_60_Across_498.csv').exists()
           print('FINALIZER_RANK_BOUNDS_TEST_PASSED', json.dumps(report))
