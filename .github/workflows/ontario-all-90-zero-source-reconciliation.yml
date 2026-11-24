@@ -25,7 +25,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p initial-498 recovered-90 first-plan second-plan third-plan
-          gh run download 45420439600 -R "$GITHUB_REPOSITORY" -n ontario-498-strict-5km-clinical-source-crossaudit -D initial-498
+          gh run download 45424716313 -R "$GITHUB_REPOSITORY" -n ontario-498-independently-confirmed-original-google-clinical-offices -D initial-498
           for a in 1 2 3; do
             case "$a" in
               1) id=45421150683; kind='priority-ontario-google-source-*'; name=top30-incomplete-google-verified-sources; dest=first-plan;;
@@ -35,7 +35,7 @@ jobs:
             gh run download "$id" -R "$GITHUB_REPOSITORY" -n "$name" -D "$dest"
             gh run download "$id" -R "$GITHUB_REPOSITORY" -p "$kind" -D recovered-90
           done
-          test -s initial-498/Ontario_498_Strict_5km_Google_Clinical_Crossaudit.csv
+          test -s initial-498/Ontario_498_With_Independently_Corroborated_Clinic_Evidence.csv
       - name: Verify 90 distinct planned FSA locations and every recoverable source identity
         run: |
           python - <<'PY'
