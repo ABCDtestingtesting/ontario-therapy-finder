@@ -73,14 +73,23 @@ def run(out,baseline=ROOT/"candidates.csv",seed=ROOT/"directory_snapshot.csv",pr
         count=next(iter(distinct)) if len(distinct)==1 else historical[fsa]["displayed_count"]
         status="indexed_statistic_retrieved" if len(distinct)==1 else "conflicting_index_statistics_historical_fallback" if distinct else "historical_snapshot_only"
         score,bound=proxy(count,pop)
+        # Rounded PT directory labels are one-sided bounds, not comparable
+        # point estimates. Ranking them together would manufacture precision.
+        interval_min=0.0 if bound=="upper" else score
+        interval_max=score if bound=="upper" else None
         conflict_with_snapshot=bool(distinct and historical[fsa]["displayed_count"] not in distinct)
         # An index result has no guaranteed crawl date. Treat disagreement as
         # unresolved instead of silently replacing the earlier observation.
         rows.append(dict(fsa=fsa,population_2021=pop,directory_url=url(fsa),displayed_count=count,count_status=status,
             historical_displayed_count=historical[fsa]["displayed_count"],historical_capture_age=historical[fsa]["index_capture_age"],historical_review_date=historical[fsa]["review_date"],
-            retrieved_index_statistics="; ".join(f"{n}:{c}:{a or 'capture date unknown'}" for n,c,a in hits),screening_proxy_per_10000=round(score,4),bound=bound,index_disagrees_with_historical_snapshot=conflict_with_snapshot,exact_current_count_verified=False,**review_links(fsa)))
+            retrieved_index_statistics="; ".join(f"{n}:{c}:{a or 'capture date unknown'}" for n,c,a in hits),screening_proxy_per_10000=round(score,4),bound=bound,
+            possible_min_per_10000=round(interval_min,4),possible_max_per_10000=round(interval_max,4) if interval_max is not None else "",index_disagrees_with_historical_snapshot=conflict_with_snapshot,exact_current_count_verified=False,**review_links(fsa)))
     rows.sort(key=lambda r:(r["index_disagrees_with_historical_snapshot"],r["screening_proxy_per_10000"]))
-    for i,r in enumerate(rows,1):r["screening_order"]=i
+    # Display order is an exploratory heuristic only. Never claim exact rank.
+    for i,r in enumerate(rows,1):
+        r["screening_order"]=i
+        r["verified_competition_rank"]=""
+        r["screening_order_is_verified_rank"]=False
     with (out/"directory-screening.csv").open("w",newline="") as f:
         w=csv.DictWriter(f,fieldnames=list(rows[0]));w.writeheader();w.writerows(rows)
     return rows
