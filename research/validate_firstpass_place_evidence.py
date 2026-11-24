@@ -46,7 +46,10 @@ def parse_sources(source_root: Path, baseline_path: Path):
             if len(center) != 2 or max(abs(center[i]-expected[i]) for i in (0,1)) > 0.00001:
                 raise RuntimeError(f'Original Google FSA centre mismatch: {code}')
             query = f'psychotherapist near {code} Ontario Canada'
-            if record.get('search_query') != query:
+            if record.get('status') == 'incomplete':
+                if record.get('search_query') or record.get('locations') or record.get('local_count') not in (None, 0):
+                    raise RuntimeError(f'Incomplete Google source contains unverified results: {code}')
+            elif record.get('search_query') != query:
                 raise RuntimeError(f'Original Google search query mismatch: {code}')
             locations = record.get('locations') or []
             if not isinstance(locations, list):
