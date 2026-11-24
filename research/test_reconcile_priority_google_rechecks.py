@@ -76,6 +76,42 @@ class PriorityGoogleRecoveryReconciliationTests(unittest.TestCase):
         self.assertEqual(result['clinically_complete_eligible_sources'],0)
         self.assertEqual(result['unresolved_contenders'],498)
 
+    def test_true_zero_density_equal_cutoff_can_be_rank_dominated_by_population(self):
+        # 60 clinically complete sources with higher local populations rank
+        # above every unresolved source whose observed lower bound is zero.
+        with self.source.open(newline='') as fh:
+            rows=list(csv.DictReader(fh))
+        for row in rows:
+            if row['fsa'] in self.codes[:60]:
+                row['merged_google_observation_source_complete']='True'
+                row['population_within_5km_2021_estimate']='20000'
+        with self.source.open('w',newline='') as fh:
+            wr=csv.DictWriter(fh,fieldnames=list(rows[0]))
+            wr.writeheader();wr.writerows(rows)
+        # Must still retain a real source checkpoint in this merge.
+        self.save(self.document(unknown=True))
+        result=merge(self.source,self.maps,self.out)
+        self.assertEqual(result['clinically_complete_eligible_sources'],60)
+        self.assertEqual(result['unresolved_contenders'],0)
+        self.assertTrue(result['observed_google_source_model_60_verified'])
+        self.assertTrue((self.out/'Ontario_60_Certified_Within_Observed_Google_Model.csv').exists())
+
+    def test_zero_density_tie_with_larger_unverified_population_remains_contender(self):
+        with self.source.open(newline='') as fh:
+            rows=list(csv.DictReader(fh))
+        for row in rows:
+            if row['fsa'] in self.codes[:60]:
+                row['merged_google_observation_source_complete']='True'
+            elif row['fsa']==self.codes[60]:
+                row['population_within_5km_2021_estimate']='50000'
+        with self.source.open('w',newline='') as fh:
+            wr=csv.DictWriter(fh,fieldnames=list(rows[0]))
+            wr.writeheader();wr.writerows(rows)
+        self.save(self.document(unknown=True))
+        result=merge(self.source,self.maps,self.out)
+        self.assertGreater(result['unresolved_contenders'],0)
+        self.assertFalse(result['observed_google_source_model_60_verified'])
+
     def test_remote_google_business_not_counted_in_local_fsa(self):
         self.save(self.document(remote=True))
         with self.assertRaisesRegex(RuntimeError,'outside five-kilometre'):
