@@ -4,6 +4,8 @@ on:
     branches: [ontario-401-fsa-live-ranking-20261121]
     paths:
       - '.github/workflows/ontario-reshuffled-top60-category-research.yml'
+      - 'research/prepare_google_title_uncertainties.py'
+      - 'research/test_prepare_rolling_categories.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,6 +23,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Verify rolling Google category source identity and retry behavior
+        run: |
+          python -m compileall -q research/prepare_google_title_uncertainties.py
+          python -m unittest research.test_prepare_rolling_categories -v
       - name: Recover all original Google businesses, freshly ranked 60 FSAs and 60 previously reviewed business checkpoints
         run: |
           set -euo pipefail
