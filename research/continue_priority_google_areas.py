@@ -33,10 +33,10 @@ def find_seed(code:str,archive:Path):
         raise RuntimeError('Duplicate historical place IDs '+code)
     return paths[0]
 
-def run(audit:Path,archive:Path,shard:int,shards:int,cohort:int,out:Path,seconds:int):
-    if not 0<=shard<shards or not 1<=cohort<=498 or not 90<=seconds<=1500:
+def run(audit:Path,archive:Path,shard:int,shards:int,cohort:int,out:Path,seconds:int,offset:int=0):
+    if not 0<=shard<shards or not 1<=cohort<=498 or offset<0 or offset+cohort>498 or not 90<=seconds<=1500:
         raise RuntimeError('Invalid bounded Google source batch')
-    rank=load_plan(audit,cohort)
+    rank=load_plan(audit,cohort+offset)[offset:]
     selected=[r for i,r in enumerate(rank) if i%shards==shard]
     area_doc=json.loads(Path('research/ontario_all_populated_fsa_2021.json').read_text())
     areas={r['fsa']:r for r in area_doc['areas']}
@@ -112,7 +112,8 @@ if __name__=='__main__':
     p.add_argument('--shard',type=int,required=True)
     p.add_argument('--shards',type=int,default=15)
     p.add_argument('--cohort',type=int,default=90)
+    p.add_argument('--offset',type=int,default=0)
     p.add_argument('--seconds',type=int,default=360)
     p.add_argument('--out',type=Path,required=True)
     a=p.parse_args()
-    run(a.audit,a.seeds,a.shard,a.shards,a.cohort,a.out,a.seconds)
+    run(a.audit,a.seeds,a.shard,a.shards,a.cohort,a.out,a.seconds,a.offset)
