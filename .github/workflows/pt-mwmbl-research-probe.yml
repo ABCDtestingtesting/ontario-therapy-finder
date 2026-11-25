@@ -1,0 +1,47 @@
+name: PT Mwmbl anonymous research source probe
+on:
+  push:
+    paths:
+      - '.github/workflows/pt-mwmbl-research-probe.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Evaluate anonymous research API on missing-area and control searches
+        run: |
+          python - <<'PY'
+          import json, time, datetime, urllib.request, urllib.parse, urllib.error, re
+          queries=[("control","open source search engine"),("P6C","Psychology Today P6C Sault Ste Marie therapist"),("P6C","psychologytoday.com Sault Ste Marie counselling"),("L3S","Psychology Today L3S Markham therapist")]
+          rows=[]
+          for f,q in queries:
+              row={"area":f,"query":q,"observed_at":datetime.datetime.now(datetime.timezone.utc).isoformat()}
+              stop=False
+              try:
+                  u="https://api.mwmbl.org/api/v2/search/?"+urllib.parse.urlencode({"q":q})
+                  with urllib.request.urlopen(u,timeout=20) as r:
+                      data=json.load(r)
+                      row["status"]=r.status
+                  records=data if isinstance(data,list) else data.get("results",[])
+                  row["result_count"]=len(records)
+                  row["pt_profile_count"]=sum(bool(re.search(r'https://(?:www\.)?psychologytoday\.com/ca/therapists/[^/\s]+/\d{4,12}',str(x))) for x in records)
+              except urllib.error.HTTPError as e:
+                  row.update(status=e.code,error=str(e))
+                  stop=e.code in (401,403,429)
+              except Exception as e:
+                  row.update(status="error",error=str(e)[:200])
+              rows.append(row)
+              print(json.dumps(row),flush=True)
+              if stop:break
+              time.sleep(1.2)
+          with open("mwmbl-probe.json","w") as f:json.dump({"source":"Mwmbl","licence":"CC BY-NC-SA 4.0 for results; source-attributed research only","observations":rows},f,indent=2)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mwmbl-research-probe
+          path: mwmbl-probe.json
