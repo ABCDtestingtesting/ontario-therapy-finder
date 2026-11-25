@@ -14,47 +14,23 @@ def write(path,body):
 def read(path,default):
     try:return json.loads(path.read_text())
     except (OSError,ValueError):return default
-def browser():
-    py=ROOT/".venv/bin/python"
-    if not py.exists():subprocess.run([sys.executable,"-m","venv",str(ROOT/".venv")],check=True)
+def browser_python():
+    return ROOT/".venv/bin/python"
+def prepare_browser():
+    py=browser_python()
+    if not py.exists():subprocess.run([sys.executable,"-m","venv",str(ROOT/".venv")],check=True,timeout=90)
     if subprocess.run([str(py),"-c","import playwright"]).returncode:
-        subprocess.run([str(py),"-m","pip","install","playwright"],check=True)
+        subprocess.run([str(py),"-m","pip","install","playwright"],check=True,timeout=120)
     probe="from pathlib import Path;from playwright.sync_api import sync_playwright\nwith sync_playwright() as p: assert Path(p.firefox.executable_path).exists()"
-    if subprocess.run([str(py),"-c",probe]).returncode:subprocess.run([str(py),"-m","playwright","install","firefox"],check=True)
-    return subprocess.call([str(py),"-u",str(ROOT/"decision_live_check.py")])
+    if subprocess.run([str(py),"-c",probe]).returncode:subprocess.run([str(py),"-m","playwright","install","firefox"],check=True,timeout=180)
+    return py
+def browser():
+    return subprocess.call([str(browser_python()),"-u",str(ROOT/"decision_live_check.py")])
 def index():
     from keyless_probe import survey
     return survey(output=Path("index-evidence.json"),baseline=ROOT/"candidates.csv",resume=False)
 def named():
-    from metasearch_audit import run
-    base="http://127.0.0.1:8888";folder=Path("named-engines");folder.mkdir(exist_ok=True)
-    def ready():
-        try:
-            with urlopen(base+"/healthz",timeout=2) as r:return r.status==200
-        except Exception:return False
-    owned=None
-    try:
-        if not ready() and shutil.which("docker"):
-            try:
-                if subprocess.run(["docker","info"],capture_output=True,timeout=10).returncode==0:
-                    owned="pt-weekly-"+secrets.token_hex(5)
-                    (folder/"owned-container.txt").write_text(owned)
-                    config=folder/"settings.yml"
-                    config.write_text('use_default_settings: true\nserver:\n  secret_key: "'+secrets.token_hex(24)+'"\n  limiter: false\n  image_proxy: false\nsearch:\n  formats: [html, json]\n')
-                    subprocess.run(["docker","run","-d","--rm","--name",owned,"-p","127.0.0.1:8888:8080","-v",str(config.resolve())+":/etc/searxng/settings.yml:ro","docker.io/searxng/searxng:latest"],check=True,timeout=180)
-                    for _ in range(30):
-                        if ready():break
-                        time.sleep(2)
-            except (OSError,subprocess.SubprocessError):pass
-        if not ready():
-            write(folder/"engine-coverage.json",{"all_engines_verified":False,"status":"No local metasearch server","coverage":{}})
-            return 3
-        report=run(base,folder)
-        return 0 if report["all_engines_verified"] else 3
-    finally:
-        if owned:
-            try:subprocess.run(["docker","stop","-t","1",owned],capture_output=True,timeout=10)
-            except (OSError,subprocess.SubprocessError):pass
+    return subprocess.call([str(browser_python()),"-u",str(ROOT/"browser_engine_search.py"),"--out","named-engines"])
 def finalize(out,elapsed,workers):
     with (ROOT/"candidates.csv").open() as f:areas=list(csv.DictReader(f))
     assert len(areas)==len({a["fsa"] for a in areas})==60
@@ -117,6 +93,7 @@ def main():
         print("Results:",out,flush=True)
         children={};logs=[];status={}
         try:
+            prepare_browser()
             for name in ("browser","index","named"):
                 log=(out/(name+".log")).open("w");logs.append(log)
                 children[name]=subprocess.Popen([sys.executable,"-u",str(ROOT/"integrated_run.py"),"--worker",name],cwd=out,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)

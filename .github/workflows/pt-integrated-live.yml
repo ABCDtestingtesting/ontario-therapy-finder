@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'pt-weekly-mac/integrated_run.py'
+      - 'pt-weekly-mac/browser_engine_search.py'
       - 'pt-weekly-mac/Run-integrated.command'
       - 'pt-weekly-mac/test_integrated.py'
       - '.github/workflows/pt-integrated-live.yml'
@@ -21,7 +22,7 @@ jobs:
       - name: Package exact application
         run: |
           mkdir "$RUNNER_TEMP/package"
-          cp pt-weekly-mac/{Run-integrated.command,integrated_run.py,decision_live_check.py,keyless_probe.py,metasearch_audit.py,directory_index.py,release_gate.py,candidates.csv,directory_snapshot.csv,test_integrated.py} "$RUNNER_TEMP/package/"
+          cp pt-weekly-mac/{Run-integrated.command,integrated_run.py,browser_engine_search.py,decision_live_check.py,keyless_probe.py,metasearch_audit.py,directory_index.py,release_gate.py,candidates.csv,directory_snapshot.csv,test_integrated.py} "$RUNNER_TEMP/package/"
           cd "$RUNNER_TEMP/package"
           mv Run-integrated.command Run.command
           chmod +x Run.command

@@ -1,0 +1,26 @@
+name: PT browser search provider smoke test
+on:
+  push:
+    paths:
+      - 'pt-weekly-mac/browser_engine_search.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: macos-15
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install playwright
+          python -m playwright install firefox
+      - run: python -u pt-weekly-mac/browser_engine_search.py --limit 2 --out smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-engine-smoke
+          path: smoke
