@@ -1,0 +1,60 @@
+name: PT integrated Mac browser application live acceptance
+on:
+  push:
+    paths:
+      - 'pt-weekly-mac/integrated_run.py'
+      - 'pt-weekly-mac/Run-integrated.command'
+      - 'pt-weekly-mac/test_integrated.py'
+      - '.github/workflows/pt-integrated-live.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  live:
+    runs-on: macos-15
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Package exact application
+        run: |
+          mkdir "$RUNNER_TEMP/package"
+          cp pt-weekly-mac/{Run-integrated.command,integrated_run.py,decision_live_check.py,keyless_probe.py,metasearch_audit.py,directory_index.py,release_gate.py,candidates.csv,directory_snapshot.csv,test_integrated.py} "$RUNNER_TEMP/package/"
+          cd "$RUNNER_TEMP/package"
+          mv Run-integrated.command Run.command
+          chmod +x Run.command
+          zip -9 "$RUNNER_TEMP/PT-Weekly-Integrated.zip" *
+      - name: Extract and validate exact release ZIP
+        run: |
+          mkdir "$RUNNER_TEMP/release"
+          cd "$RUNNER_TEMP/release"
+          unzip "$RUNNER_TEMP/PT-Weekly-Integrated.zip"
+          bash -n Run.command
+          python -m unittest -v test_integrated.py
+      - name: Run actual application, including initial setup and concurrent live workers
+        run: |
+          cd "$RUNNER_TEMP/release"
+          PT_RESULTS_HOME="$GITHUB_WORKSPACE/live-integrated" ./Run.command
+      - name: Preserve measured outcomes even if any source failed
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PT-integrated-live-evidence
+          path: |
+            live-integrated/**/run-status.json
+            live-integrated/**/weekly-ranking.csv
+            live-integrated/**/decision-live-evidence/status.json
+            live-integrated/**/decision-live-evidence/pages.json
+            live-integrated/**/decision-live-evidence/areas.csv
+            live-integrated/**/index-evidence.json
+            live-integrated/**/named-engines/engine-coverage.json
+            live-integrated/**/named-engines/engine-evidence.json
+            live-integrated/**/*.log
+      - name: Preserve exact tested ZIP
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PT-Weekly-Integrated-package
+          path: ${{ runner.temp }}/PT-Weekly-Integrated.zip
