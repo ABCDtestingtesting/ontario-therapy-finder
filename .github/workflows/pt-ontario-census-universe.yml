@@ -28,10 +28,9 @@ jobs:
               geo=row["GEO"].strip()
               m=re.fullmatch(r"([KLMNP]\d[A-Z])(?:\s*\([^)]*\))?",geo)
               if not m:continue
-              metric=next((v for k,v in row.items() if "Population and dwelling counts" in k),"")
-              if metric.strip().lower()!="population, 2021":continue
-              if not row["VALUE"]:continue
-              value=int(float(row["VALUE"]))
+              key=next(k for k in row if ":Population, 2021" in k)
+              if not row[key].strip().isdigit():continue
+              value=int(row[key])
               if value<=0:continue
               f=m.group(1)
               assert f not in out or out[f]==value
