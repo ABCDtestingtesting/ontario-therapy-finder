@@ -1,0 +1,50 @@
+name: PT official census universe
+on:
+  push:
+    paths:
+      - '.github/workflows/pt-ontario-census-universe.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  census:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Download Statistics Canada table 98-10-0019-01
+        run: |
+          curl --fail --location --max-time 60 -o census.zip https://www150.statcan.gc.ca/n1/tbl/csv/98100019-eng.zip
+          python - <<'PY'
+          import csv,zipfile,re,io,json,hashlib
+          from pathlib import Path
+          b=Path("census.zip").read_bytes()
+          z=zipfile.ZipFile(io.BytesIO(b))
+          names=[n for n in z.namelist() if n.endswith(".csv") and "MetaData" not in n]
+          assert len(names)==1,names
+          rows=list(csv.DictReader(io.TextIOWrapper(z.open(names[0]),encoding="utf-8-sig")))
+          print("Columns:",list(rows[0]),"Sample:",rows[:2])
+          out={}
+          for row in rows:
+              geo=row["GEO"].strip()
+              m=re.fullmatch(r"([KLMNP]\d[A-Z])(?:\s*\([^)]*\))?",geo)
+              if not m:continue
+              metric=next((v for k,v in row.items() if "Population and dwelling counts" in k),"")
+              if metric.strip().lower()!="population, 2021":continue
+              if not row["VALUE"]:continue
+              value=int(float(row["VALUE"]))
+              if value<=0:continue
+              f=m.group(1)
+              assert f not in out or out[f]==value
+              out[f]=value
+          assert len(out)>450,(len(out),list(out)[:10])
+          with open("ontario-fsa-population.csv","w") as f:
+              w=csv.writer(f);w.writerow(["fsa","population"]);w.writerows(sorted(out.items()))
+          print("Ontario populated FSAs:",len(out),"population:",sum(out.values()))
+          Path("provenance.json").write_text(json.dumps({"source":"https://www150.statcan.gc.ca/n1/tbl/csv/98100019-eng.zip","sha256":hashlib.sha256(b).hexdigest(),"areas":len(out),"year":2021},indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ontario-fsa-census
+          path: |
+            ontario-fsa-population.csv
+            provenance.json
